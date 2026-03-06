@@ -1,0 +1,53 @@
+services:
+  # FastAPI Backend
+  - type: web
+    name: afrizone-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    rootDir: backend
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: afrizone-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+
+  # Next.js Frontend
+  - type: web
+    name: afrizone-frontend
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    rootDir: frontend
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: afrizone-api
+          type: web
+          property: host
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        sync: false
+
+databases:
+  - name: afrizone-db
+    databaseName: afrizone
+    user: afrizone_user
+    plan: starter  # $7/month - upgrade as you grow

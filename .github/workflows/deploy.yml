@@ -1,0 +1,49 @@
+name: Afrizone CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+      - name: Test backend starts
+        run: |
+          cd backend
+          echo "DATABASE_URL=sqlite:///./test.db" > .env
+          echo "SECRET_KEY=testkey123" >> .env
+          echo "ALGORITHM=HS256" >> .env
+          echo "STRIPE_SECRET_KEY=sk_test_placeholder" >> .env
+          echo "CLOUDINARY_CLOUD_NAME=placeholder" >> .env
+          echo "CLOUDINARY_API_KEY=placeholder" >> .env
+          echo "CLOUDINARY_API_SECRET=placeholder" >> .env
+          echo "SENDGRID_API_KEY=placeholder" >> .env
+          python -c "from main import app; print('Backend OK')"
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+      - name: Install and build
+        run: |
+          cd frontend
+          npm install
+          echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
+          echo "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_placeholder" >> .env.local
+          npm run build

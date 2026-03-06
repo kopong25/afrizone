@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --green: #1A5C38;
+  --gold: #D4A017;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: #f9fafb;
+  color: #111827;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: var(--green); border-radius: 3px; }
+
+/* Afrizone button styles */
+.btn-primary {
+  @apply bg-green-900 hover:bg-green-800 text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-200;
+}
+
+.btn-secondary {
+  @apply border-2 border-green-900 text-green-900 hover:bg-green-900 hover:text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-200;
+}
+
+.btn-gold {
+  @apply bg-gold-500 hover:bg-gold-400 text-green-900 font-bold py-2 px-6 rounded-lg transition-colors duration-200;
+}
+
+/* Card hover effect */
+.product-card {
+  @apply bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden;
+}
+
+/* Star rating */
+.star-filled { color: #D4A017; }
+.star-empty { color: #d1d5db; }
+
+/* Badge */
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
