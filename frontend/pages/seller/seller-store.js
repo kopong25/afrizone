@@ -7,7 +7,7 @@ import { storesAPI } from "../../lib/api";
 import { useAuth } from "../_app";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { FiSave, FiArrowLeft, FiStore } from "react-icons/fi";
+import { FiSave, FiArrowLeft, FiShoppingBag } from "react-icons/fi";
 
 const COUNTRIES = ["USA", "Canada", "UK", "Germany", "France", "Netherlands", "Belgium", "Sweden", "Other"];
 const BUSINESS_TYPES = ["Food & Groceries", "Fashion & Clothing", "Beauty & Hair", "Arts & Crafts", "Electronics", "Books & Media", "Health & Wellness", "Home & Living", "Other"];
@@ -104,7 +104,7 @@ export default function StoreSettings() {
         {/* Store Images */}
         <div className="bg-white rounded-2xl border shadow-sm p-6 mb-6">
           <h2 className="font-bold text-gray-900 mb-5 flex items-center gap-2">
-            <FiStore size={18} /> Store Images
+            <FiShoppingBag size={18} /> Store Images
           </h2>
 
           <div className="mb-5">
