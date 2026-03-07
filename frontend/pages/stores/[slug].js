@@ -16,13 +16,16 @@ export default function StorePage() {
 
   useEffect(() => {
     if (!slug) return;
-    Promise.all([
-      storesAPI.get(slug),
-      storesAPI.getProducts(slug),
-    ]).then(([storeRes, productsRes]) => {
-      setStore(storeRes.data);
-      setProducts(productsRes.data?.items || productsRes.data || []);
-    }).catch(() => router.push("/stores"))
+    storesAPI.get(slug)
+      .then((storeRes) => {
+        const s = storeRes.data;
+        setStore(s);
+        return storesAPI.getProducts(s.id);
+      })
+      .then((productsRes) => {
+        setProducts(productsRes.data?.items || productsRes.data || []);
+      })
+      .catch(() => router.push("/stores"))
       .finally(() => setLoading(false));
   }, [slug]);
 
