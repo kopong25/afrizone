@@ -1,91 +1,61 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import List
-from database import get_db
-import models, schemas, auth as auth_utils
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { StarDisplay } from "./StarRating";
 
-router = APIRouter()
+const MAX_ITEMS = 5;
+const STORAGE_KEY = "afrizone_recently_viewed";
 
+export function trackProductView(product) {
+  if (typeof window === "undefined") return;
+  try {
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    const filtered = stored.filter((p) => p.id !== product.id);
+    const updated = [{ id: product.id, name: product.name, slug: product.slug, price: product.price, images: product.images, avg_rating: product.avg_rating, store: product.store }, ...filtered].slice(0, MAX_ITEMS);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  } catch {}
+}
 
-@router.get("/product/{product_id}", response_model=List[schemas.ReviewOut])
-def get_product_reviews(product_id: int, db: Session = Depends(get_db)):
-    return db.query(models.Review).filter(
-        models.Review.product_id == product_id
-    ).order_by(models.Review.created_at.desc()).all()
+export function getRecentlyViewed() {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  } catch { return []; }
+}
 
+export default function RecentlyViewed({ currentProductId }) {
+  const [items, setItems] = useState([]);
 
-@router.post("/", response_model=schemas.ReviewOut, status_code=201)
-def create_review(
-    review_in: schemas.ReviewCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.get_current_user)
-):
-    """Submit a product review. User must have purchased the product."""
-    product = db.query(models.Product).filter(models.Product.id == review_in.product_id).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
+  useEffect(() => {
+    const all = getRecentlyViewed();
+    setItems(all.filter((p) => p.id !== currentProductId));
+  }, [currentProductId]);
 
-    # Check for duplicate review
-    existing = db.query(models.Review).filter(
-        models.Review.user_id == current_user.id,
-        models.Review.product_id == review_in.product_id
-    ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="You have already reviewed this product")
+  if (items.length === 0) return null;
 
-    # Check if verified purchase
-    purchased = db.query(models.OrderItem).join(models.Order).filter(
-        models.Order.buyer_id == current_user.id,
-        models.OrderItem.product_id == review_in.product_id,
-        models.Order.status == models.OrderStatus.delivered
-    ).first()
-
-    review = models.Review(
-        user_id=current_user.id,
-        is_verified_purchase=bool(purchased),
-        **review_in.model_dump()
-    )
-    db.add(review)
-    db.flush()
-
-    # Recalculate product avg rating
-    all_reviews = db.query(models.Review).filter(models.Review.product_id == product.id).all()
-    product.avg_rating = round(sum(r.rating for r in all_reviews) / len(all_reviews), 2)
-    product.review_count = len(all_reviews)
-
-    db.commit()
-    db.refresh(review)
-    return review
-
-
-@router.delete("/{review_id}", status_code=204)
-def delete_review(
-    review_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.get_current_user)
-):
-    review = db.query(models.Review).filter(models.Review.id == review_id).first()
-    if not review:
-        raise HTTPException(status_code=404, detail="Review not found")
-    if review.user_id != current_user.id and current_user.role != models.UserRole.admin:
-        raise HTTPException(status_code=403, detail="Access denied")
-    db.delete(review)
-    db.commit()
-
-
-@router.get("/store/{store_id}", response_model=List[schemas.ReviewOut])
-def get_store_reviews(store_id: int, db: Session = Depends(get_db)):
-    """Get all reviews for a store's products."""
-    return db.query(models.Review).join(models.Product).filter(
-        models.Product.store_id == store_id
-    ).order_by(models.Review.created_at.desc()).limit(20).all()
-
-
-@router.post("/{review_id}/helpful")
-def mark_helpful(review_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth_utils.get_current_user)):
-    review = db.query(models.Review).filter(models.Review.id == review_id).first()
-    if not review:
-        raise HTTPException(status_code=404, detail="Review not found")
-    review.helpful_count = (review.helpful_count or 0) + 1
-    db.commit()
-    return {"helpful_count": review.helpful_count}
+  return (
+    <div className="mt-12 border-t pt-10">
+      <h2 className="text-xl font-black text-gray-900 mb-5">🕐 Recently Viewed</h2>
+      <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+        {items.map((product) => (
+          <Link key={product.id} href={`/products/${product.slug}`}
+            className="flex-shrink-0 w-44 bg-white rounded-xl border hover:shadow-md transition-shadow group">
+            <div className="aspect-square bg-gray-100 rounded-t-xl overflow-hidden">
+              {product.images?.[0]
+                ? <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                : <div className="w-full h-full flex items-center justify-center text-4xl">🛒</div>
+              }
+            </div>
+            <div className="p-3">
+              <p className="text-xs text-gray-400 truncate mb-0.5">{product.store?.name}</p>
+              <p className="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug">{product.name}</p>
+              <div className="flex items-center justify-between mt-1.5">
+                <span className="text-sm font-black text-green-900">${Number(product.price).toFixed(2)}</span>
+                {product.avg_rating > 0 && <StarDisplay rating={product.avg_rating} size={10} />}
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
