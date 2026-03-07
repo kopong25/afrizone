@@ -34,7 +34,7 @@ function OrderTracker({ status }) {
         const active = i === currentStep;
         return (
           <div key={step} className="flex items-center flex-1">
-            <div className={`flex flex-col items-center flex-1`}>
+            <div className="flex flex-col items-center flex-1">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                 done ? "bg-green-900 text-white" : "bg-gray-200 text-gray-400"
               } ${active ? "ring-2 ring-green-900 ring-offset-2" : ""}`}>
@@ -61,7 +61,6 @@ function OrderCard({ order }) {
 
   return (
     <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-      {/* Header */}
       <div className="p-4 flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
@@ -76,7 +75,7 @@ function OrderCard({ order }) {
           </p>
         </div>
         <div className="text-right">
-          <p className="font-bold text-green-900 text-lg">${order.total.toFixed(2)}</p>
+          <p className="font-bold text-green-900 text-lg">${Number(order.total || 0).toFixed(2)}</p>
           <button onClick={() => setExpanded(!expanded)}
             className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 mt-1 ml-auto">
             {expanded ? <><FiChevronUp size={12} /> Less</> : <><FiChevronDown size={12} /> Details</>}
@@ -84,12 +83,10 @@ function OrderCard({ order }) {
         </div>
       </div>
 
-      {/* Tracking bar */}
       <div className="px-4 pb-4">
         <OrderTracker status={order.status} />
       </div>
 
-      {/* Tracking number */}
       {order.tracking_number && (
         <div className="px-4 pb-3">
           <div className="bg-blue-50 rounded-lg p-3 flex items-center justify-between">
@@ -107,14 +104,13 @@ function OrderCard({ order }) {
         </div>
       )}
 
-      {/* Expanded details */}
       {expanded && (
         <div className="border-t bg-gray-50 p-4">
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <p className="text-xs font-bold text-gray-500 uppercase mb-2">Items</p>
               <div className="space-y-2">
-                {order.items?.map((item) => (
+                {(order.items || []).map((item) => (
                   <div key={item.id} className="flex gap-3">
                     <div className="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
                       {item.product?.images?.[0]
@@ -123,8 +119,8 @@ function OrderCard({ order }) {
                       }
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-800">{item.product?.name}</p>
-                      <p className="text-xs text-gray-500">Qty: {item.quantity} · ${item.unit_price.toFixed(2)} each</p>
+                      <p className="text-sm font-medium text-gray-800">{item.product?.name || "Product"}</p>
+                      <p className="text-xs text-gray-500">Qty: {item.quantity} · ${Number(item.unit_price || 0).toFixed(2)} each</p>
                     </div>
                   </div>
                 ))}
@@ -140,16 +136,15 @@ function OrderCard({ order }) {
                   <p>{order.shipping_country}</p>
                 </div>
               ) : <p className="text-sm text-gray-400">No shipping address provided</p>}
-
               <div className="mt-3 pt-3 border-t space-y-1">
                 <div className="flex justify-between text-xs text-gray-500">
-                  <span>Subtotal</span><span>${order.subtotal.toFixed(2)}</span>
+                  <span>Subtotal</span><span>${Number(order.subtotal || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-xs text-gray-500">
-                  <span>Shipping</span><span>${order.shipping_cost.toFixed(2)}</span>
+                  <span>Shipping</span><span>${Number(order.shipping_cost || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-bold text-gray-800">
-                  <span>Total</span><span>${order.total.toFixed(2)}</span>
+                  <span>Total</span><span>${Number(order.total || 0).toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -169,10 +164,20 @@ export default function OrdersPage() {
 
   useEffect(() => {
     if (!user) { router.push("/login"); return; }
-    ordersAPI.myOrders().then((r) => setOrders(r.data)).catch(() => toast.error("Failed to load orders")).finally(() => setLoading(false));
+    ordersAPI.myOrders()
+      .then((r) => {
+        const data = r.data;
+        if (Array.isArray(data)) setOrders(data);
+        else if (Array.isArray(data?.items)) setOrders(data.items);
+        else setOrders([]);
+      })
+      .catch(() => { toast.error("Failed to load orders"); setOrders([]); })
+      .finally(() => setLoading(false));
   }, [user]);
 
-  const filtered = filter === "all" ? orders : orders.filter((o) => o.status === filter);
+  const filtered = Array.isArray(orders)
+    ? (filter === "all" ? orders : orders.filter((o) => o.status === filter))
+    : [];
 
   return (
     <>
@@ -183,7 +188,6 @@ export default function OrdersPage() {
           <Link href="/" className="btn-secondary py-2 px-4 text-sm">Continue Shopping</Link>
         </div>
 
-        {/* Filter tabs */}
         <div className="flex gap-2 overflow-x-auto mb-6" style={{ scrollbarWidth: "none" }}>
           {["all", "pending", "paid", "processing", "shipped", "delivered", "cancelled"].map((s) => (
             <button key={s} onClick={() => setFilter(s)}
