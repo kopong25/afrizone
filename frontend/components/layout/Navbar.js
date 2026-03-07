@@ -131,6 +131,10 @@ export default function Navbar() {
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
                         <FiShoppingCart size={15} /> Cart {cartCount > 0 && <span className="ml-auto bg-yellow-400 text-green-900 text-xs font-bold px-1.5 rounded-full">{cartCount}</span>}
                       </Link>
+                      <Link href="/wishlist" onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+                        ❤️ Wishlist
+                      </Link>
                       {(user.role === "seller" || user.role === "admin") && (
                         <Link href="/seller/dashboard" onClick={() => setUserMenuOpen(false)}
                           className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">

@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
-import { ordersAPI, paymentsAPI } from "../lib/api";
+import { ordersAPI, paymentsAPI, discountsAPI } from "../lib/api";
 import { useAuth } from "./_app";
 import toast from "react-hot-toast";
 import { FiTrash2, FiMinus, FiPlus, FiShoppingCart, FiArrowRight, FiLock } from "react-icons/fi";
@@ -14,6 +14,9 @@ export default function CartPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
+  const [discountCode, setDiscountCode] = useState("");
+  const [discount, setDiscount] = useState(null);
+  const [applyingCode, setApplyingCode] = useState(false);
   const [step, setStep] = useState("cart"); // cart | shipping | confirm
   const [shipping, setShipping] = useState({
     name: user?.full_name || "",
@@ -47,9 +50,9 @@ export default function CartPage() {
   };
 
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const platformFee = subtotal * 0.08;
   const shipping_cost = subtotal > 50 ? 0 : 5.99;
-  const total = subtotal + shipping_cost;
+  const discountAmount = discount?.discount_amount || 0;
+  const total = subtotal + shipping_cost - discountAmount;
 
   // Group items by store
   const byStore = items.reduce((acc, item) => {
@@ -58,6 +61,19 @@ export default function CartPage() {
     acc[storeId].items.push(item);
     return acc;
   }, {});
+
+  const applyDiscount = async () => {
+    if (!discountCode.trim()) return;
+    setApplyingCode(true);
+    try {
+      const res = await discountsAPI.apply(discountCode, subtotal);
+      setDiscount(res.data);
+      toast.success(`✅ Code applied! You save $${res.data.discount_amount.toFixed(2)}`);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Invalid code");
+      setDiscount(null);
+    } finally { setApplyingCode(false); }
+  };
 
   const handleCheckout = async () => {
     if (items.length === 0) return;
@@ -259,6 +275,33 @@ export default function CartPage() {
                   </div>
                   {shipping_cost > 0 && (
                     <p className="text-xs text-green-600">Add ${(50 - subtotal).toFixed(2)} more for free shipping!</p>
+                  )}
+                  {/* Discount code input */}
+                  <div className="pt-2">
+                    {discount ? (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-2.5 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-green-800">{discount.code} applied!</p>
+                          <p className="text-xs text-green-600">-${discountAmount.toFixed(2)} off</p>
+                        </div>
+                        <button onClick={() => { setDiscount(null); setDiscountCode(""); }} className="text-xs text-red-400 hover:text-red-600">Remove</button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input value={discountCode} onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+                          placeholder="Discount code"
+                          className="flex-1 border rounded-lg px-3 py-2 text-xs font-mono uppercase focus:outline-none focus:ring-2 focus:ring-green-900" />
+                        <button onClick={applyDiscount} disabled={applyingCode || !discountCode}
+                          className="bg-green-900 text-white text-xs px-3 py-2 rounded-lg hover:bg-green-800 disabled:opacity-50">
+                          {applyingCode ? "..." : "Apply"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-green-600 font-medium text-sm">
+                      <span>Discount</span><span>-${discountAmount.toFixed(2)}</span>
+                    </div>
                   )}
                   <div className="border-t pt-3 flex justify-between font-bold text-base">
                     <span>Total</span>

@@ -288,6 +288,8 @@ class ReviewOut(BaseModel):
     title: Optional[str]
     body: Optional[str]
     is_verified_purchase: bool
+    photos: Optional[List[str]] = []
+    helpful_count: Optional[int] = 0
     user: UserOut
     created_at: datetime
 
@@ -355,3 +357,68 @@ class PlatformStats(BaseModel):
     total_orders: int
     total_revenue: float
     pending_sellers: int
+
+
+# ─────────────────────────────────────────────
+# WISHLIST
+# ─────────────────────────────────────────────
+
+class WishlistItemOut(BaseModel):
+    id: int
+    product: "ProductListOut"
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+# ─────────────────────────────────────────────
+# DISCOUNT CODES
+# ─────────────────────────────────────────────
+
+class DiscountCodeCreate(BaseModel):
+    code: str
+    description: Optional[str] = None
+    discount_type: str = "percent"
+    discount_value: float
+    min_order_amount: float = 0.0
+    max_uses: Optional[int] = None
+    expires_at: Optional[datetime] = None
+
+class DiscountCodeOut(BaseModel):
+    id: int
+    code: str
+    description: Optional[str]
+    discount_type: str
+    discount_value: float
+    min_order_amount: float
+    max_uses: Optional[int]
+    uses_count: int
+    is_active: bool
+    expires_at: Optional[datetime]
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+class ApplyDiscountRequest(BaseModel):
+    code: str
+    subtotal: float
+
+
+# ─────────────────────────────────────────────
+# PRODUCT VARIANTS
+# ─────────────────────────────────────────────
+
+class VariantCreate(BaseModel):
+    name: str
+    value: str
+    price_modifier: float = 0.0
+    stock: int = 0
+    sku: Optional[str] = None
+
+class VariantOut(BaseModel):
+    id: int
+    name: str
+    value: str
+    price_modifier: float
+    stock: int
+    sku: Optional[str]
+    is_active: bool
+    model_config = {"from_attributes": True}

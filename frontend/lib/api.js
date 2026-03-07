@@ -111,3 +111,25 @@ export const adminAPI = {
 };
 
 export default api;
+
+// ── Wishlist ──
+export const wishlistAPI = {
+  get: () => api.get("/wishlist/"),
+  getIds: () => api.get("/wishlist/ids"),
+  toggle: (productId) => api.post(`/wishlist/${productId}`),
+};
+
+// ── Discounts ──
+export const discountsAPI = {
+  apply: (code, subtotal) => api.post("/discounts/apply", { code, subtotal }),
+  myCodes: () => api.get("/discounts/seller"),
+  create: (data) => api.post("/discounts/seller", data),
+  delete: (id) => api.delete(`/discounts/seller/${id}`),
+};
+
+// ── Variants ──
+export const variantsAPI = {
+  getForProduct: (productId) => api.get(`/variants/product/${productId}`),
+  create: (productId, data) => api.post(`/variants/product/${productId}`, data),
+  delete: (id) => api.delete(`/variants/${id}`),
+};

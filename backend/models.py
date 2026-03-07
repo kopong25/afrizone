@@ -285,6 +285,8 @@ class Review(Base):
     title = Column(String, nullable=True)
     body = Column(Text, nullable=True)
     is_verified_purchase = Column(Boolean, default=False)
+    photos = Column(JSON, default=list)             # ["url1", "url2"]
+    helpful_count = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="reviews")
@@ -310,3 +312,68 @@ class Payout(Base):
 
     store = relationship("Store", back_populates="payouts")
     order = relationship("Order", back_populates="payout")
+
+
+# ─────────────────────────────────────────────
+# WISHLIST
+# ─────────────────────────────────────────────
+
+class WishlistItem(Base):
+    __tablename__ = "wishlist_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", backref="wishlist_items")
+    product = relationship("Product", backref="wishlisted_by")
+
+
+# ─────────────────────────────────────────────
+# DISCOUNT CODES
+# ─────────────────────────────────────────────
+
+class DiscountCode(Base):
+    __tablename__ = "discount_codes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
+    code = Column(String, unique=True, nullable=False, index=True)
+    description = Column(String, nullable=True)
+    discount_type = Column(String, default="percent")   # percent | fixed
+    discount_value = Column(Float, nullable=False)       # 10 = 10% or $10
+    min_order_amount = Column(Float, default=0.0)
+    max_uses = Column(Integer, nullable=True)            # None = unlimited
+    uses_count = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    store = relationship("Store", backref="discount_codes")
+
+
+# ─────────────────────────────────────────────
+# PRODUCT VARIANTS
+# ─────────────────────────────────────────────
+
+class ProductVariant(Base):
+    __tablename__ = "product_variants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    name = Column(String, nullable=False)       # e.g. "Size" or "Color"
+    value = Column(String, nullable=False)      # e.g. "Large" or "Red"
+    price_modifier = Column(Float, default=0.0) # +/- from base price
+    stock = Column(Integer, default=0)
+    sku = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+
+    product = relationship("Product", backref="variants")
+
+
+# ─────────────────────────────────────────────
+# REVIEW PHOTOS
+# ─────────────────────────────────────────────
+
+# Add photos column to Review — we'll handle via migration note
