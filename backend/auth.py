@@ -16,21 +16,19 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
-
 
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
-
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
+    # sub MUST be a string for JWT standard compliance
+    to_encode["sub"] = str(to_encode["sub"])
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
 
 def get_current_user(
     token: str = Depends(oauth2_scheme),
@@ -43,10 +41,11 @@ def get_current_user(
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("sub")
-        if user_id is None:
+        sub = payload.get("sub")
+        if sub is None:
             raise credentials_exception
-    except JWTError:
+        user_id = int(sub)  # convert string back to int
+    except (JWTError, ValueError):
         raise credentials_exception
 
     user = db.query(models.User).filter(models.User.id == user_id).first()
@@ -54,12 +53,10 @@ def get_current_user(
         raise credentials_exception
     return user
 
-
 def require_seller(current_user: models.User = Depends(get_current_user)) -> models.User:
     if current_user.role not in [models.UserRole.seller, models.UserRole.admin]:
         raise HTTPException(status_code=403, detail="Seller access required")
     return current_user
-
 
 def require_admin(current_user: models.User = Depends(get_current_user)) -> models.User:
     if current_user.role != models.UserRole.admin:
