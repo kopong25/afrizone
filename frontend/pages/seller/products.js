@@ -4,11 +4,11 @@ import Navbar from "../../components/layout/Navbar";
 import { productsAPI } from "../../lib/api";
 import { useAuth } from "../_app";
 import toast from "react-hot-toast";
-import { FiPlus, FiEdit, FiEdit2, FiTrash2, FiUpload, FiPackage, FiX, FiCheck } from "react-icons/fi";
+import { FiPlus, FiEdit2, FiTrash2, FiUpload, FiX } from "react-icons/fi";
 
 const INITIAL_FORM = {
   name: "", description: "", price: "", compare_price: "",
-  stock: "", sku: "", country_of_origin: "", tags: "",
+  stock: "", sku: "", country_of_origin: "", tags: "", existing_images: [],
   currency: "USD", ships_from: "",
 };
 
@@ -22,6 +22,7 @@ export default function SellerProducts() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [images, setImages] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef();
 
@@ -76,6 +77,7 @@ export default function SellerProducts() {
       setShowForm(false);
       setForm(INITIAL_FORM);
       setImages([]);
+      setImagePreviews([]);
       setEditingId(null);
       fetchProducts();
     } catch (err) {
@@ -191,19 +193,47 @@ export default function SellerProducts() {
 
               {/* Image upload */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Product Images (max 5)</label>
-                <div
-                  onClick={() => fileRef.current.click()}
-                  className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-green-900 transition-colors"
-                >
-                  <FiUpload size={24} className="mx-auto mb-2 text-gray-400" />
-                  <p className="text-sm text-gray-500">Click to upload images (JPEG, PNG, max 5MB each)</p>
-                  <input ref={fileRef} type="file" multiple accept="image/*" className="hidden"
-                    onChange={(e) => setImages(Array.from(e.target.files).slice(0, 5))} />
+                <label className="block text-sm font-medium text-gray-700 mb-2">Product Images (max 5)</label>
+                <div className="grid grid-cols-3 gap-3 mb-3">
+                  {/* Existing images */}
+                  {form.existing_images && form.existing_images.map((url, i) => (
+                    <div key={i} className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden group">
+                      <img src={url} className="w-full h-full object-cover" />
+                      <button type="button"
+                        onClick={() => setForm(f => ({ ...f, existing_images: f.existing_images.filter((_, j) => j !== i) }))}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {/* New image previews */}
+                  {imagePreviews.map((src, i) => (
+                    <div key={i} className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden group">
+                      <img src={src} className="w-full h-full object-cover" />
+                      <button type="button"
+                        onClick={() => { setImages(imgs => imgs.filter((_, j) => j !== i)); setImagePreviews(p => p.filter((_, j) => j !== i)); }}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {/* Upload button */}
+                  {(images.length + (form.existing_images?.length || 0)) < 5 && (
+                    <div onClick={() => fileRef.current.click()}
+                      className="aspect-square border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-green-900 hover:bg-green-50 transition-colors">
+                      <FiUpload size={20} className="text-gray-400 mb-1" />
+                      <p className="text-xs text-gray-400 text-center px-2">Add photo</p>
+                    </div>
+                  )}
                 </div>
-                {images.length > 0 && (
-                  <p className="text-sm text-green-700 mt-2">✅ {images.length} image(s) selected</p>
-                )}
+                <input ref={fileRef} type="file" multiple accept="image/*" className="hidden"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files).slice(0, 5 - (form.existing_images?.length || 0));
+                    setImages(files);
+                    const readers = files.map(f => new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(f); }));
+                    Promise.all(readers).then(setImagePreviews);
+                  }} />
+                <p className="text-xs text-gray-400">JPEG, PNG or WebP · Max 5MB each · First image is the main photo</p>
               </div>
 
               <div className="flex gap-3">
