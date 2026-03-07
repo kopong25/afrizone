@@ -5,6 +5,7 @@ import { productsAPI } from "../../lib/api";
 import { useAuth } from "../_app";
 import toast from "react-hot-toast";
 import { FiPlus, FiEdit2, FiTrash2, FiUpload, FiX } from "react-icons/fi";
+import { FiPlus, FiEdit, FiTrash2, FiUpload, FiPackage, FiX, FiCheck } from "react-icons/fi";
 
 const INITIAL_FORM = {
   name: "", description: "", price: "", compare_price: "",
