@@ -10,7 +10,7 @@ const api = axios.create({
 
 // Attach JWT token to every request
 api.interceptors.request.use((config) => {
-  const token = Cookies.get("token");
+  const token = Cookies.get("afrizone_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -22,7 +22,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      Cookies.remove("token");
+      Cookies.remove("afrizone_token");
       if (typeof window !== "undefined") {
         window.location.href = "/login";
       }

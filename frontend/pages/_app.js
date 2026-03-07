@@ -4,7 +4,6 @@ import Cookies from "js-cookie";
 import { authAPI } from "../lib/api";
 import "../styles/globals.css";
 
-// ── Auth Context ──
 const AuthContext = createContext(null);
 
 export function useAuth() {
@@ -16,11 +15,14 @@ function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = Cookies.get("token");
+    const token = Cookies.get("afrizone_token");
     if (token) {
       authAPI.me()
         .then((res) => setUser(res.data))
-        .catch(() => Cookies.remove("token"))
+        .catch(() => {
+          Cookies.remove("afrizone_token");
+          setUser(null);
+        })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
@@ -28,12 +30,19 @@ function AuthProvider({ children }) {
   }, []);
 
   const login = (token, userData) => {
-    Cookies.set("token", token, { expires: 1 }); // 1 day
+    // Use secure cookie settings for production
+    const isProduction = window.location.protocol === "https:";
+    Cookies.set("afrizone_token", token, {
+      expires: 7,
+      sameSite: isProduction ? "None" : "Lax",
+      secure: isProduction,
+    });
     setUser(userData);
   };
 
   const logout = () => {
-    Cookies.remove("token");
+    Cookies.remove("afrizone_token");
+    Cookies.remove("token"); // remove old cookie too
     setUser(null);
     window.location.href = "/";
   };
