@@ -61,6 +61,7 @@ export const storesAPI = {
   get: (slug) => api.get(`/sellers/${slug}`),
   getProducts: (id) => api.get(`/sellers/${id}/products`),
   myStore: () => api.get("/sellers/my-store"),
+  analytics: (days = 30) => api.get(`/sellers/my-store/analytics?days=${days}`),
   updateMyStore: (data) => api.put("/sellers/my-store", data),
   uploadLogo: (formData) =>
     api.post("/sellers/my-store/logo", formData, {

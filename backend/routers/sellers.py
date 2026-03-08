@@ -111,3 +111,104 @@ def get_store_products(store_id: int, db: Session = Depends(get_db)):
         models.Product.store_id == store_id,
         models.Product.is_active == True
     ).all()
+
+
+@router.get("/my-store/analytics")
+def get_store_analytics(
+    days: int = 30,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.require_seller)
+):
+    """Seller analytics — revenue, orders, top products, daily breakdown."""
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import func
+
+    store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="Store not found")
+
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    # All orders in period
+    orders = db.query(models.Order).filter(
+        models.Order.store_id == store.id,
+        models.Order.created_at >= since,
+        models.Order.status != models.OrderStatus.cancelled,
+    ).all()
+
+    # All-time stats
+    all_orders = db.query(models.Order).filter(
+        models.Order.store_id == store.id,
+        models.Order.status != models.OrderStatus.cancelled,
+    ).all()
+
+    total_revenue = sum(o.seller_amount for o in orders)
+    total_orders = len(orders)
+    avg_order_value = total_revenue / total_orders if total_orders > 0 else 0
+
+    # Status breakdown
+    status_counts = {}
+    for o in all_orders:
+        status_counts[o.status] = status_counts.get(o.status, 0) + 1
+
+    # Daily revenue for chart (last N days)
+    daily = {}
+    for i in range(days):
+        day = (datetime.now(timezone.utc) - timedelta(days=days - i - 1)).strftime("%Y-%m-%d")
+        daily[day] = {"date": day, "revenue": 0.0, "orders": 0}
+    for o in orders:
+        day = o.created_at.strftime("%Y-%m-%d")
+        if day in daily:
+            daily[day]["revenue"] += o.seller_amount
+            daily[day]["orders"] += 1
+
+    # Top products by revenue
+    item_stats = {}
+    for o in orders:
+        for item in o.items:
+            pid = item.product_id
+            if pid not in item_stats:
+                item_stats[pid] = {
+                    "id": pid,
+                    "name": item.product.name if item.product else "Unknown",
+                    "image": item.product.images[0] if item.product and item.product.images else None,
+                    "revenue": 0.0,
+                    "units": 0,
+                    "orders": 0,
+                }
+            item_stats[pid]["revenue"] += item.total_price
+            item_stats[pid]["units"] += item.quantity
+            item_stats[pid]["orders"] += 1
+
+    top_products = sorted(item_stats.values(), key=lambda x: x["revenue"], reverse=True)[:5]
+
+    # Previous period for comparison
+    prev_since = since - timedelta(days=days)
+    prev_orders = db.query(models.Order).filter(
+        models.Order.store_id == store.id,
+        models.Order.created_at >= prev_since,
+        models.Order.created_at < since,
+        models.Order.status != models.OrderStatus.cancelled,
+    ).all()
+    prev_revenue = sum(o.seller_amount for o in prev_orders)
+    prev_count = len(prev_orders)
+
+    revenue_change = ((total_revenue - prev_revenue) / prev_revenue * 100) if prev_revenue > 0 else 0
+    orders_change = ((total_orders - prev_count) / prev_count * 100) if prev_count > 0 else 0
+
+    return {
+        "period_days": days,
+        "summary": {
+            "total_revenue": round(total_revenue, 2),
+            "total_orders": total_orders,
+            "avg_order_value": round(avg_order_value, 2),
+            "total_products": db.query(models.Product).filter(models.Product.store_id == store.id, models.Product.is_active == True).count(),
+            "avg_rating": store.avg_rating,
+            "review_count": store.review_count,
+            "revenue_change_pct": round(revenue_change, 1),
+            "orders_change_pct": round(orders_change, 1),
+        },
+        "daily_chart": list(daily.values()),
+        "top_products": top_products,
+        "status_breakdown": status_counts,
+    }

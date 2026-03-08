@@ -86,6 +86,33 @@ def create_order(
 
     db.commit()
     db.refresh(order)
+
+    # Send email notifications (non-blocking)
+    try:
+        from utils.email import send_order_confirmation, send_new_order_to_seller
+        email_items = [{"name": oi.product.name, "quantity": oi.quantity, "price": oi.unit_price} for oi in order.items]
+        send_order_confirmation(
+            buyer_email=current_user.email,
+            buyer_name=current_user.full_name,
+            order_id=order.id,
+            items=email_items,
+            subtotal=order.subtotal,
+            shipping=order.shipping_cost,
+            total=order.total,
+            store_name=store.name,
+        )
+        send_new_order_to_seller(
+            seller_email=store.owner.email,
+            store_name=store.name,
+            order_id=order.id,
+            items=email_items,
+            total=order.total,
+            seller_amount=order.seller_amount,
+            buyer_name=current_user.full_name,
+        )
+    except Exception as e:
+        print(f"Email error: {e}")
+
     return order
 
 
@@ -177,6 +204,31 @@ def update_order_status(
 
     db.commit()
     db.refresh(order)
+
+    # Send status-change emails
+    try:
+        from utils.email import send_shipping_update, send_delivery_confirmation
+        buyer = db.query(models.User).filter(models.User.id == order.buyer_id).first()
+        if buyer:
+            if update.status == models.OrderStatus.shipped:
+                send_shipping_update(
+                    buyer_email=buyer.email,
+                    buyer_name=buyer.full_name,
+                    order_id=order.id,
+                    tracking_number=order.tracking_number,
+                    tracking_url=order.tracking_url,
+                    store_name=store.name,
+                )
+            elif update.status == models.OrderStatus.delivered:
+                send_delivery_confirmation(
+                    buyer_email=buyer.email,
+                    buyer_name=buyer.full_name,
+                    order_id=order.id,
+                    store_name=store.name,
+                )
+    except Exception as e:
+        print(f"Email error: {e}")
+
     return order
 
 

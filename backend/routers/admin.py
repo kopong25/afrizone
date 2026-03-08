@@ -50,6 +50,13 @@ def approve_seller(
     store.status = approval.status
     db.commit()
     db.refresh(store)
+
+    try:
+        from utils.email import send_seller_approved
+        send_seller_approved(store.owner.email, store.owner.full_name, store.name)
+    except Exception as e:
+        print(f"Email error: {e}")
+
     return store
 
 
