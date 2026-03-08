@@ -46,9 +46,9 @@ export default function Navbar() {
     <nav className="bg-green-900 text-white sticky top-0 z-50 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
         {/* Logo */}
-        <Link href="/" className="font-black text-xl text-yellow-400 flex-shrink-0 tracking-tight">
-          AFRIZONE
-        </Link>
+        <Link href="/" className="flex-shrink-0">
+          <img src="/logo.jpg" alt="Afrizone" className="h-10 w-auto" />
+        </Link> 
 
         {/* Search bar */}
         <div className="flex-1 max-w-xl relative hidden md:block">
