@@ -98,6 +98,7 @@ export default function SellerDashboard() {
             </p>
           </div>
           <Link href="/seller/store" className="btn-secondary py-2 px-4 text-sm mr-2">Store Settings</Link>
+          <Link href="/seller/analytics" className="btn-secondary py-2 px-4 text-sm mr-2">📊 Analytics</Link>
           <Link href="/seller/products" className="btn-primary py-2 px-4 text-sm">
             + Add Product
           </Link>
