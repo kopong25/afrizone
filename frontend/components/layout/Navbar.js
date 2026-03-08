@@ -46,9 +46,9 @@ export default function Navbar() {
     <nav className="bg-green-900 text-white sticky top-0 z-50 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
         {/* Logo */}
-        <Link href="/" className="flex-shrink-0">
-          <img src="/logo.jpg" alt="Afrizone" className="h-10 w-auto" />
-        </Link> 
+        <Link href="/" className="font-black text-xl text-yellow-400 flex-shrink-0 tracking-tight">
+          AFRIZONE
+        </Link>
 
         {/* Search bar */}
         <div className="flex-1 max-w-xl relative hidden md:block">
@@ -131,7 +131,12 @@ export default function Navbar() {
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
                         <FiShoppingCart size={15} /> Cart {cartCount > 0 && <span className="ml-auto bg-yellow-400 text-green-900 text-xs font-bold px-1.5 rounded-full">{cartCount}</span>}
                       </Link>
-                      <Link href="/wishlist" onClick={() => setUserMenuOpen(false)}
+                      <Link href="/messages"
+              className="text-gray-300 hover:text-white transition-colors text-sm flex items-center gap-1">
+              <FiMessageSquare size={16}/> Messages
+            </Link>
+            <Link
+              href="/wishlist" onClick={() => setUserMenuOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
                         ❤️ Wishlist
                       </Link>

@@ -134,3 +134,33 @@ export const variantsAPI = {
   create: (productId, data) => api.post(`/variants/product/${productId}`, data),
   delete: (id) => api.delete(`/variants/${id}`),
 };
+
+export const messagesAPI = {
+  list: () => api.get("/messages/"),
+  start: (data) => api.post("/messages/start", data),
+  get: (id) => api.get(`/messages/${id}`),
+  send: (id, body) => api.post(`/messages/${id}/send`, { body }),
+  unread: () => api.get("/messages/unread/count"),
+};
+
+export const shippingAPI = {
+  getRates: (orderId) => api.get(`/shipping/rates/${orderId}`),
+  createLabel: (orderId, rateId) => api.post(`/shipping/label/${orderId}?rate_id=${rateId}`),
+  getLabel: (orderId) => api.get(`/shipping/label/${orderId}`),
+};
+
+export const subscriptionsAPI = {
+  plans: () => api.get("/subscriptions/plans"),
+  myPlan: () => api.get("/subscriptions/my-plan"),
+  upgrade: (tier) => api.post(`/subscriptions/upgrade/${tier}`),
+};
+
+export const referralsAPI = {
+  myCode: () => api.get("/referrals/my-code"),
+  stats: () => api.get("/referrals/stats"),
+  use: (code) => api.post(`/referrals/use/${code}`),
+};
+
+export const adminAnalyticsAPI = {
+  get: (days = 30) => api.get(`/admin/analytics?days=${days}`),
+};

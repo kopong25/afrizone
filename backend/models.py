@@ -377,3 +377,86 @@ class ProductVariant(Base):
 # ─────────────────────────────────────────────
 
 # Add photos column to Review — we'll handle via migration note
+
+# ─────────────────────────────────────────────
+# MESSAGES (Buyer/Seller Chat)
+# ─────────────────────────────────────────────
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+    id = Column(Integer, primary_key=True, index=True)
+    buyer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    seller_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=True)
+    last_message_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    buyer = relationship("User", foreign_keys=[buyer_id], backref="buyer_conversations")
+    seller = relationship("User", foreign_keys=[seller_id], backref="seller_conversations")
+    store = relationship("Store", backref="conversations")
+    messages = relationship("Message", back_populates="conversation", order_by="Message.created_at")
+
+class Message(Base):
+    __tablename__ = "messages"
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False)
+    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    body = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    conversation = relationship("Conversation", back_populates="messages")
+    sender = relationship("User", foreign_keys=[sender_id], backref="sent_messages")
+
+
+# ─────────────────────────────────────────────
+# SUBSCRIPTION TIERS
+# ─────────────────────────────────────────────
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
+    tier = Column(String, default="basic")          # basic | standard | premium
+    stripe_subscription_id = Column(String, nullable=True)
+    stripe_customer_id = Column(String, nullable=True)
+    status = Column(String, default="active")       # active | cancelled | past_due
+    current_period_end = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    store = relationship("Store", backref="subscription", uselist=False)
+
+
+# ─────────────────────────────────────────────
+# SHIPPING LABELS
+# ─────────────────────────────────────────────
+
+class ShippingLabel(Base):
+    __tablename__ = "shipping_labels"
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    shippo_transaction_id = Column(String, nullable=True)
+    tracking_number = Column(String, nullable=True)
+    label_url = Column(String, nullable=True)       # PDF download URL
+    carrier = Column(String, default="USPS")
+    service = Column(String, default="Priority")
+    rate = Column(Float, nullable=True)             # Cost in USD
+    status = Column(String, default="created")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    order = relationship("Order", backref="shipping_label", uselist=False)
+
+
+# ─────────────────────────────────────────────
+# REFERRALS
+# ─────────────────────────────────────────────
+
+class Referral(Base):
+    __tablename__ = "referrals"
+    id = Column(Integer, primary_key=True, index=True)
+    referrer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    referred_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    code = Column(String, unique=True, nullable=False, index=True)
+    type = Column(String, default="seller")         # seller | buyer
+    status = Column(String, default="pending")      # pending | completed | rewarded
+    reward_amount = Column(Float, default=0.0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    referrer = relationship("User", foreign_keys=[referrer_id], backref="referrals_made")
+    referred = relationship("User", foreign_keys=[referred_id], backref="referred_by")

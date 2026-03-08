@@ -3,70 +3,58 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 
-# Load environment variables
 load_dotenv()
 
-# Import all routers
-from routers import auth, sellers, products, orders, payments, reviews, admin, wishlist, discounts, variants
+from routers import (
+    auth, sellers, products, orders, payments,
+    reviews, admin, wishlist, discounts, variants,
+    shipping, messages, subscriptions, referrals
+)
 
-# Import models and create tables on startup
 from database import engine
 import models
 
 models.Base.metadata.create_all(bind=engine)
 
-# ─────────────────────────────────────────────
-# APP SETUP
-# ─────────────────────────────────────────────
-
 app = FastAPI(
     title="Afrizone API",
-    description="Pan-African marketplace backend — Amazon-style multi-vendor platform for African stores in the USA, Canada & Europe.",
-    version="1.0.0",
+    description="Pan-African marketplace — Amazon-style multi-vendor platform.",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
-
-# ─────────────────────────────────────────────
-# CORS — allow frontend to call API
-# ─────────────────────────────────────────────
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL, "http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ─────────────────────────────────────────────
-# REGISTER ROUTERS
-# ─────────────────────────────────────────────
+# Phase 1 & 2
+app.include_router(auth.router,          prefix="/auth",          tags=["Auth"])
+app.include_router(sellers.router,       prefix="/sellers",       tags=["Sellers"])
+app.include_router(products.router,      prefix="/products",      tags=["Products"])
+app.include_router(orders.router,        prefix="/orders",        tags=["Orders"])
+app.include_router(payments.router,      prefix="/payments",      tags=["Payments"])
+app.include_router(reviews.router,       prefix="/reviews",       tags=["Reviews"])
+app.include_router(admin.router,         prefix="/admin",         tags=["Admin"])
+app.include_router(wishlist.router,      prefix="/wishlist",      tags=["Wishlist"])
+app.include_router(discounts.router,     prefix="/discounts",     tags=["Discounts"])
+app.include_router(variants.router,      prefix="/variants",      tags=["Variants"])
 
-app.include_router(auth.router,     prefix="/auth",     tags=["Authentication"])
-app.include_router(sellers.router,  prefix="/sellers",  tags=["Sellers & Stores"])
-app.include_router(products.router, prefix="/products", tags=["Products"])
-app.include_router(orders.router,   prefix="/orders",   tags=["Orders"])
-app.include_router(payments.router, prefix="/payments", tags=["Payments & Payouts"])
-app.include_router(reviews.router,  prefix="/reviews",  tags=["Reviews"])
-app.include_router(admin.router,    prefix="/admin",    tags=["Admin"])
-
-
-# ─────────────────────────────────────────────
-# ROOT & HEALTH CHECK
-# ─────────────────────────────────────────────
+# Phase 3
+app.include_router(shipping.router,      prefix="/shipping",      tags=["Shipping"])
+app.include_router(messages.router,      prefix="/messages",      tags=["Messages"])
+app.include_router(subscriptions.router, prefix="/subscriptions", tags=["Subscriptions"])
+app.include_router(referrals.router,     prefix="/referrals",     tags=["Referrals"])
 
 @app.get("/", tags=["Health"])
 def root():
-    return {
-        "app": "Afrizone API",
-        "version": "1.0.0",
-        "status": "running",
-        "docs": "/docs",
-    }
-
+    return {"app": "Afrizone API", "version": "2.0.0", "status": "running", "docs": "/docs"}
 
 @app.get("/health", tags=["Health"])
 def health_check():
