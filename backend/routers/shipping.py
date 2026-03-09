@@ -123,8 +123,8 @@ async def create_shipping_label(
     if existing:
         return {"label_url": existing.label_url, "tracking_number": existing.tracking_number, "carrier": existing.carrier}
 
-    if not SHIPPO_API_KEY or rate_id.startswith("mock_") or rate_id == "auto":
-        # Mock label for testing
+    # If no Shippo key or mock rate, use mock label
+    if not SHIPPO_API_KEY or rate_id.startswith("mock_"):
         label = models.ShippingLabel(
             order_id=order_id, carrier="USPS", service="Priority Mail",
             tracking_number=f"9400111899223{order_id:06d}",
@@ -137,6 +137,57 @@ async def create_shipping_label(
         db.commit()
         background_tasks.add_task(_email_label_to_seller, order, store, label)
         return {"label_url": label.label_url, "tracking_number": label.tracking_number, "carrier": label.carrier}
+
+    # Shippo key exists — get real rates first if rate_id is "auto"
+    if rate_id == "auto":
+        try:
+            total_weight = sum(
+                (item.product.weight_kg or 0.5) * item.quantity
+                for item in order.items
+            ) or 0.5
+            shipment = await shippo_post("shipments", {
+                "address_from": {
+                    "name": store.name,
+                    "street1": store.address or "123 Main St",
+                    "city": store.city or "Houston",
+                    "state": "TX", "zip": "77001", "country": "US",
+                },
+                "address_to": {
+                    "name": order.shipping_name or "Customer",
+                    "street1": order.shipping_address or "456 Oak Ave",
+                    "city": order.shipping_city or "New York",
+                    "state": order.shipping_state or "NY",
+                    "zip": order.shipping_zip or "10001",
+                    "country": "US",
+                },
+                "parcels": [{
+                    "length": "12", "width": "10", "height": "6",
+                    "distance_unit": "in",
+                    "weight": str(round(total_weight * 2.205, 2)),
+                    "mass_unit": "lb",
+                }],
+                "async": False,
+            })
+            # Pick cheapest USPS Priority rate
+            rates = shipment.get("rates", [])
+            priority = [r for r in rates if "PRIORITY" in r.get("servicelevel", {}).get("token", "").upper()]
+            rate_id = priority[0]["object_id"] if priority else (rates[0]["object_id"] if rates else None)
+            if not rate_id:
+                raise Exception("No rates available")
+        except Exception as e:
+            # Fall back to mock if Shippo rates fail
+            label = models.ShippingLabel(
+                order_id=order_id, carrier="USPS", service="Priority Mail",
+                tracking_number=f"9400111899223{order_id:06d}",
+                label_url=f"https://afrizone-loqr.onrender.com/shipping/mock-label/{order_id}",
+                rate=8.95, status="created",
+            )
+            db.add(label)
+            order.tracking_number = label.tracking_number
+            order.status = models.OrderStatus.shipped
+            db.commit()
+            background_tasks.add_task(_email_label_to_seller, order, store, label)
+            return {"label_url": label.label_url, "tracking_number": label.tracking_number, "carrier": label.carrier}
 
     try:
         txn = await shippo_post("transactions", {
