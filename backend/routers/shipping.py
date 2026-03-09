@@ -128,7 +128,7 @@ async def create_shipping_label(
         label = models.ShippingLabel(
             order_id=order_id, carrier="USPS", service="Priority Mail",
             tracking_number=f"9400111899223{order_id:06d}",
-            label_url="https://shippo-static.s3.amazonaws.com/providers/usps/USPS.pdf",
+            label_url=f"https://afrizone-loqr.onrender.com/shipping/mock-label/{order_id}",
             rate=8.95, status="created",
         )
         db.add(label)
@@ -202,3 +202,70 @@ def _email_label_to_seller(order, store, label):
         send_email(store.owner.email, f"🏷️ Print Label — Afrizone Order #{order.id}", _wrap(body))
     except Exception as e:
         print(f"Label email error: {e}")
+
+
+@router.get("/mock-label/{order_id}")
+def mock_label_pdf(order_id: int, db: Session = Depends(get_db)):
+    """Generate a mock shipping label PDF for testing."""
+    from fastapi.responses import Response
+    import textwrap
+
+    label = db.query(models.ShippingLabel).filter(models.ShippingLabel.order_id == order_id).first()
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+
+    tracking = label.tracking_number if label else f"9400111899223{order_id:06d}"
+    ship_to = ""
+    if order:
+        ship_to = f"{order.shipping_name or ''}\n{order.shipping_address or ''}\n{order.shipping_city or ''}, {order.shipping_state or ''} {order.shipping_zip or ''}"
+
+    # Generate a simple HTML label that looks like a shipping label
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background: white; }}
+  .label {{ border: 3px solid black; padding: 20px; max-width: 500px; margin: auto; }}
+  .carrier {{ font-size: 36px; font-weight: 900; text-align: center; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 10px; }}
+  .service {{ font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 16px; }}
+  .section {{ margin-bottom: 14px; }}
+  .label-text {{ font-size: 11px; color: #555; font-weight: bold; text-transform: uppercase; }}
+  .value {{ font-size: 15px; font-weight: bold; }}
+  .tracking {{ font-family: monospace; font-size: 18px; font-weight: 900; letter-spacing: 2px; text-align: center; background: #f0f0f0; padding: 10px; border: 1px solid #ccc; margin: 12px 0; }}
+  .barcode {{ text-align: center; font-family: monospace; font-size: 28px; letter-spacing: -1px; margin: 8px 0; }}
+  .note {{ font-size: 11px; color: #888; text-align: center; margin-top: 16px; border-top: 1px dashed #ccc; padding-top: 10px; }}
+  @media print {{ body {{ margin: 0; }} }}
+</style>
+</head>
+<body>
+<div class="label">
+  <div class="carrier">USPS</div>
+  <div class="service">PRIORITY MAIL 2-DAY</div>
+
+  <div class="section">
+    <div class="label-text">From:</div>
+    <div class="value">Afrizone Seller</div>
+    <div class="value" style="font-weight:normal">Fulfilled via Afrizone Marketplace</div>
+  </div>
+
+  <div class="section">
+    <div class="label-text">Ship To:</div>
+    <div class="value" style="white-space:pre-line">{ship_to}</div>
+  </div>
+
+  <div class="tracking">{tracking}</div>
+  <div class="barcode">||| |||| ||| |||| ||| ||||</div>
+
+  <div style="text-align:center;margin:10px 0">
+    <span style="font-size:13px;background:#1A5C38;color:white;padding:4px 12px;border-radius:4px">Afrizone Order #{order_id}</span>
+  </div>
+
+  <div class="note">
+    TEST LABEL — For real shipments, add your Shippo API key to Render environment.<br>
+    Print this label and tape it to your package. Drop at any USPS location.
+  </div>
+</div>
+<script>window.onload = function() {{ window.print(); }}</script>
+</body>
+</html>"""
+
+    return Response(content=html, media_type="text/html")
