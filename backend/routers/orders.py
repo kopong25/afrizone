@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 from database import get_db
 import models, schemas, auth as auth_utils
@@ -174,7 +174,10 @@ def get_store_orders(
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
 
-    query = db.query(models.Order).filter(models.Order.store_id == store.id)
+    query = db.query(models.Order).options(
+        joinedload(models.Order.items).joinedload(models.OrderItem.product),
+        joinedload(models.Order.buyer)
+    ).filter(models.Order.store_id == store.id)
     if status:
         query = query.filter(models.Order.status == status)
     query = query.order_by(models.Order.created_at.desc())
