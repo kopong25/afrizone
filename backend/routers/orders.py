@@ -152,6 +152,30 @@ def get_seller_orders(
     return {"items": orders, "total": total, "page": page, "pages": math.ceil(total / size), "size": size}
 
 
+
+
+@router.get("/store-orders")
+def get_store_orders(
+    page: int = 1,
+    size: int = 50,
+    status: str = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.require_seller)
+):
+    """Get all orders for the seller's store."""
+    store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="Store not found")
+
+    query = db.query(models.Order).filter(models.Order.store_id == store.id)
+    if status:
+        query = query.filter(models.Order.status == status)
+    query = query.order_by(models.Order.created_at.desc())
+
+    total = query.count()
+    orders = query.offset((page - 1) * size).limit(size).all()
+    return {"items": orders, "total": total, "page": page, "size": size}
+
 @router.get("/{order_id}", response_model=schemas.OrderOut)
 def get_order(
     order_id: int,
@@ -233,28 +257,6 @@ def update_order_status(
 
 
 
-
-@router.get("/store-orders")
-def get_store_orders(
-    page: int = 1,
-    size: int = 50,
-    status: str = None,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.require_seller)
-):
-    """Get all orders for the seller's store."""
-    store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
-    if not store:
-        raise HTTPException(status_code=404, detail="Store not found")
-
-    query = db.query(models.Order).filter(models.Order.store_id == store.id)
-    if status:
-        query = query.filter(models.Order.status == status)
-    query = query.order_by(models.Order.created_at.desc())
-
-    total = query.count()
-    orders = query.offset((page - 1) * size).limit(size).all()
-    return {"items": orders, "total": total, "page": page, "size": size}
 
 # ─── CART ───
 
