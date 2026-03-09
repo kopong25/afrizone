@@ -1,138 +1,239 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Navbar from "../../components/layout/Navbar";
-import { adminAPI } from "../../lib/api";
-import Footer from "../../components/layout/Footer";
+import { storesAPI, productsAPI, ordersAPI, paymentsAPI } from "../../lib/api";
 import { useAuth } from "../_app";
 import toast from "react-hot-toast";
-import { FiUsers, FiShoppingBag, FiPackage, FiDollarSign, FiCheck, FiX } from "react-icons/fi";
+import Link from "next/link";
+import { FiPackage, FiShoppingBag, FiDollarSign, FiStar, FiExternalLink, FiAlertCircle } from "react-icons/fi";
 
-export default function AdminDashboard() {
+function StatCard({ icon, label, value, sub, color = "green" }) {
+  const colors = {
+    green: "bg-green-50 text-green-900",
+    gold: "bg-yellow-50 text-yellow-700",
+    blue: "bg-blue-50 text-blue-700",
+    purple: "bg-purple-50 text-purple-700",
+  };
+  return (
+    <div className="bg-white rounded-xl p-5 shadow-sm border">
+      <div className={`inline-flex p-2 rounded-lg mb-3 ${colors[color]}`}>{icon}</div>
+      <p className="text-2xl font-black text-gray-900">{value}</p>
+      <p className="text-sm font-medium text-gray-600">{label}</p>
+      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+export default function SellerDashboard() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [stats, setStats] = useState(null);
-  const [pendingSellers, setPendingSellers] = useState([]);
+  const [store, setStore] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [stripeStatus, setStripeStatus] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("overview");
 
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== "admin")) {
-      router.push("/");
-    }
+    if (!authLoading && !user) router.push("/login?redirect=/seller/dashboard");
+    if (!authLoading && user && user.role === "buyer") router.push("/");
   }, [user, authLoading]);
 
   useEffect(() => {
-    if (user?.role === "admin") {
-      Promise.all([adminAPI.stats(), adminAPI.pendingSellers()])
-        .then(([s, p]) => {
-          setStats(s.data);
-          setPendingSellers(p.data);
-        })
-        .catch(console.error)
-        .finally(() => setLoading(false));
+    if (user && user.role !== "buyer") {
+      Promise.all([
+        storesAPI.myStore(),
+        productsAPI.myProducts(),
+        ordersAPI.sellerOrders({ size: 5 }),
+        paymentsAPI.stripeStatus(),
+      ]).then(([s, p, o, stripe]) => {
+        setStore(s.data);
+        setProducts(p.data);
+        setOrders(o.data?.items || o.data || []);
+        setStripeStatus(stripe.data);
+      }).catch(console.error).finally(() => setLoading(false));
+
+      // Handle Stripe redirect
+      if (router.query.stripe === "success") {
+        toast.success("Stripe account connected! You can now receive payments.");
+      }
     }
   }, [user]);
 
-  const approveSeller = async (storeId, status) => {
+  const connectStripe = async () => {
     try {
-      await adminAPI.approveSeller(storeId, { status });
-      toast.success(`Store ${status}`);
-      setPendingSellers(pendingSellers.filter((s) => s.id !== storeId));
-      const s = await adminAPI.stats();
-      setStats(s.data);
+      const res = await paymentsAPI.stripeConnect();
+      window.location.href = res.data.onboarding_url;
     } catch {
-      toast.error("Action failed");
+      toast.error("Failed to start Stripe onboarding");
     }
   };
 
-  if (authLoading || loading) return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin w-8 h-8 border-4 border-green-900 border-t-transparent rounded-full" /></div>;
+  if (authLoading || loading) return (
+    <>
+      <Navbar />
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/3" />
+          <div className="grid grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => <div key={i} className="h-32 bg-gray-200 rounded-xl" />)}
+          </div>
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <>
       <Navbar />
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-black text-gray-900 mb-2">Admin Dashboard</h1>
-        <p className="text-gray-500 mb-8">Manage the Afrizone platform</p>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-          {[
-            { label: "Total Users", value: stats?.total_users, icon: <FiUsers />, color: "bg-blue-50 text-blue-700" },
-            { label: "Total Sellers", value: stats?.total_sellers, icon: <FiShoppingBag />, color: "bg-green-50 text-green-700" },
-            { label: "Products", value: stats?.total_products, icon: <FiPackage />, color: "bg-purple-50 text-purple-700" },
-            { label: "Total Orders", value: stats?.total_orders, icon: <FiShoppingBag />, color: "bg-indigo-50 text-indigo-700" },
-            { label: "Platform Revenue", value: `$${(stats?.total_revenue || 0).toFixed(0)}`, icon: <FiDollarSign />, color: "bg-yellow-50 text-yellow-700" },
-            { label: "Pending Approvals", value: stats?.pending_sellers, icon: <FiUsers />, color: "bg-red-50 text-red-600", urgent: true },
-          ].map((s, i) => (
-            <div key={i} className={`bg-white rounded-xl p-4 shadow-sm border ${s.urgent && s.value > 0 ? "border-red-200" : ""}`}>
-              <div className={`inline-flex p-2 rounded-lg mb-2 ${s.color}`}>{s.icon}</div>
-              <p className="text-xl font-black text-gray-900">{s.value}</p>
-              <p className="text-xs text-gray-500">{s.label}</p>
-            </div>
-          ))}
+        {/* Header */}
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-black text-gray-900">Seller Dashboard</h1>
+            <p className="text-gray-500 mt-1">
+              {store?.name} ·{" "}
+              <span className={`font-semibold ${store?.status === "approved" ? "text-green-600" : "text-yellow-600"}`}>
+                {store?.status === "approved" ? "✅ Approved" : "⏳ Pending Approval"}
+              </span>
+            </p>
+          </div>
+          <Link href="/seller/store" className="btn-secondary py-2 px-4 text-sm mr-2">Store Settings</Link>
+          <Link href="/referral"
+              className="flex flex-col items-center justify-center gap-2 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 text-yellow-800 p-4 rounded-xl transition-colors text-center">
+              <span className="text-2xl">🎁</span>
+              <span className="text-xs font-bold">Referral</span>
+            </Link>
+            <Link href="/seller/subscription" className="btn-secondary py-2 px-4 text-sm mr-2">⚡ Upgrade Plan</Link>
+          <Link href="/seller/analytics" className="btn-secondary py-2 px-4 text-sm mr-2">Analytics</Link>
+          <Link href="/seller/products" className="btn-primary py-2 px-4 text-sm">
+            + Add Product
+          </Link>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b">
-          {["overview", "sellers", "users"].map((t) => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-2.5 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${
-                tab === t ? "border-green-900 text-green-900" : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}>
-              {t}
-            </button>
-          ))}
+        {/* Stripe Alert */}
+        {!stripeStatus?.connected && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+            <FiAlertCircle className="text-yellow-600 mt-0.5 flex-shrink-0" size={20} />
+            <div>
+              <p className="font-semibold text-yellow-800">Connect Stripe to receive payments</p>
+              <p className="text-sm text-yellow-700 mt-1">
+                You need to set up a Stripe account to receive payouts when customers buy your products.
+              </p>
+              <button onClick={connectStripe} className="mt-3 text-sm bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-500">
+                Connect Stripe Account →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Subscription Alert */}
+        {store?.status === "approved" && store?.tier === "basic" && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-green-900">You're on the Basic plan (50 products max)</p>
+              <p className="text-sm text-green-700">Upgrade to list more products and unlock premium features.</p>
+            </div>
+            <Link href="/pricing" className="btn-gold text-sm py-2 px-4">Upgrade Plan</Link>
+          </div>
+        )}
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <StatCard icon={<FiPackage />} label="Total Products" value={products.length} color="green" />
+          <StatCard icon={<FiShoppingBag />} label="Total Orders" value={store?.total_sales || 0} color="blue" />
+          <StatCard icon={<FiDollarSign />} label="Total Revenue" value={`$${(store?.total_revenue || 0).toFixed(2)}`} color="gold" />
+          <StatCard icon={<FiStar />} label="Avg. Rating" value={`${(store?.avg_rating || 0).toFixed(1)} ★`} sub={`${store?.review_count || 0} reviews`} color="purple" />
         </div>
 
-        {/* Pending Sellers */}
-        {(tab === "overview" || tab === "sellers") && (
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
-            <div className="px-6 py-4 border-b bg-gray-50">
-              <h2 className="font-bold text-gray-800">
-                Pending Seller Approvals
-                {pendingSellers.length > 0 && (
-                  <span className="ml-2 bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">{pendingSellers.length}</span>
-                )}
-              </h2>
+        <div className="grid md:grid-cols-2 gap-8">
+          {/* Recent Products */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-bold text-gray-800">Recent Products</h2>
+              <Link href="/seller/store" className="btn-secondary py-2 px-4 text-sm mr-2">Store Settings</Link>
+          <Link href="/referral"
+              className="flex flex-col items-center justify-center gap-2 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 text-yellow-800 p-4 rounded-xl transition-colors text-center">
+              <span className="text-2xl">🎁</span>
+              <span className="text-xs font-bold">Referral</span>
+            </Link>
+            <Link href="/seller/subscription" className="btn-secondary py-2 px-4 text-sm mr-2">⚡ Upgrade Plan</Link>
+          <Link href="/seller/analytics" className="btn-secondary py-2 px-4 text-sm mr-2">Analytics</Link>
+          <Link href="/seller/products" className="text-sm text-green-900 hover:underline">View All</Link>
             </div>
-            {pendingSellers.length === 0 ? (
-              <div className="text-center py-10 text-gray-400">
-                <FiCheck size={32} className="mx-auto mb-2 text-green-500" />
-                <p>All sellers reviewed — no pending approvals</p>
+            {products.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <FiPackage size={40} className="mx-auto mb-2" />
+                <p>No products yet</p>
+                <Link href="/seller/store" className="btn-secondary py-2 px-4 text-sm mr-2">Store Settings</Link>
+          <Link href="/referral"
+              className="flex flex-col items-center justify-center gap-2 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 text-yellow-800 p-4 rounded-xl transition-colors text-center">
+              <span className="text-2xl">🎁</span>
+              <span className="text-xs font-bold">Referral</span>
+            </Link>
+            <Link href="/seller/subscription" className="btn-secondary py-2 px-4 text-sm mr-2">⚡ Upgrade Plan</Link>
+          <Link href="/seller/analytics" className="btn-secondary py-2 px-4 text-sm mr-2">Analytics</Link>
+          <Link href="/seller/products" className="text-green-900 text-sm font-semibold hover:underline">Add your first product</Link>
               </div>
             ) : (
-              <div className="divide-y">
-                {pendingSellers.map((store) => (
-                  <div key={store.id} className="px-6 py-4 flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-gray-800">{store.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {store.country} · {store.business_type || "General"} ·
-                        Registered {new Date(store.created_at).toLocaleDateString()}
-                      </p>
+              <div className="space-y-3">
+                {products.slice(0, 5).map((p) => (
+                  <div key={p.id} className="flex items-center gap-3 py-2 border-b last:border-0">
+                    <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                      {p.images?.[0] ? <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xl">📦</div>}
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => approveSeller(store.id, "approved")}
-                        className="flex items-center gap-1 bg-green-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-green-800"
-                      >
-                        <FiCheck size={14} /> Approve
-                      </button>
-                      <button
-                        onClick={() => approveSeller(store.id, "suspended")}
-                        className="flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 text-sm px-4 py-2 rounded-lg hover:bg-red-100"
-                      >
-                        <FiX size={14} /> Reject
-                      </button>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
+                      <p className="text-xs text-gray-500">${p.price.toFixed(2)} · {p.stock} in stock</p>
                     </div>
+                    <span className={`badge text-xs ${p.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                      {p.is_active ? "Active" : "Draft"}
+                    </span>
                   </div>
                 ))}
               </div>
             )}
           </div>
-        )}
+
+          {/* Recent Orders */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-bold text-gray-800">Recent Orders</h2>
+              <Link href="/seller/orders" className="text-sm text-green-900 hover:underline">View All</Link>
+            </div>
+            {orders.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <FiShoppingBag size={40} className="mx-auto mb-2" />
+                <p>No orders yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {orders.map((o) => (
+                  <div key={o.id} className="flex items-center justify-between py-2 border-b last:border-0 gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-800">Order #{o.id}</p>
+                      <p className="text-xs text-gray-500">{new Date(o.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      o.status === "paid" ? "bg-blue-100 text-blue-700" :
+                      o.status === "shipped" ? "bg-purple-100 text-purple-700" :
+                      o.status === "delivered" ? "bg-green-100 text-green-700" :
+                      o.status === "pending" ? "bg-yellow-100 text-yellow-700" :
+                      "bg-gray-100 text-gray-600"
+                    }`}>
+                      {o.status}
+                    </span>
+                    <p className="text-sm font-bold text-gray-900 flex-shrink-0">${Number(o.total).toFixed(2)}</p>
+                    <Link href="/seller/orders" className="text-xs bg-green-900 text-white px-3 py-1.5 rounded-lg hover:bg-green-800 flex-shrink-0">
+                      Manage →
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+      <Footer />
     </>
-    <Footer />
   );
 }
