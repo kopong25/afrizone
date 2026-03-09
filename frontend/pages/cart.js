@@ -98,6 +98,9 @@ export default function CartPage() {
           },
         });
       }
+      // Clear the cart
+      try { await ordersAPI.clearCart(); } catch {} 
+      setItems([]);
       toast.success("🎉 Order placed successfully!");
       router.push("/orders");
     } catch (err) {

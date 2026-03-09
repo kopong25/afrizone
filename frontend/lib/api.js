@@ -84,6 +84,7 @@ export const ordersAPI = {
   cart: () => api.get("/orders/cart/items"),
   addToCart: (data) => api.post("/orders/cart/add", data),
   removeFromCart: (id) => api.delete(`/orders/cart/${id}`),
+  clearCart: () => api.delete("/orders/cart/clear"),
 };
 
 // ── Payments ──

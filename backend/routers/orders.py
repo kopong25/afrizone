@@ -84,6 +84,13 @@ def create_order(
         product.stock -= qty
         product.sale_count += qty
 
+    # Clear ordered items from cart
+    ordered_product_ids = [item.product_id for item in order.items]
+    db.query(models.CartItem).filter(
+        models.CartItem.user_id == current_user.id,
+        models.CartItem.product_id.in_(ordered_product_ids)
+    ).delete(synchronize_session=False)
+
     db.commit()
     db.refresh(order)
 
@@ -295,6 +302,15 @@ def add_to_cart(
     db.refresh(cart_item)
     return cart_item
 
+
+@router.delete("/cart/clear", status_code=204)
+def clear_cart(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.get_current_user)
+):
+    """Clear all items from the user's cart."""
+    db.query(models.CartItem).filter(models.CartItem.user_id == current_user.id).delete()
+    db.commit()
 
 @router.delete("/cart/{item_id}", status_code=204)
 def remove_from_cart(
