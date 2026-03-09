@@ -77,7 +77,7 @@ export const storesAPI = {
 export const ordersAPI = {
   create: (data) => api.post("/orders", data),
   myOrders: (params) => api.get("/orders/my-orders", { params }),
-  sellerOrders: (params) => api.get("/orders/seller/orders", { params }),
+  sellerOrders: (params) => api.get("/orders/store-orders", { params }),
   get: (id) => api.get(`/orders/${id}`),
   updateStatus: (id, data) => api.put(`/orders/${id}/status`, data),
   // Cart

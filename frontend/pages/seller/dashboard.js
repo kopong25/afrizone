@@ -48,7 +48,7 @@ export default function SellerDashboard() {
       ]).then(([s, p, o, stripe]) => {
         setStore(s.data);
         setProducts(p.data);
-        setOrders(o.data.items);
+        setOrders(o.data?.items || o.data || []);
         setStripeStatus(stripe.data);
       }).catch(console.error).finally(() => setLoading(false));
 
@@ -193,22 +193,24 @@ export default function SellerDashboard() {
             ) : (
               <div className="space-y-3">
                 {orders.map((o) => (
-                  <div key={o.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                    <div>
+                  <div key={o.id} className="flex items-center justify-between py-2 border-b last:border-0 gap-3">
+                    <div className="flex-1">
                       <p className="text-sm font-medium text-gray-800">Order #{o.id}</p>
                       <p className="text-xs text-gray-500">{new Date(o.created_at).toLocaleDateString()}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-green-900">${o.total.toFixed(2)}</p>
-                      <span className={`badge text-xs ${
-                        o.status === "paid" ? "bg-blue-100 text-blue-700" :
-                        o.status === "shipped" ? "bg-purple-100 text-purple-700" :
-                        o.status === "delivered" ? "bg-green-100 text-green-700" :
-                        "bg-gray-100 text-gray-600"
-                      }`}>
-                        {o.status}
-                      </span>
-                    </div>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      o.status === "paid" ? "bg-blue-100 text-blue-700" :
+                      o.status === "shipped" ? "bg-purple-100 text-purple-700" :
+                      o.status === "delivered" ? "bg-green-100 text-green-700" :
+                      o.status === "pending" ? "bg-yellow-100 text-yellow-700" :
+                      "bg-gray-100 text-gray-600"
+                    }`}>
+                      {o.status}
+                    </span>
+                    <p className="text-sm font-bold text-gray-900 flex-shrink-0">${Number(o.total).toFixed(2)}</p>
+                    <Link href="/seller/orders" className="text-xs bg-green-900 text-white px-3 py-1.5 rounded-lg hover:bg-green-800 flex-shrink-0">
+                      Manage →
+                    </Link>
                   </div>
                 ))}
               </div>
