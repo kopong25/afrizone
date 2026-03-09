@@ -59,15 +59,34 @@ export default function SellerOrders() {
   };
 
   const downloadLabel = async (orderId) => {
+    setUpdating(orderId + "_label");
     try {
-      const r = await api.get(`/shipping/label/${orderId}`);
-      if (r.data?.label_url) {
-        window.open(r.data.label_url, "_blank");
-      } else {
-        toast.error("No label yet — mark as shipped first");
+      // Try to get existing label first
+      let labelUrl = null;
+      try {
+        const existing = await api.get(`/shipping/label/${orderId}`);
+        labelUrl = existing.data?.label_url;
+      } catch {
+        // No label yet — create one automatically
       }
-    } catch {
-      toast.error("No shipping label found for this order");
+
+      if (!labelUrl) {
+        // Auto-create label with default USPS Priority rate
+        const created = await api.post(`/shipping/label/${orderId}?rate_id=auto`);
+        labelUrl = created.data?.label_url;
+        toast.success("Shipping label created! Seller will receive email with PDF.");
+        fetchOrders();
+      }
+
+      if (labelUrl) {
+        window.open(labelUrl, "_blank");
+      } else {
+        toast.error("Could not generate label. Try again.");
+      }
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Label generation failed");
+    } finally {
+      setUpdating(null);
     }
   };
 
@@ -207,8 +226,9 @@ export default function SellerOrders() {
                           </button>
                         )}
                         <button onClick={() => downloadLabel(order.id)}
-                          className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-green-900 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
-                          <FiDownload size={14} /> Shipping Label
+                          disabled={updating === order.id + "_label"}
+                          className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-green-900 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
+                          <FiDownload size={14} /> {updating === order.id + "_label" ? "Generating..." : "Shipping Label"}
                         </button>
                         {order.status === "pending" && (
                           <button onClick={() => updateStatus(order.id, "cancelled")}

@@ -102,7 +102,7 @@ async def get_shipping_rates(
 @router.post("/label/{order_id}")
 async def create_shipping_label(
     order_id: int,
-    rate_id: str,
+    rate_id: str = "auto",
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.require_seller)
@@ -123,7 +123,7 @@ async def create_shipping_label(
     if existing:
         return {"label_url": existing.label_url, "tracking_number": existing.tracking_number, "carrier": existing.carrier}
 
-    if not SHIPPO_API_KEY or rate_id.startswith("mock_"):
+    if not SHIPPO_API_KEY or rate_id.startswith("mock_") or rate_id == "auto":
         # Mock label for testing
         label = models.ShippingLabel(
             order_id=order_id, carrier="USPS", service="Priority Mail",
