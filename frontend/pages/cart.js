@@ -79,13 +79,14 @@ export default function CartPage() {
     if (items.length === 0) return;
     setCheckingOut(true);
     try {
-      // Create order for each store
+      // Create order for each store and redirect to payment
+      const createdOrders = [];
       for (const storeGroup of Object.values(byStore)) {
         const orderItems = storeGroup.items.map((i) => ({
           product_id: i.product.id,
           quantity: i.quantity,
         }));
-        await ordersAPI.create({
+        const r = await ordersAPI.create({
           store_id: storeGroup.store.id,
           items: orderItems,
           shipping: {
@@ -97,12 +98,17 @@ export default function CartPage() {
             zip: shipping.zip,
           },
         });
+        createdOrders.push(r.data);
       }
-      // Clear the cart
-      try { await ordersAPI.clearCart(); } catch {} 
+      // Clear cart
+      try { await ordersAPI.clearCart(); } catch {}
       setItems([]);
-      toast.success("🎉 Order placed successfully!");
-      router.push("/orders");
+      // Redirect to Stripe checkout for first order
+      if (createdOrders.length > 0) {
+        router.push(`/checkout?order_id=${createdOrders[0].id}`);
+      } else {
+        router.push("/orders");
+      }
     } catch (err) {
       toast.error(err.response?.data?.detail || "Checkout failed. Please try again.");
     } finally {
