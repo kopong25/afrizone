@@ -102,10 +102,10 @@ async def get_shipping_rates(
 @router.post("/label/{order_id}")
 async def create_shipping_label(
     order_id: int,
-    rate_id: str = "auto",
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.require_seller)
+    current_user: models.User = Depends(auth_utils.require_seller),
+    rate_id: str = "auto",
 ):
     """Create a shipping label for an order."""
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
