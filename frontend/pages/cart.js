@@ -88,12 +88,14 @@ export default function CartPage() {
         await ordersAPI.create({
           store_id: storeGroup.store.id,
           items: orderItems,
-          shipping_name: shipping.name,
-          shipping_address: shipping.address,
-          shipping_city: shipping.city,
-          shipping_state: shipping.state,
-          shipping_country: shipping.country,
-          shipping_zip: shipping.zip,
+          shipping: {
+            name: shipping.name,
+            address: shipping.address,
+            city: shipping.city,
+            state: shipping.state,
+            country: shipping.country || "USA",
+            zip: shipping.zip,
+          },
         });
       }
       toast.success("🎉 Order placed successfully!");
