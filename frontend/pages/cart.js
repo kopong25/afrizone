@@ -56,8 +56,8 @@ export default function CartPage() {
 
   // Group items by store
   const byStore = items.reduce((acc, item) => {
-    const storeId = item.product.store?.id || "unknown";
-    if (!acc[storeId]) acc[storeId] = { store: item.product.store, items: [] };
+    const storeId = item.product.store_id || item.product.store?.id || "unknown";
+    if (!acc[storeId]) acc[storeId] = { store: { id: storeId, name: item.product.store?.name || "Store" }, items: [] };
     acc[storeId].items.push(item);
     return acc;
   }, {});
