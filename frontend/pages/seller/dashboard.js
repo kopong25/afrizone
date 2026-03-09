@@ -98,7 +98,12 @@ export default function SellerDashboard() {
             </p>
           </div>
           <Link href="/seller/store" className="btn-secondary py-2 px-4 text-sm mr-2">Store Settings</Link>
-          <Link href="/seller/subscription" className="btn-secondary py-2 px-4 text-sm mr-2">⚡ Upgrade Plan</Link>
+          <Link href="/referral"
+              className="flex flex-col items-center justify-center gap-2 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 text-yellow-800 p-4 rounded-xl transition-colors text-center">
+              <span className="text-2xl">🎁</span>
+              <span className="text-xs font-bold">Referral</span>
+            </Link>
+            <Link href="/seller/subscription" className="btn-secondary py-2 px-4 text-sm mr-2">⚡ Upgrade Plan</Link>
           <Link href="/seller/analytics" className="btn-secondary py-2 px-4 text-sm mr-2">Analytics</Link>
           <Link href="/seller/products" className="btn-primary py-2 px-4 text-sm">
             + Add Product
@@ -146,7 +151,12 @@ export default function SellerDashboard() {
             <div className="flex justify-between items-center mb-4">
               <h2 className="font-bold text-gray-800">Recent Products</h2>
               <Link href="/seller/store" className="btn-secondary py-2 px-4 text-sm mr-2">Store Settings</Link>
-          <Link href="/seller/subscription" className="btn-secondary py-2 px-4 text-sm mr-2">⚡ Upgrade Plan</Link>
+          <Link href="/referral"
+              className="flex flex-col items-center justify-center gap-2 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 text-yellow-800 p-4 rounded-xl transition-colors text-center">
+              <span className="text-2xl">🎁</span>
+              <span className="text-xs font-bold">Referral</span>
+            </Link>
+            <Link href="/seller/subscription" className="btn-secondary py-2 px-4 text-sm mr-2">⚡ Upgrade Plan</Link>
           <Link href="/seller/analytics" className="btn-secondary py-2 px-4 text-sm mr-2">Analytics</Link>
           <Link href="/seller/products" className="text-sm text-green-900 hover:underline">View All</Link>
             </div>
@@ -155,7 +165,12 @@ export default function SellerDashboard() {
                 <FiPackage size={40} className="mx-auto mb-2" />
                 <p>No products yet</p>
                 <Link href="/seller/store" className="btn-secondary py-2 px-4 text-sm mr-2">Store Settings</Link>
-          <Link href="/seller/subscription" className="btn-secondary py-2 px-4 text-sm mr-2">⚡ Upgrade Plan</Link>
+          <Link href="/referral"
+              className="flex flex-col items-center justify-center gap-2 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 text-yellow-800 p-4 rounded-xl transition-colors text-center">
+              <span className="text-2xl">🎁</span>
+              <span className="text-xs font-bold">Referral</span>
+            </Link>
+            <Link href="/seller/subscription" className="btn-secondary py-2 px-4 text-sm mr-2">⚡ Upgrade Plan</Link>
           <Link href="/seller/analytics" className="btn-secondary py-2 px-4 text-sm mr-2">Analytics</Link>
           <Link href="/seller/products" className="text-green-900 text-sm font-semibold hover:underline">Add your first product</Link>
               </div>

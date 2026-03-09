@@ -131,7 +131,10 @@ export default function Navbar() {
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
                         <FiShoppingCart size={15} /> Cart {cartCount > 0 && <span className="ml-auto bg-yellow-400 text-green-900 text-xs font-bold px-1.5 rounded-full">{cartCount}</span>}
                       </Link>
-                      <Link href="/messages"
+                      <Link href="/referral" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+              <FiGift size={14} /> Referral Program
+            </Link>
+            <Link href="/messages"
               className="text-gray-300 hover:text-white transition-colors text-sm flex items-center gap-1">
               <FiMessageSquare size={16}/> Messages
             </Link>
