@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useAuth } from "../../pages/_app";
 import { ordersAPI, productsAPI } from "../../lib/api";
-import { FiShoppingCart, FiUser, FiMenu, FiX, FiSearch, FiPackage, FiLogOut, FiSettings, FiMessageSquare } from "react-icons/fi";
+import { FiShoppingCart, FiUser, FiMenu, FiX, FiSearch, FiPackage, FiLogOut, FiSettings, FiMessageSquare, FiGift } from "react-icons/fi";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
