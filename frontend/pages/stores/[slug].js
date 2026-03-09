@@ -5,7 +5,10 @@ import Navbar from "../../components/layout/Navbar";
 import Footer from "../../components/layout/Footer";
 import ProductCard from "../../components/ui/ProductCard";
 import { storesAPI } from "../../lib/api";
-import { FiMapPin, FiStar, FiPackage, FiGlobe, FiPhone } from "react-icons/fi";
+import { FiMapPin, FiStar, FiPackage, FiGlobe, FiPhone, FiMessageSquare } from "react-icons/fi";
+import { useAuth } from "../_app";
+import api from "../../lib/api";
+import toast from "react-hot-toast";
 
 export default function StorePage() {
   const router = useRouter();
@@ -13,6 +16,27 @@ export default function StorePage() {
   const [store, setStore] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const [messaging, setMessaging] = useState(false);
+
+  const startMessage = async () => {
+    if (!user) { router.push("/login"); return; }
+    if (user.role === "seller" || user.role === "admin") {
+      toast.error("Login as a buyer to message sellers");
+      return;
+    }
+    setMessaging(true);
+    try {
+      const r = await api.post("/messages/start", {
+        seller_id: store.owner_id,
+        body: `Hi! I have a question about your store ${store.name}.`,
+        store_id: store.id,
+      });
+      router.push("/messages");
+    } catch (e) {
+      toast.error("Could not start conversation");
+    } finally { setMessaging(false); }
+  };
 
   useEffect(() => {
     if (!slug) return;
@@ -92,6 +116,13 @@ export default function StorePage() {
                 )}
               </div>
               {store.description && <p className="text-gray-600 text-sm max-w-2xl">{store.description}</p>}
+              <div className="mt-4">
+                <button onClick={startMessage} disabled={messaging}
+                  className="flex items-center gap-2 bg-green-900 hover:bg-green-800 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors">
+                  <FiMessageSquare size={15} />
+                  {messaging ? "Opening chat..." : "Message Seller"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

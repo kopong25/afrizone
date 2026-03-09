@@ -87,6 +87,11 @@ class StoreOut(BaseModel):
     avg_rating: float
     review_count: int
     stripe_onboarding_complete: bool
+    owner_id: Optional[int] = None
+    website: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    total_revenue: Optional[float] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
