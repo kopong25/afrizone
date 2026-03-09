@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Navbar from "../../components/layout/Navbar";
+import Footer from "../../components/layout/Footer";
 import { storesAPI, productsAPI, ordersAPI, paymentsAPI } from "../../lib/api";
 import { useAuth } from "../_app";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { FiPackage, FiShoppingBag, FiDollarSign, FiStar, FiExternalLink, FiAlertCircle } from "react-icons/fi";
+import { FiPackage, FiShoppingBag, FiDollarSign, FiStar, FiAlertCircle } from "react-icons/fi";
 
 function StatCard({ icon, label, value, sub, color = "green" }) {
   const colors = {
@@ -52,7 +53,6 @@ export default function SellerDashboard() {
         setStripeStatus(stripe.data);
       }).catch(console.error).finally(() => setLoading(false));
 
-      // Handle Stripe redirect
       if (router.query.stripe === "success") {
         toast.success("Stripe account connected! You can now receive payments.");
       }
@@ -86,8 +86,9 @@ export default function SellerDashboard() {
     <>
       <Navbar />
       <div className="max-w-7xl mx-auto px-4 py-8">
+
         {/* Header */}
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex items-start justify-between mb-8 flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-black text-gray-900">Seller Dashboard</h1>
             <p className="text-gray-500 mt-1">
@@ -97,17 +98,13 @@ export default function SellerDashboard() {
               </span>
             </p>
           </div>
-          <Link href="/seller/store" className="btn-secondary py-2 px-4 text-sm mr-2">Store Settings</Link>
-          <Link href="/referral"
-              className="flex flex-col items-center justify-center gap-2 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 text-yellow-800 p-4 rounded-xl transition-colors text-center">
-              <span className="text-2xl">🎁</span>
-              <span className="text-xs font-bold">Referral</span>
-            </Link>
-            <Link href="/seller/subscription" className="btn-secondary py-2 px-4 text-sm mr-2">⚡ Upgrade Plan</Link>
-          <Link href="/seller/analytics" className="btn-secondary py-2 px-4 text-sm mr-2">Analytics</Link>
-          <Link href="/seller/products" className="btn-primary py-2 px-4 text-sm">
-            + Add Product
-          </Link>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link href="/seller/analytics" className="text-sm border border-gray-200 text-gray-700 hover:bg-gray-50 py-2 px-4 rounded-xl font-medium">📊 Analytics</Link>
+            <Link href="/seller/subscription" className="text-sm border border-gray-200 text-gray-700 hover:bg-gray-50 py-2 px-4 rounded-xl font-medium">⚡ Upgrade</Link>
+            <Link href="/referral" className="text-sm border border-yellow-200 bg-yellow-50 text-yellow-800 hover:bg-yellow-100 py-2 px-4 rounded-xl font-medium">🎁 Referral</Link>
+            <Link href="/seller/store" className="text-sm border border-gray-200 text-gray-700 hover:bg-gray-50 py-2 px-4 rounded-xl font-medium">⚙️ Settings</Link>
+            <Link href="/seller/products" className="text-sm bg-green-900 hover:bg-green-800 text-white py-2 px-4 rounded-xl font-bold">+ Add Product</Link>
+          </div>
         </div>
 
         {/* Stripe Alert */}
@@ -116,9 +113,7 @@ export default function SellerDashboard() {
             <FiAlertCircle className="text-yellow-600 mt-0.5 flex-shrink-0" size={20} />
             <div>
               <p className="font-semibold text-yellow-800">Connect Stripe to receive payments</p>
-              <p className="text-sm text-yellow-700 mt-1">
-                You need to set up a Stripe account to receive payouts when customers buy your products.
-              </p>
+              <p className="text-sm text-yellow-700 mt-1">Set up a Stripe account to receive payouts when customers buy your products.</p>
               <button onClick={connectStripe} className="mt-3 text-sm bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-500">
                 Connect Stripe Account →
               </button>
@@ -126,14 +121,16 @@ export default function SellerDashboard() {
           </div>
         )}
 
-        {/* Subscription Alert */}
+        {/* Upgrade nudge */}
         {store?.status === "approved" && store?.tier === "basic" && (
-          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center justify-between gap-4">
             <div>
-              <p className="font-semibold text-green-900">You're on the Basic plan (50 products max)</p>
-              <p className="text-sm text-green-700">Upgrade to list more products and unlock premium features.</p>
+              <p className="font-semibold text-green-900">You're on the Basic plan</p>
+              <p className="text-sm text-green-700">Upgrade to list more products and lower your commission.</p>
             </div>
-            <Link href="/pricing" className="btn-gold text-sm py-2 px-4">Upgrade Plan</Link>
+            <Link href="/pricing" className="text-sm bg-yellow-400 hover:bg-yellow-300 text-green-900 font-bold py-2 px-4 rounded-xl flex-shrink-0">
+              Upgrade Plan
+            </Link>
           </div>
         )}
 
@@ -150,42 +147,28 @@ export default function SellerDashboard() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="font-bold text-gray-800">Recent Products</h2>
-              <Link href="/seller/store" className="btn-secondary py-2 px-4 text-sm mr-2">Store Settings</Link>
-          <Link href="/referral"
-              className="flex flex-col items-center justify-center gap-2 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 text-yellow-800 p-4 rounded-xl transition-colors text-center">
-              <span className="text-2xl">🎁</span>
-              <span className="text-xs font-bold">Referral</span>
-            </Link>
-            <Link href="/seller/subscription" className="btn-secondary py-2 px-4 text-sm mr-2">⚡ Upgrade Plan</Link>
-          <Link href="/seller/analytics" className="btn-secondary py-2 px-4 text-sm mr-2">Analytics</Link>
-          <Link href="/seller/products" className="text-sm text-green-900 hover:underline">View All</Link>
+              <Link href="/seller/products" className="text-sm text-green-900 hover:underline">View All</Link>
             </div>
             {products.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
                 <FiPackage size={40} className="mx-auto mb-2" />
-                <p>No products yet</p>
-                <Link href="/seller/store" className="btn-secondary py-2 px-4 text-sm mr-2">Store Settings</Link>
-          <Link href="/referral"
-              className="flex flex-col items-center justify-center gap-2 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 text-yellow-800 p-4 rounded-xl transition-colors text-center">
-              <span className="text-2xl">🎁</span>
-              <span className="text-xs font-bold">Referral</span>
-            </Link>
-            <Link href="/seller/subscription" className="btn-secondary py-2 px-4 text-sm mr-2">⚡ Upgrade Plan</Link>
-          <Link href="/seller/analytics" className="btn-secondary py-2 px-4 text-sm mr-2">Analytics</Link>
-          <Link href="/seller/products" className="text-green-900 text-sm font-semibold hover:underline">Add your first product</Link>
+                <p className="mb-3">No products yet</p>
+                <Link href="/seller/products" className="text-green-900 text-sm font-semibold hover:underline">Add your first product</Link>
               </div>
             ) : (
               <div className="space-y-3">
                 {products.slice(0, 5).map((p) => (
                   <div key={p.id} className="flex items-center gap-3 py-2 border-b last:border-0">
                     <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                      {p.images?.[0] ? <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xl">📦</div>}
+                      {p.images?.[0]
+                        ? <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />
+                        : <div className="w-full h-full flex items-center justify-center text-xl">📦</div>}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
                       <p className="text-xs text-gray-500">${p.price.toFixed(2)} · {p.stock} in stock</p>
                     </div>
-                    <span className={`badge text-xs ${p.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${p.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                       {p.is_active ? "Active" : "Draft"}
                     </span>
                   </div>
