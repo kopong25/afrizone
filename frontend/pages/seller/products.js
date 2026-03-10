@@ -4,7 +4,7 @@ import Navbar from "../../components/layout/Navbar";
 import { productsAPI } from "../../lib/api";
 import { useAuth } from "../_app";
 import toast from "react-hot-toast";
-import { FiPlus, FiEdit, FiEdit2, FiTrash2, FiUpload, FiPackage, FiX, FiCheck } from "react-icons/fi";
+import { FiPlus, FiEdit2, FiTrash2, FiUpload, FiX } from "react-icons/fi";
 
 const INITIAL_FORM = {
   name: "", description: "", price: "", compare_price: "",
@@ -226,14 +226,14 @@ export default function SellerProducts() {
                     </div>
                   )}
                 </div>
-                <input ref={fileRef} type="file" multiple accept="image/*" className="hidden"
+                <input ref={fileRef} type="file" multiple accept="image/jpeg,image/png,image/webp" className="hidden"
                   onChange={(e) => {
                     const files = Array.from(e.target.files).slice(0, 5 - (form.existing_images?.length || 0));
                     setImages(files);
                     const readers = files.map(f => new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(f); }));
                     Promise.all(readers).then(setImagePreviews);
                   }} />
-                <p className="text-xs text-gray-400">JPEG, PNG or WebP · Max 5MB each · First image is the main photo</p>
+                <p className="text-xs text-gray-400"><strong>PNG, JPG or WebP</strong> · Max 5MB each · First image is the main photo · Min 800×800px recommended</p>
               </div>
 
               <div className="flex gap-3">
