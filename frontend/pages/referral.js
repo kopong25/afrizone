@@ -13,7 +13,7 @@ export default function ReferralPage() {
   const [data, setData] = useState(null);
   const [stats, setStats] = useState(null);
   const [copied, setCopied] = useState(false);
-  const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || "https://afrizone-frontend.onrender.com";
+  const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || "https://afrizoneshop.com";
 
   useEffect(() => {
     if (!user) { router.push("/login"); return; }

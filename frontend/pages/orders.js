@@ -156,13 +156,14 @@ function OrderCard({ order }) {
 }
 
 export default function OrdersPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) { router.push("/login"); return; }
     ordersAPI.myOrders()
       .then((r) => {
@@ -173,7 +174,7 @@ export default function OrdersPage() {
       })
       .catch(() => { toast.error("Failed to load orders"); setOrders([]); })
       .finally(() => setLoading(false));
-  }, [user]);
+  }, [user, authLoading]);
 
   const filtered = Array.isArray(orders)
     ? (filter === "all" ? orders : orders.filter((o) => o.status === filter))
