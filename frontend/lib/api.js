@@ -8,23 +8,30 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Attach JWT token to every request
+// Attach JWT token - localStorage first (works on mobile), cookie fallback
 api.interceptors.request.use((config) => {
-  const token = Cookies.get("afrizone_token");
+  let token = null;
+  try { token = localStorage.getItem("afrizone_token"); } catch {}
+  if (!token) { try { token = Cookies.get("afrizone_token"); } catch {} }
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Handle 401 — redirect to login
+// Handle 401 — only redirect if we actually had a token (real session expiry)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      let hadToken = false;
+      try { hadToken = !!localStorage.getItem("afrizone_token"); } catch {}
+      if (!hadToken) { try { hadToken = !!Cookies.get("afrizone_token"); } catch {} }
+      // Clear tokens
       try { localStorage.removeItem("afrizone_token"); } catch {}
       try { Cookies.remove("afrizone_token"); } catch {}
-      if (typeof window !== "undefined") {
+      // Only redirect if user was actually logged in
+      if (hadToken && typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
         window.location.href = "/login";
       }
     }
