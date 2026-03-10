@@ -60,7 +60,7 @@ function PaymentForm({ orderId, total, onSuccess }) {
 
 // ─── Main Checkout Page ───────────────────────────────────────
 export default function CheckoutPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const { order_id } = router.query;
 
@@ -70,10 +70,11 @@ export default function CheckoutPage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!user) { router.push("/login"); return; }
+    if (authLoading) return; // Wait for auth to load
+    if (!user) { router.push("/login?redirect=/checkout?order_id=" + order_id); return; }
     if (!order_id) return;
     initPayment();
-  }, [user, order_id]);
+  }, [user, order_id, authLoading]);
 
   const initPayment = async () => {
     try {

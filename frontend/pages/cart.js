@@ -10,7 +10,7 @@ import { FiTrash2, FiMinus, FiPlus, FiShoppingCart, FiArrowRight, FiLock } from 
 
 export default function CartPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
@@ -24,9 +24,10 @@ export default function CartPage() {
   });
 
   useEffect(() => {
-    if (!user) { router.push("/login"); return; }
+    if (loading) return;
+    if (!user) { router.push("/login?redirect=/cart"); return; }
     fetchCart();
-  }, [user]);
+  }, [user, loading]);
 
   const fetchCart = async () => {
     try {
