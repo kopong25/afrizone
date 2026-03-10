@@ -11,17 +11,44 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+// Store token in BOTH localStorage (mobile) and cookie (desktop)
+function saveToken(token) {
+  try { localStorage.setItem("afrizone_token", token); } catch {}
+  try {
+    const isProduction = window.location.protocol === "https:";
+    Cookies.set("afrizone_token", token, {
+      expires: 7,
+      sameSite: isProduction ? "None" : "Lax",
+      secure: isProduction,
+    });
+  } catch {}
+}
+
+function getToken() {
+  try {
+    return localStorage.getItem("afrizone_token") || Cookies.get("afrizone_token") || null;
+  } catch {
+    return Cookies.get("afrizone_token") || null;
+  }
+}
+
+function clearToken() {
+  try { localStorage.removeItem("afrizone_token"); } catch {}
+  try { Cookies.remove("afrizone_token"); } catch {}
+  try { Cookies.remove("token"); } catch {}
+}
+
 function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = Cookies.get("afrizone_token");
+    const token = getToken();
     if (token) {
       authAPI.me()
         .then((res) => setUser(res.data))
         .catch(() => {
-          Cookies.remove("afrizone_token");
+          clearToken();
           setUser(null);
         })
         .finally(() => setLoading(false));
@@ -31,19 +58,12 @@ function AuthProvider({ children }) {
   }, []);
 
   const login = (token, userData) => {
-    // Use secure cookie settings for production
-    const isProduction = window.location.protocol === "https:";
-    Cookies.set("afrizone_token", token, {
-      expires: 7,
-      sameSite: isProduction ? "None" : "Lax",
-      secure: isProduction,
-    });
+    saveToken(token);
     setUser(userData);
   };
 
   const logout = () => {
-    Cookies.remove("afrizone_token");
-    Cookies.remove("token"); // remove old cookie too
+    clearToken();
     setUser(null);
     window.location.href = "/";
   };

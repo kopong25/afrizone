@@ -22,7 +22,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      Cookies.remove("afrizone_token");
+      try { localStorage.removeItem("afrizone_token"); } catch {}
+      try { Cookies.remove("afrizone_token"); } catch {}
       if (typeof window !== "undefined") {
         window.location.href = "/login";
       }
