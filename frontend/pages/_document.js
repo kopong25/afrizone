@@ -25,6 +25,7 @@ export default function Document() {
         <link rel="shortcut icon" href="/icons/icon-96x96.png" />
 
         {/* SEO */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
         <meta name="description" content="Shop authentic African products from stores in the USA, Canada & Europe. Food, fashion, beauty, art and more." />
         <meta property="og:title" content="Afrizone — Pan-African Marketplace" />
         <meta property="og:description" content="Shop authentic African products from stores across the diaspora." />

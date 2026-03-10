@@ -67,6 +67,7 @@ export default function ProductCard({ product, wishlisted, onWishlist }) {
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onWishlist(); }}
             className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:scale-110 transition-transform opacity-0 group-hover:opacity-100"
+            aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
           >
             <FiHeart size={14} className={wishlisted ? "fill-red-500 text-red-500" : "text-gray-400"} />
           </button>

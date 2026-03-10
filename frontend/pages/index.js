@@ -277,7 +277,7 @@ export default function Home() {
           </aside>
 
           {/* Products Grid */}
-          <main className="flex-1 min-w-0">
+          <main id="main-content" className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-5">
               <p className="text-sm text-gray-500">
                 {loading ? "Loading..." : <><span className="font-bold text-gray-800">{pagination.total}</span> products found</>}
