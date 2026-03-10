@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/router";
 import { useAuth } from "../../pages/_app";
 import { ordersAPI, productsAPI } from "../../lib/api";
@@ -48,8 +49,9 @@ export default function Navbar() {
     <nav className="bg-green-900 text-white sticky top-0 z-50 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
         {/* Logo */}
-        <Link href="/" className="font-black text-xl text-yellow-400 flex-shrink-0 tracking-tight">
-          AFRIZONE
+        <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+          <img src="/logo.png" alt="Afrizone" width={36} height={36} style={{borderRadius:8,display:"block"}} />
+          <span className="font-black text-xl text-yellow-400 tracking-tight">AFRIZONE</span>
         </Link>
 
         {/* Search bar */}
