@@ -60,13 +60,39 @@ def approve_seller(
     return store
 
 
-@router.get("/users", response_model=List[schemas.UserOut])
+@router.get("/users")
 def list_users(
-    skip: int = 0, limit: int = 50,
+    skip: int = 0, limit: int = 100,
+    role: str = None,
+    search: str = None,
     db: Session = Depends(get_db),
     _: models.User = Depends(auth_utils.require_admin)
 ):
-    return db.query(models.User).offset(skip).limit(limit).all()
+    from sqlalchemy.orm import joinedload
+    query = db.query(models.User).options(joinedload(models.User.store))
+    if role:
+        query = query.filter(models.User.role == role)
+    if search:
+        query = query.filter(
+            (models.User.full_name.ilike(f"%{search}%")) |
+            (models.User.email.ilike(f"%{search}%"))
+        )
+    users = query.order_by(models.User.created_at.desc()).offset(skip).limit(limit).all()
+    return [
+        {
+            "id": u.id,
+            "full_name": u.full_name,
+            "email": u.email,
+            "role": u.role,
+            "is_active": u.is_active,
+            "created_at": u.created_at,
+            "store_name": u.store.name if u.store else None,
+            "store_status": u.store.status if u.store else None,
+            "store_id": u.store.id if u.store else None,
+            "store_country": u.store.country if u.store else None,
+        }
+        for u in users
+    ]
 
 
 @router.put("/users/{user_id}/deactivate")
