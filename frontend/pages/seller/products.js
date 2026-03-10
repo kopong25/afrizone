@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import Navbar from "../../components/layout/Navbar";
-import { productsAPI } from "../../lib/api";
+import api, { productsAPI } from "../../lib/api";
 import { useAuth } from "../_app";
 import toast from "react-hot-toast";
 import { FiPlus, FiEdit2, FiTrash2, FiUpload, FiX, FiPackage } from "react-icons/fi";
@@ -23,8 +23,9 @@ export default function SellerProducts() {
   const [form, setForm] = useState(INITIAL_FORM);
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const fileRef = useRef();
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/login");
@@ -67,11 +68,28 @@ export default function SellerProducts() {
         toast.success("Product created!");
       }
 
-      // Upload images if selected
+      // Upload images separately so product save always succeeds
       if (images.length > 0) {
-        const formData = new FormData();
-        images.forEach((f) => formData.append("files", f));
-        await productsAPI.uploadImages(product.id, formData);
+        try {
+          // Check if images are already URLs (from direct Cloudinary upload)
+          const fileImages = images.filter(i => i instanceof File);
+          const urlImages = images.filter(i => typeof i === "string");
+
+          // Save any direct URL images to backend
+          if (urlImages.length > 0) {
+            await api.post(`/products/seller/${product.id}/image-urls`, { urls: urlImages });
+          }
+
+          // Upload any File objects via backend
+          if (fileImages.length > 0) {
+            const formData = new FormData();
+            fileImages.forEach((f) => formData.append("files", f));
+            await productsAPI.uploadImages(product.id, formData);
+          }
+        } catch (imgErr) {
+          console.error("Image upload failed:", imgErr);
+          toast.error("Product saved but image upload failed — try uploading images again from Edit");
+        }
       }
 
       setShowForm(false);
@@ -219,21 +237,65 @@ export default function SellerProducts() {
                   ))}
                   {/* Upload button */}
                   {(images.length + (form.existing_images?.length || 0)) < 5 && (
-                    <div onClick={() => fileRef.current.click()}
-                      className="aspect-square border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-green-900 hover:bg-green-50 transition-colors">
-                      <FiUpload size={20} className="text-gray-400 mb-1" />
-                      <p className="text-xs text-gray-400 text-center px-2">Add photo</p>
-                    </div>
+                    <label className="aspect-square border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-green-900 hover:bg-green-50 transition-colors">
+                      {uploadingImg ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <div className="w-6 h-6 border-2 border-green-900 border-t-transparent rounded-full animate-spin" />
+                          <p className="text-xs text-green-900">{uploadProgress}%</p>
+                        </div>
+                      ) : (
+                        <>
+                          <FiUpload size={20} className="text-gray-400 mb-1" />
+                          <p className="text-xs text-gray-400 text-center px-2">Add photo</p>
+                        </>
+                      )}
+                      <input type="file" multiple accept="image/jpeg,image/png,image/webp" className="hidden"
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files).slice(0, 5 - (form.existing_images?.length || 0) - images.length);
+                          const CLOUD = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+                          const PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+                          for (const file of files) {
+                            // Show local preview immediately
+                            const localUrl = await new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(file); });
+                            setImagePreviews(p => [...p, localUrl]);
+
+                            if (CLOUD && PRESET) {
+                              // Upload directly to Cloudinary
+                              setUploadingImg(true);
+                              try {
+                                const fd = new FormData();
+                                fd.append("file", file);
+                                fd.append("upload_preset", PRESET);
+                                fd.append("folder", "afrizone/products");
+                                const xhr = new XMLHttpRequest();
+                                xhr.upload.onprogress = (ev) => { if (ev.lengthComputable) setUploadProgress(Math.round(ev.loaded/ev.total*100)); };
+                                const url = await new Promise((resolve, reject) => {
+                                  xhr.onload = () => xhr.status === 200 ? resolve(JSON.parse(xhr.responseText).secure_url) : reject();
+                                  xhr.onerror = reject;
+                                  xhr.open("POST", `https://api.cloudinary.com/v1_1/${CLOUD}/image/upload`);
+                                  xhr.send(fd);
+                                });
+                                setImages(imgs => [...imgs, url]);
+                                setImagePreviews(p => [...p.slice(0, -1), url]);
+                                toast.success("Image uploaded!");
+                              } catch {
+                                toast.error("Image upload failed — check Cloudinary settings");
+                                setImagePreviews(p => p.slice(0, -1));
+                              } finally {
+                                setUploadingImg(false);
+                                setUploadProgress(0);
+                              }
+                            } else {
+                              // Fallback: store File object for backend upload
+                              setImages(imgs => [...imgs, file]);
+                            }
+                          }
+                        }} />
+                    </label>
                   )}
                 </div>
-                <input ref={fileRef} type="file" multiple accept="image/jpeg,image/png,image/webp" className="hidden"
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files).slice(0, 5 - (form.existing_images?.length || 0));
-                    setImages(files);
-                    const readers = files.map(f => new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(f); }));
-                    Promise.all(readers).then(setImagePreviews);
-                  }} />
-                <p className="text-xs text-gray-400"><strong>PNG, JPG or WebP</strong> · Max 5MB each · First image is the main photo · Min 800×800px recommended</p>
+                <p className="text-xs text-gray-400"><strong>PNG, JPG or WebP</strong> · Max 5MB · First image is the main photo · Min 800×800px recommended</p>
               </div>
 
               <div className="flex gap-3">

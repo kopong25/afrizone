@@ -203,6 +203,26 @@ async def upload_product_images(
     return {"images": product.images}
 
 
+@router.post("/seller/{product_id}/image-urls")
+def save_image_urls(
+    product_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.require_seller)
+):
+    """Save Cloudinary URLs directly (for browser-side direct uploads)."""
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
+    if not store or product.store_id != store.id:
+        raise HTTPException(status_code=403, detail="You don't own this product")
+    urls = payload.get("urls", [])
+    product.images = (product.images or []) + [u for u in urls if u.startswith("http")]
+    db.commit()
+    return {"images": product.images}
+
+
 @router.delete("/seller/{product_id}", status_code=204)
 def delete_product(
     product_id: int,
