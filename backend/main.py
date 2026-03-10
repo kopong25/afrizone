@@ -26,9 +26,17 @@ app = FastAPI(
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
+ALLOWED_ORIGINS = [
+    FRONTEND_URL,
+    "http://localhost:3000",
+    "https://afrizone-frontend.onrender.com",
+    "https://afrizoneshop.com",
+    "https://www.afrizoneshop.com",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
