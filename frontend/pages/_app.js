@@ -15,7 +15,8 @@ function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load any persisted token into memory first, then verify with backend
+    // loadStoredToken reads sessionStorage → localStorage → cookie
+    // and puts token into _memoryToken so all axios calls are authenticated
     const token = loadStoredToken();
     if (token) {
       authAPI.me()

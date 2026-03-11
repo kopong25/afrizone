@@ -3,16 +3,18 @@ import Cookies from "js-cookie";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-// ─── In-memory token store ───────────────────────────────────────────────────
-// PRIMARY source of truth. Works everywhere: normal browser, iOS Safari,
-// Private mode, PWA. Token lives in RAM for the page session.
-// localStorage/cookie are used only for persistence across page loads.
+// ─── Token store ─────────────────────────────────────────────────────────────
+// Priority: sessionStorage (works in iOS Private) → localStorage → cookie
+// sessionStorage survives page navigation within the same tab on ALL browsers
+// including iOS Safari Private mode where localStorage quota is 0.
 let _memoryToken = null;
 
-export function setAuthToken(token) {
-  _memoryToken = token || null;
-  // Best-effort persistence (may fail in Private mode — that's OK)
+function _write(token) {
+  // sessionStorage: works in iOS Private mode, survives navigation within tab
+  try { if (token) sessionStorage.setItem("az_tok", token); else sessionStorage.removeItem("az_tok"); } catch {}
+  // localStorage: survives across tabs/sessions (blocked in iOS Private — silent fail)
   try { if (token) localStorage.setItem("afrizone_token", token); else localStorage.removeItem("afrizone_token"); } catch {}
+  // Cookie: fallback for SSR / desktop
   try {
     if (token) {
       const isProd = typeof window !== "undefined" && window.location.protocol === "https:";
@@ -23,18 +25,32 @@ export function setAuthToken(token) {
   } catch {}
 }
 
-export function loadStoredToken() {
-  // Load persisted token into memory on page load
-  let token = null;
-  try { token = localStorage.getItem("afrizone_token"); } catch {}
-  if (!token) { try { token = Cookies.get("afrizone_token"); } catch {} }
-  if (!token && typeof document !== "undefined") {
+function _read() {
+  let t = null;
+  try { t = sessionStorage.getItem("az_tok"); } catch {}
+  if (!t) { try { t = localStorage.getItem("afrizone_token"); } catch {} }
+  if (!t) { try { t = Cookies.get("afrizone_token"); } catch {} }
+  if (!t && typeof document !== "undefined") {
     try {
       const m = document.cookie.match(/(?:^|;\s*)afrizone_token=([^;]+)/);
-      if (m) token = decodeURIComponent(m[1]);
+      if (m) t = decodeURIComponent(m[1]);
     } catch {}
   }
-  if (token) _memoryToken = token;
+  return t || null;
+}
+
+export function setAuthToken(token) {
+  _memoryToken = token || null;
+  _write(token || null);
+}
+
+export function loadStoredToken() {
+  const token = _read();
+  if (token) {
+    _memoryToken = token;
+    // Ensure sessionStorage has it for this tab session
+    try { sessionStorage.setItem("az_tok", token); } catch {}
+  }
   return token;
 }
 
@@ -57,13 +73,12 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Only wipe token if it was a real auth endpoint failure, not a checkout/order call
+      // Never auto-redirect — let the component show the error
+      // Only clear tokens if this was an explicit /auth/ call
       const url = error.config?.url || "";
-      const isAuthCall = url.includes("/auth/");
-      if (isAuthCall) {
+      if (url.includes("/auth/me") || url.includes("/auth/login")) {
         _memoryToken = null;
-        try { localStorage.removeItem("afrizone_token"); } catch {}
-        try { Cookies.remove("afrizone_token"); } catch {}
+        _write(null);
       }
     }
     return Promise.reject(error);
