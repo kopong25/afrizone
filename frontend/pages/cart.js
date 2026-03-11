@@ -118,7 +118,7 @@ export default function CartPage() {
         }, { headers: authHeaders });
         createdOrders.push(r.data);
       }
-      try { await api.post("/orders/cart/clear", {}, { headers: authHeaders }); } catch {}
+      try { await api.delete("/orders/cart/clear", { headers: authHeaders }); } catch {}
       setItems([]);
       if (createdOrders.length > 0) {
         router.push(`/checkout?order_id=${createdOrders[0].id}`);
