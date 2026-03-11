@@ -60,7 +60,7 @@ function PaymentForm({ orderId, total, onSuccess }) {
 
 // ─── Main Checkout Page ───────────────────────────────────────
 export default function CheckoutPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
   const { order_id } = router.query;
 
@@ -73,17 +73,16 @@ export default function CheckoutPage() {
     if (authLoading) return; // Wait for auth to load
     if (!user) { router.push("/login?redirect=/checkout?order_id=" + order_id); return; }
     if (!order_id) return;
-    initPayment();
+    initPayment(token);
   }, [user, order_id, authLoading]);
 
-  const initPayment = async () => {
+  const initPayment = async (authToken) => {
     try {
-      // Fetch order details
-      const orderRes = await api.get(`/orders/${order_id}`);
+      // Use explicit auth header — bypasses interceptor for iOS Safari reliability
+      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+      const orderRes = await api.get(`/orders/${order_id}`, { headers });
       setOrder(orderRes.data);
-
-      // Create payment intent
-      const payRes = await api.post("/payments/checkout", { order_id: parseInt(order_id) });
+      const payRes = await api.post("/payments/checkout", { order_id: parseInt(order_id) }, { headers });
       setClientSecret(payRes.data.client_secret);
     } catch (e) {
       const msg = e.response?.data?.detail || "Failed to initialize payment";

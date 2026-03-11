@@ -3,14 +3,14 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
-import { ordersAPI, paymentsAPI, discountsAPI } from "../lib/api";
+import api, { ordersAPI, paymentsAPI, discountsAPI } from "../lib/api";
 import { useAuth } from "./_app";
 import toast from "react-hot-toast";
 import { FiTrash2, FiMinus, FiPlus, FiShoppingCart, FiArrowRight, FiLock } from "react-icons/fi";
 
 export default function CartPage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
@@ -78,16 +78,33 @@ export default function CartPage() {
 
   const handleCheckout = async () => {
     if (items.length === 0) return;
+
+    // Get the best available token - context is most reliable (always in React memory)
+    const authToken = token || (() => {
+      let t = null;
+      try { t = sessionStorage.getItem("az_tok"); } catch {}
+      if (!t) { try { t = localStorage.getItem("afrizone_token"); } catch {} }
+      return t;
+    })();
+
+    if (!authToken) {
+      toast.error("Session expired — please sign in again");
+      router.push("/login?redirect=/cart");
+      return;
+    }
+
+    // Explicit auth header — bypasses interceptor completely, guaranteed on iOS
+    const authHeaders = { Authorization: `Bearer ${authToken}` };
+
     setCheckingOut(true);
     try {
-      // Create order for each store and redirect to payment
       const createdOrders = [];
       for (const storeGroup of Object.values(byStore)) {
         const orderItems = storeGroup.items.map((i) => ({
           product_id: i.product.id,
           quantity: i.quantity,
         }));
-        const r = await ordersAPI.create({
+        const r = await api.post("/orders/", {
           store_id: storeGroup.store.id,
           items: orderItems,
           shipping: {
@@ -98,13 +115,11 @@ export default function CartPage() {
             country: shipping.country || "USA",
             zip: shipping.zip,
           },
-        });
+        }, { headers: authHeaders });
         createdOrders.push(r.data);
       }
-      // Clear cart
-      try { await ordersAPI.clearCart(); } catch {}
+      try { await api.post("/orders/cart/clear", {}, { headers: authHeaders }); } catch {}
       setItems([]);
-      // Redirect to Stripe checkout for first order
       if (createdOrders.length > 0) {
         router.push(`/checkout?order_id=${createdOrders[0].id}`);
       } else {

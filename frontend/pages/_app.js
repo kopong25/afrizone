@@ -12,17 +12,18 @@ export function useAuth() {
 
 function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // loadStoredToken reads sessionStorage → localStorage → cookie
-    // and puts token into _memoryToken so all axios calls are authenticated
-    const token = loadStoredToken();
-    if (token) {
+    const stored = loadStoredToken();
+    if (stored) {
+      setToken(stored); // put token in React state immediately
       authAPI.me()
         .then((res) => setUser(res.data))
         .catch(() => {
           setAuthToken(null);
+          setToken(null);
           setUser(null);
         })
         .finally(() => setLoading(false));
@@ -31,19 +32,21 @@ function AuthProvider({ children }) {
     }
   }, []);
 
-  const login = (token, userData) => {
-    setAuthToken(token);   // sets memory + best-effort localStorage/cookie
+  const login = (tok, userData) => {
+    setAuthToken(tok);
+    setToken(tok);
     setUser(userData);
   };
 
   const logout = () => {
     setAuthToken(null);
+    setToken(null);
     setUser(null);
     window.location.href = "/";
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, setUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout, setUser }}>
       {children}
     </AuthContext.Provider>
   );
