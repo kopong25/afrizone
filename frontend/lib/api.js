@@ -3,49 +3,67 @@ import Cookies from "js-cookie";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// ─── In-memory token store ───────────────────────────────────────────────────
+// PRIMARY source of truth. Works everywhere: normal browser, iOS Safari,
+// Private mode, PWA. Token lives in RAM for the page session.
+// localStorage/cookie are used only for persistence across page loads.
+let _memoryToken = null;
+
+export function setAuthToken(token) {
+  _memoryToken = token || null;
+  // Best-effort persistence (may fail in Private mode — that's OK)
+  try { if (token) localStorage.setItem("afrizone_token", token); else localStorage.removeItem("afrizone_token"); } catch {}
+  try {
+    if (token) {
+      const isProd = typeof window !== "undefined" && window.location.protocol === "https:";
+      Cookies.set("afrizone_token", token, { expires: 7, sameSite: isProd ? "None" : "Lax", secure: isProd });
+    } else {
+      Cookies.remove("afrizone_token");
+    }
+  } catch {}
+}
+
+export function loadStoredToken() {
+  // Load persisted token into memory on page load
+  let token = null;
+  try { token = localStorage.getItem("afrizone_token"); } catch {}
+  if (!token) { try { token = Cookies.get("afrizone_token"); } catch {} }
+  if (!token && typeof document !== "undefined") {
+    try {
+      const m = document.cookie.match(/(?:^|;\s*)afrizone_token=([^;]+)/);
+      if (m) token = decodeURIComponent(m[1]);
+    } catch {}
+  }
+  if (token) _memoryToken = token;
+  return token;
+}
+
+// ─── Axios instance ──────────────────────────────────────────────────────────
 const api = axios.create({
   baseURL: API_URL,
   headers: { "Content-Type": "application/json" },
 });
 
-// Attach JWT token - try every possible source
+// Always use in-memory token first — guaranteed to work on all browsers
 api.interceptors.request.use((config) => {
-  let token = null;
-  // 1. localStorage (most reliable on mobile)
-  try { token = localStorage.getItem("afrizone_token"); } catch {}
-  // 2. js-cookie
-  if (!token) { try { token = Cookies.get("afrizone_token"); } catch {} }
-  // 3. Raw document.cookie parse (last resort for iOS Safari)
-  if (!token && typeof document !== "undefined") {
-    try {
-      const match = document.cookie.match(/(?:^|;\s*)afrizone_token=([^;]+)/);
-      if (match) token = decodeURIComponent(match[1]);
-    } catch {}
-  }
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-    // Opportunistically migrate to localStorage
-    try {
-      if (!localStorage.getItem("afrizone_token")) localStorage.setItem("afrizone_token", token);
-    } catch {}
-  }
+  const token = _memoryToken;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// Handle 401 — only redirect if we actually had a token (real session expiry)
+// Handle 401 — DO NOT auto-redirect (let components handle it)
+// Just clear the token so next requests don't keep failing
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      let hadToken = false;
-      try { hadToken = !!localStorage.getItem("afrizone_token"); } catch {}
-      if (!hadToken) { try { hadToken = !!Cookies.get("afrizone_token"); } catch {} }
-      // Clear tokens
-      try { localStorage.removeItem("afrizone_token"); } catch {}
-      try { Cookies.remove("afrizone_token"); } catch {}
-      // Only redirect if user was actually logged in
-      if (hadToken && typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
-        window.location.href = "/login";
+      // Only wipe token if it was a real auth endpoint failure, not a checkout/order call
+      const url = error.config?.url || "";
+      const isAuthCall = url.includes("/auth/");
+      if (isAuthCall) {
+        _memoryToken = null;
+        try { localStorage.removeItem("afrizone_token"); } catch {}
+        try { Cookies.remove("afrizone_token"); } catch {}
       }
     }
     return Promise.reject(error);

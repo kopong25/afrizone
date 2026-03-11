@@ -1,8 +1,7 @@
 import React from 'react';
 import { createContext, useContext, useState, useEffect } from "react";
 import { Toaster } from "react-hot-toast";
-import Cookies from "js-cookie";
-import { authAPI } from "../lib/api";
+import { authAPI, setAuthToken, loadStoredToken } from "../lib/api";
 import "../styles/globals.css";
 
 const AuthContext = createContext(null);
@@ -11,47 +10,18 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
-// Store token in BOTH localStorage (mobile) and cookie (desktop)
-function saveToken(token) {
-  try { localStorage.setItem("afrizone_token", token); } catch {}
-  try {
-    const isProduction = window.location.protocol === "https:";
-    Cookies.set("afrizone_token", token, {
-      expires: 7,
-      sameSite: isProduction ? "None" : "Lax",
-      secure: isProduction,
-    });
-  } catch {}
-}
-
-function getToken() {
-  try {
-    return localStorage.getItem("afrizone_token") || Cookies.get("afrizone_token") || null;
-  } catch {
-    return Cookies.get("afrizone_token") || null;
-  }
-}
-
-function clearToken() {
-  try { localStorage.removeItem("afrizone_token"); } catch {}
-  try { Cookies.remove("afrizone_token"); } catch {}
-  try { Cookies.remove("token"); } catch {}
-}
-
 function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = getToken();
+    // Load any persisted token into memory first, then verify with backend
+    const token = loadStoredToken();
     if (token) {
-      // CRITICAL: Re-save to localStorage immediately so axios interceptor
-      // can find it for all subsequent API calls (fixes iOS Safari cookie blocking)
-      try { localStorage.setItem("afrizone_token", token); } catch {}
       authAPI.me()
         .then((res) => setUser(res.data))
         .catch(() => {
-          clearToken();
+          setAuthToken(null);
           setUser(null);
         })
         .finally(() => setLoading(false));
@@ -61,12 +31,12 @@ function AuthProvider({ children }) {
   }, []);
 
   const login = (token, userData) => {
-    saveToken(token);
+    setAuthToken(token);   // sets memory + best-effort localStorage/cookie
     setUser(userData);
   };
 
   const logout = () => {
-    clearToken();
+    setAuthToken(null);
     setUser(null);
     window.location.href = "/";
   };
