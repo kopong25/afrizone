@@ -54,7 +54,7 @@ export default function Navbar() {
          <span className="flex flex-col leading-none w-fit">
           <span className="font-black text-xl text-yellow-400 tracking-tight"> AFRIZONE</span>
          <span className="text-[10px] text-yellow-200 font-medium tracking-tight">
-        Taste of Africa
+        Authentic African Products
      </span>
     </span>
          </Link>
