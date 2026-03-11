@@ -70,7 +70,7 @@ function EmptyState({ q, onReset }) {
             <Link key={cat.slug} href={`/?category=${cat.slug}`}
               className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all text-center border hover:border-green-900">
               <div className="text-3xl mb-2">{cat.icon}</div>
-              <p className="text-sm font-medium text-gray-700">{cat.name}</p>
+              <p className="text-xs font-medium text-gray-700 leading-tight">{cat.name}</p>
             </Link>
           ))}
         </div>
