@@ -53,7 +53,7 @@ export default function Navbar() {
           <img src="/logo.png" alt="Afrizone" width={36} height={36} style={{borderRadius:8,display:"block"}} />
         <span className="flex flex-col leading-none">
            <span className="font-black text-xl text-yellow-400 tracking-tight">AFRIZONE</span>
-           <span className="text-yellow-200 text-xs font-medium tracking-wide">Shop Authentic African Products</span>
+           <span className="text-yellow-100 text-xs font-medium tracking-wide">Shop Authentic African Products</span>
         </span>
          </Link>
 
