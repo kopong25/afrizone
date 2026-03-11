@@ -51,8 +51,11 @@ export default function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 flex-shrink-0">
           <img src="/logo.png" alt="Afrizone" width={36} height={36} style={{borderRadius:8,display:"block"}} />
-          <span className="font-black text-xl text-yellow-400 tracking-tight">AFRIZONE</span>
-        </Link>
+        <span className="flex flex-col leading-none">
+           <span className="font-black text-xl text-yellow-400 tracking-tight">AFRIZONE</span>
+           <span className="text-yellow-200 text-xs font-medium tracking-wide">Shop Authentic African Products</span>
+        </span>
+         </Link>
 
         {/* Search bar */}
         <div className="flex-1 max-w-xl relative hidden md:block">
