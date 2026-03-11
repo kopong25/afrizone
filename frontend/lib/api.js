@@ -8,13 +8,26 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Attach JWT token - localStorage first (works on mobile), cookie fallback
+// Attach JWT token - try every possible source
 api.interceptors.request.use((config) => {
   let token = null;
+  // 1. localStorage (most reliable on mobile)
   try { token = localStorage.getItem("afrizone_token"); } catch {}
+  // 2. js-cookie
   if (!token) { try { token = Cookies.get("afrizone_token"); } catch {} }
+  // 3. Raw document.cookie parse (last resort for iOS Safari)
+  if (!token && typeof document !== "undefined") {
+    try {
+      const match = document.cookie.match(/(?:^|;\s*)afrizone_token=([^;]+)/);
+      if (match) token = decodeURIComponent(match[1]);
+    } catch {}
+  }
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+    // Opportunistically migrate to localStorage
+    try {
+      if (!localStorage.getItem("afrizone_token")) localStorage.setItem("afrizone_token", token);
+    } catch {}
   }
   return config;
 });

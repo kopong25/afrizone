@@ -45,6 +45,9 @@ function AuthProvider({ children }) {
   useEffect(() => {
     const token = getToken();
     if (token) {
+      // CRITICAL: Re-save to localStorage immediately so axios interceptor
+      // can find it for all subsequent API calls (fixes iOS Safari cookie blocking)
+      try { localStorage.setItem("afrizone_token", token); } catch {}
       authAPI.me()
         .then((res) => setUser(res.data))
         .catch(() => {
