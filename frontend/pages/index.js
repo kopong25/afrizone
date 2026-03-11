@@ -168,7 +168,7 @@ export default function Home() {
 
       {/* Category Bar */}
       <div className="bg-white border-b sticky top-16 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+        <div className="max-w-7xl mx-auto px-4 py-3 flex gap-2 overflow-x-auto flex-wrap" style={{ scrollbarWidth: "none" }}>
           {CATEGORIES.map((cat) => (
             <button key={cat.slug} onClick={() => setFilter("category", cat.slug)}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
