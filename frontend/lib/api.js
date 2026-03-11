@@ -60,10 +60,16 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Always use in-memory token first — guaranteed to work on all browsers
+// Read token on EVERY request — never trust cached _memoryToken alone
+// because iOS Safari resets module state on every page navigation
 api.interceptors.request.use((config) => {
-  const token = _memoryToken;
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Use memory if set, otherwise read fresh from all storage layers
+  const token = _memoryToken || _read();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+    // Keep memory in sync so next call is faster
+    if (!_memoryToken) _memoryToken = token;
+  }
   return config;
 });
 
