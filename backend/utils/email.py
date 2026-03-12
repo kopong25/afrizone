@@ -148,3 +148,27 @@ def send_low_stock_alert(seller_email: str, store_name: str, product_name: str, 
     </div>
     <a href="{FRONTEND_URL}/seller/products" class="btn btn-gold">Update Stock</a>"""
     send_email(seller_email, f"Low stock: {product_name} ({stock} left)", _wrap(body))
+
+
+def send_password_reset(user_email: str, user_name: str, reset_url: str):
+    first = user_name.split()[0] if user_name else "there"
+    html = _wrap(f"""
+        <div class="body">
+            <p class="hero">Reset your password 🔐</p>
+            <p>Hi {first},</p>
+            <p>We received a request to reset your Afrizone password. Click the button below to choose a new password:</p>
+            <div style="text-align:center;margin:28px 0">
+                <a href="{reset_url}" class="btn btn-gold">Reset My Password →</a>
+            </div>
+            <div class="order-box" style="text-align:center">
+                <p style="margin:0;font-size:13px;color:#888">⏰ This link expires in <strong>1 hour</strong></p>
+            </div>
+            <p style="font-size:13px;color:#888">If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.</p>
+            <hr/>
+            <p style="font-size:12px;color:#aaa;text-align:center">
+                If the button doesn't work, copy this link:<br/>
+                <a href="{reset_url}" style="color:#1A5C38;word-break:break-all">{reset_url}</a>
+            </p>
+        </div>
+    """)
+    send_email(user_email, "Reset your Afrizone password", html)

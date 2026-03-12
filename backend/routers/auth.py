@@ -5,8 +5,9 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import timedelta
 from database import get_db
+import os
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 import models, schemas, auth as auth_utils
 from slugify import slugify
 
