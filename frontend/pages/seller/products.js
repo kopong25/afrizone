@@ -328,6 +328,7 @@ export default function SellerProducts() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Stock</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Sales</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Remaining</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
@@ -347,9 +348,13 @@ export default function SellerProducts() {
                     </td>
                     <td className="px-4 py-3 text-sm font-semibold text-green-900">${p.price.toFixed(2)}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-sm ${p.stock === 0 ? "text-red-600 font-semibold" : p.stock < 5 ? "text-yellow-600" : "text-gray-700"}`}>
-                        {p.stock}
-                      </span>
+                      <div>
+                        <span className={`text-sm font-bold ${p.stock === 0 ? "text-red-600" : p.stock <= 5 ? "text-yellow-600" : "text-gray-800"}`}>
+                          {p.stock}
+                        </span>
+                        {p.stock === 0 && <span className="ml-1 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">OUT</span>}
+                        {p.stock > 0 && p.stock <= 5 && <span className="ml-1 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-bold">LOW</span>}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`badge text-xs ${p.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
@@ -357,6 +362,25 @@ export default function SellerProducts() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{p.sale_count}</td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const total = (p.stock || 0) + (p.sale_count || 0);
+                        const pct = total > 0 ? Math.round((p.stock / total) * 100) : 0;
+                        const barColor = pct === 0 ? "bg-red-500" : pct <= 20 ? "bg-orange-400" : pct <= 50 ? "bg-yellow-400" : "bg-green-500";
+                        return (
+                          <div className="w-24">
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className={pct <= 20 ? "font-bold text-orange-600" : "text-gray-500"}>{pct}%</span>
+                              {pct <= 20 && pct > 0 && <span className="text-orange-500 font-bold">Restock!</span>}
+                              {pct === 0 && <span className="text-red-600 font-bold">Restock!</span>}
+                            </div>
+                            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full transition-all ${barColor}`} style={{width: `${pct}%`}} />
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2 justify-end">
                         <button onClick={() => handleEdit(p)} className="p-1.5 text-gray-400 hover:text-green-900 hover:bg-green-50 rounded">

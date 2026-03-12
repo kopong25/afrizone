@@ -8,6 +8,20 @@ import api from "../../lib/api";
 import toast from "react-hot-toast";
 import { FiPackage, FiArrowLeft, FiTruck, FiCheck, FiClock, FiX, FiDownload } from "react-icons/fi";
 
+// Best practice: sellers should package within 24hrs of payment
+// Amazon standard: ship within 2 business days or risk penalty
+function getPackagingUrgency(order) {
+  if (order.status !== "paid") return null;
+  const paid = new Date(order.updated_at || order.created_at);
+  const now = new Date();
+  const hoursElapsed = (now - paid) / (1000 * 60 * 60);
+  const hoursLeft = 24 - hoursElapsed;
+  if (hoursLeft < 0) return { level: "overdue", label: "⚠️ Package overdue!", color: "bg-red-100 border-red-300 text-red-800" };
+  if (hoursLeft < 4) return { level: "urgent", label: `🔴 Package in ${Math.round(hoursLeft)}h`, color: "bg-red-50 border-red-200 text-red-700" };
+  if (hoursLeft < 12) return { level: "soon", label: `🟡 Package within ${Math.round(hoursLeft)}h`, color: "bg-yellow-50 border-yellow-200 text-yellow-700" };
+  return { level: "ok", label: `🟢 Package by ${new Date(paid.getTime() + 24*60*60*1000).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}`, color: "bg-green-50 border-green-200 text-green-700" };
+}
+
 const STATUS_STYLES = {
   pending:    { bg: "bg-yellow-100 text-yellow-800", label: "Pending" },
   paid:       { bg: "bg-blue-100 text-blue-800",     label: "Paid" },
@@ -112,6 +126,22 @@ export default function SellerOrders() {
           <span className="ml-1 text-sm text-gray-400">{orders.length} total</span>
         </div>
 
+        {/* Action required banner */}
+        {orders.filter(o => o.status === "paid").length > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-6 flex items-start gap-3">
+            <span className="text-2xl">📦</span>
+            <div>
+              <p className="font-black text-yellow-800">
+                {orders.filter(o => o.status === "paid").length} order{orders.filter(o => o.status === "paid").length > 1 ? "s" : ""} need packaging
+              </p>
+              <p className="text-sm text-yellow-700 mt-0.5">
+                Best practice: Package and hand to courier within <strong>24 hours</strong> of payment to maintain your seller rating.
+                Mark as <strong>Processing</strong> when packaging, <strong>Shipped</strong> once handed to courier.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Filter tabs */}
         <div className="flex gap-2 mb-6 flex-wrap">
           {["all", "pending", "paid", "processing", "shipped", "delivered", "cancelled"].map(s => (
@@ -144,6 +174,13 @@ export default function SellerOrders() {
               return (
                 <div key={order.id} className="bg-white border rounded-2xl shadow-sm overflow-hidden">
                   {/* Order row */}
+                  {/* Packaging urgency banner */}
+                  {getPackagingUrgency(order) && (
+                    <div className={`px-4 py-2 border-b text-xs font-bold flex items-center gap-2 ${getPackagingUrgency(order).color}`}>
+                      {getPackagingUrgency(order).label}
+                      <span className="font-normal opacity-75">— Package & hand to courier within 24hrs of payment</span>
+                    </div>
+                  )}
                   <div className="p-4 flex items-center gap-4 cursor-pointer hover:bg-gray-50 transition-colors"
                     onClick={() => setExpanded(isExpanded ? null : order.id)}>
                     <div className="flex-1 min-w-0">
