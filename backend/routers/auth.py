@@ -1,3 +1,6 @@
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from starlette.requests import Request
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import timedelta
@@ -9,7 +12,8 @@ router = APIRouter()
 
 
 @router.post("/register", response_model=schemas.TokenResponse, status_code=201)
-def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+def register(request: Request, user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     """Register a new buyer or seller account."""
     # Check email not already taken
     existing = db.query(models.User).filter(models.User.email == user_in.email).first()
@@ -19,7 +23,9 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     # Create user
     user = models.User(
         email=user_in.email,
-        hashed_password=auth_utils.hash_password(user_in.password),
+        if len(user_in.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    hashed_password=auth_utils.hash_password(user_in.password),
         full_name=user_in.full_name,
         role=user_in.role,
         country=user_in.country,
@@ -45,7 +51,8 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=schemas.TokenResponse)
-def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def login(request: Request, credentials: schemas.UserLogin, db: Session = Depends(get_db)):
     """Login with email and password."""
     user = db.query(models.User).filter(models.User.email == credentials.email).first()
     if not user or not auth_utils.verify_password(credentials.password, user.hashed_password):

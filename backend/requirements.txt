@@ -16,3 +16,6 @@ Pillow==10.3.0
 python-slugify==8.0.4
 shippo==3.1.0
 bcrypt==4.0.1
+
+slowapi==0.1.9
+limits==3.6.0
