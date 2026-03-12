@@ -275,7 +275,14 @@ def get_cart(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.get_current_user)
 ):
-    return db.query(models.CartItem).filter(models.CartItem.user_id == current_user.id).all()
+    return (
+        db.query(models.CartItem)
+        .options(
+            joinedload(models.CartItem.product).joinedload(models.Product.store)
+        )
+        .filter(models.CartItem.user_id == current_user.id)
+        .all()
+    )
 
 
 @router.post("/cart/add", response_model=schemas.CartItemOut, status_code=201)

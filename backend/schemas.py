@@ -152,6 +152,24 @@ class CategoryOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class StoreMinimal(BaseModel):
+    id: int
+    name: str
+    slug: str
+    vendor_type: Optional[str] = None
+    delivery_type: Optional[str] = None
+    delivery_radius_miles: Optional[int] = None
+    delivery_note: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    logo_url: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    phone: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class ProductOut(BaseModel):
     id: int
     name: str
@@ -194,10 +212,7 @@ class ProductListOut(BaseModel):
     avg_rating: float
     review_count: int
     store_id: int
-    vendor_type: Optional[str] = None
-    delivery_type: Optional[str] = None
-    delivery_radius_miles: Optional[int] = None
-    delivery_note: Optional[str] = None
+    store: Optional[StoreMinimal] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

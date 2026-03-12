@@ -62,10 +62,11 @@ export default function CartPage() {
     setSelectedDelivery(null);
 
     try {
-      // Get store IDs from cart — use first store for distance calc
-      const storeId = items[0]?.product?.store_id || items[0]?.product?.store?.id;
+      const storeId = primaryStore?.id || items[0]?.product?.store_id;
+      const isRestaurant = primaryStore?.vendor_type === "restaurant";
+      const offersLocal = ["local_delivery", "both"].includes(primaryStore?.delivery_type);
 
-      // Geocode customer address via free API (sandbox uses mock coords)
+      // Geocode customer address
       let customerLat = null, customerLng = null;
       try {
         const geo = await fetch(
@@ -78,7 +79,7 @@ export default function CartPage() {
           customerLat = parseFloat(geoData[0].lat);
           customerLng = parseFloat(geoData[0].lon);
         }
-      } catch { /* geocoding failed — sandbox will use mock distance */ }
+      } catch {}
 
       const res = await api.post("/uber-direct/delivery-options", {
         store_id: storeId,
@@ -87,18 +88,57 @@ export default function CartPage() {
         customer_address: `${shipping.address}, ${shipping.city}, ${shipping.state}`,
       });
 
-      setDeliveryOptions(res.data.options || []);
       setDistanceInfo(res.data);
-      // Auto-select first option
-      if (res.data.options?.length > 0) {
-        setSelectedDelivery(res.data.options[0]);
+      const distanceMiles = res.data.distance_miles;
+      const isLongDistance = !distanceMiles || distanceMiles >= 15;
+
+      let options = [];
+
+      if (isRestaurant && offersLocal && !isLongDistance) {
+        // Restaurant within 15 miles — Uber ONLY, no USPS for hot food
+        options = [
+          {
+            id: "uber_express",
+            label: "Uber Express Delivery",
+            icon: "🛵",
+            price: res.data.options?.find(o => o.id === "uber_express")?.price || 9.99,
+            eta: "~45 minutes",
+            description: "Hot food delivered fresh to your door.",
+            provider: "uber_direct",
+          }
+        ];
+      } else if (isLongDistance) {
+        // >15 miles — USPS Priority only
+        options = [
+          { id: "usps_priority", label: "USPS Priority Mail", icon: "📬", price: 6.99, eta: "1–3 business days", description: "Ships nationwide. Tracking included.", provider: "usps" }
+        ];
+      } else {
+        // Non-restaurant within 15 miles — USPS Standard as default
+        options = [
+          { id: "usps_standard", label: "USPS Standard Shipping", icon: "📦", price: 4.99, eta: "2–3 business days", description: "Reliable shipping with tracking.", provider: "usps" },
+          { id: "usps_priority", label: "USPS Priority Mail", icon: "📬", price: 6.99, eta: "1–2 business days", description: "Faster shipping with tracking.", provider: "usps" },
+        ];
+        // If store also offers local delivery, add Uber Express as optional fast choice
+        if (offersLocal) {
+          options.push({
+            id: "uber_express",
+            label: "Uber Express Delivery",
+            icon: "🛵",
+            price: res.data.options?.find(o => o.id === "uber_express")?.price || 8.99,
+            eta: "2–4 hours",
+            description: "Same-day local delivery. Faster but costs more.",
+            provider: "uber_direct",
+          });
+        }
       }
+
+      setDeliveryOptions(options);
+      setSelectedDelivery(options[0]);
       return true;
     } catch (err) {
-      // Fallback if uber-direct endpoint fails
       const fallback = [
-        { id: "usps_standard", label: "USPS Standard Shipping", icon: "📦", price: 4.99, eta: "2–3 business days", provider: "usps", available: true },
-        { id: "usps_priority", label: "USPS Priority Mail", icon: "📬", price: 6.99, eta: "1–2 business days", provider: "usps", available: true },
+        { id: "usps_standard", label: "USPS Standard Shipping", icon: "📦", price: 4.99, eta: "2–3 business days", provider: "usps" },
+        { id: "usps_priority", label: "USPS Priority Mail", icon: "📬", price: 6.99, eta: "1–2 business days", provider: "usps" },
       ];
       setDeliveryOptions(fallback);
       setSelectedDelivery(fallback[0]);
@@ -114,11 +154,20 @@ export default function CartPage() {
   const total = subtotal + shippingCost - discountAmount;
 
   const byStore = items.reduce((acc, item) => {
-    const storeId = item.product.store_id || item.product.store?.id || "unknown";
-    if (!acc[storeId]) acc[storeId] = { store: { id: storeId, name: item.product.store?.name || "Store", logo_url: item.product.store?.logo_url }, items: [] };
+    const storeId = item.product.store?.id || item.product.store_id || "unknown";
+    if (!acc[storeId]) acc[storeId] = { 
+      store: item.product.store || { id: storeId, name: "Store" }, 
+      items: [] 
+    };
     acc[storeId].items.push(item);
     return acc;
   }, {});
+
+  // Determine if ANY store in cart is a restaurant
+  const hasRestaurant = Object.values(byStore).some(
+    ({ store }) => store.vendor_type === "restaurant"
+  );
+  const primaryStore = Object.values(byStore)[0]?.store;
 
   const applyDiscount = async () => {
     if (!discountCode.trim()) return;
