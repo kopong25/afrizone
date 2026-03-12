@@ -62,7 +62,8 @@ export default function CartPage() {
     setSelectedDelivery(null);
 
     try {
-      const storeId = primaryStore?.id || items[0]?.product?.store_id;
+      // storeId: always use product.store_id (reliably present even without store join)
+      const storeId = items[0]?.product?.store_id || primaryStore?.id;
       const isRestaurant = primaryStore?.vendor_type === "restaurant";
       const offersLocal = ["local_delivery", "both"].includes(primaryStore?.delivery_type);
       console.log("[Delivery Debug]", { 
@@ -71,7 +72,8 @@ export default function CartPage() {
         delivery_type: primaryStore?.delivery_type,
         isRestaurant, 
         offersLocal,
-        primaryStore 
+        primaryStore,
+        cartItems: items
       });
 
       // Geocode customer address
