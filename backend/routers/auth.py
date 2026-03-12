@@ -10,7 +10,7 @@ from database import get_db
 import models, schemas, auth as auth_utils
 from slugify import slugify
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 
