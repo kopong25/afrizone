@@ -6,7 +6,7 @@ import Footer from "../../components/layout/Footer";
 import { useAuth } from "../_app";
 import api from "../../lib/api";
 import toast from "react-hot-toast";
-import { FiPackage, FiArrowLeft, FiTruck, FiCheck, FiClock, FiX, FiDownload } from "react-icons/fi";
+import { FiPackage, FiArrowLeft, FiTruck, FiCheck, FiClock, FiX, FiDownload, FiNavigation } from "react-icons/fi";
 
 // Best practice: sellers should package within 24hrs of payment
 // Amazon standard: ship within 2 business days or risk penalty
@@ -54,6 +54,38 @@ export default function SellerOrders() {
       .then(r => setOrders(r.data?.items || r.data || []))
       .catch(() => toast.error("Failed to load orders"))
       .finally(() => setLoading(false));
+  };
+
+  const dispatchUber = async (orderId) => {
+    setUpdating(orderId + "_uber");
+    try {
+      const res = await api.post(`/uber-direct/dispatch/${orderId}`);
+      if (res.data.sandbox) {
+        toast.success("🛵 Sandbox: Driver dispatch simulated! In production a real Uber driver will be sent.");
+      } else {
+        toast.success("🛵 Uber driver dispatched! Customer will be notified.");
+      }
+      fetchOrders();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Dispatch failed");
+    } finally { setUpdating(null); }
+  };
+
+  const dispatchUber = async (orderId) => {
+    setUpdating(orderId + "_uber");
+    try {
+      const res = await api.post(`/uber-direct/dispatch/${orderId}`);
+      if (res.data.sandbox) {
+        toast.success("🚗 Sandbox: Driver dispatch simulated! In production a real Uber driver is sent.");
+      } else {
+        toast.success("🚗 Uber driver dispatched! Customer is being notified.");
+      }
+      fetchOrders();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Dispatch failed");
+    } finally {
+      setUpdating(null); 
+    }
   };
 
   const updateStatus = async (orderId, status) => {
@@ -262,11 +294,31 @@ export default function SellerOrders() {
                             Mark as {nextStatus.charAt(0).toUpperCase() + nextStatus.slice(1)}
                           </button>
                         )}
-                        <button onClick={() => downloadLabel(order.id)}
-                          disabled={updating === order.id + "_label"}
-                          className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-green-900 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
-                          <FiDownload size={14} /> {updating === order.id + "_label" ? "Generating..." : "Shipping Label"}
-                        </button>
+                        {/* Show Dispatch Driver for restaurant/Uber orders */}
+                        {order.delivery_method === "uber_express" && order.status === "processing" && (
+                          <button onClick={() => dispatchUber(order.id)}
+                            disabled={updating === order.id + "_uber"}
+                            className="flex items-center gap-2 bg-black hover:bg-gray-800 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors">
+                            🛵 {updating === order.id + "_uber" ? "Dispatching..." : "Dispatch Uber Driver"}
+                          </button>
+                        )}
+                        {/* Show shipping label only for non-Uber orders */}
+                        {order.delivery_method !== "uber_express" && (
+                          <button onClick={() => downloadLabel(order.id)}
+                            disabled={updating === order.id + "_label"}
+                            className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-green-900 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
+                            <FiDownload size={14} /> {updating === order.id + "_label" ? "Generating..." : "Shipping Label"}
+                          </button>
+                        )}
+                        {/* Uber Direct dispatch — shown for local delivery orders */}
+                        {["paid","processing"].includes(order.status) && (
+                          <button onClick={() => dispatchUber(order.id)}
+                            disabled={updating === order.id + "_uber"}
+                            className="flex items-center gap-2 bg-black hover:bg-gray-900 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors">
+                            <FiNavigation size={14} />
+                            {updating === order.id + "_uber" ? "Dispatching..." : "🚗 Dispatch Uber Driver"}
+                          </button>
+                        )}
                         {order.status === "pending" && (
                           <button onClick={() => updateStatus(order.id, "cancelled")}
                             disabled={updating === order.id}

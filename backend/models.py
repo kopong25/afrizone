@@ -113,6 +113,8 @@ class Store(Base):
     delivery_type = Column(Enum(DeliveryType, native_enum=False), default=DeliveryType.shipping)
 
     # Local delivery settings (for restaurant vendors / Uber Direct prep)
+    latitude  = Column(Float, nullable=True)               # Store GPS lat (for distance calc)
+    longitude = Column(Float, nullable=True)               # Store GPS lng
     delivery_radius_miles = Column(Integer, nullable=True)   # How far they deliver
     delivery_note  = Column(String, nullable=True)             # e.g. "Min order $20, free delivery within 5 miles"
     delivery_fee          = Column(Float, nullable=True)     # Flat delivery fee they charge
@@ -270,6 +272,7 @@ class Order(Base):
 
     # Tracking
     tracking_number = Column(String, nullable=True)
+    uber_quote_id   = Column(String, nullable=True)   # Uber Direct quote ID
     tracking_url = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
 
@@ -461,6 +464,7 @@ class ShippingLabel(Base):
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
     shippo_transaction_id = Column(String, nullable=True)
     tracking_number = Column(String, nullable=True)
+    uber_quote_id   = Column(String, nullable=True)   # Uber Direct quote ID
     label_url = Column(String, nullable=True)       # PDF download URL
     carrier = Column(String, default="USPS")
     service = Column(String, default="Priority")
