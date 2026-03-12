@@ -10,7 +10,8 @@ from database import get_db
 import models, schemas, auth as auth_utils
 from slugify import slugify
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["auth"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/register", response_model=schemas.TokenResponse, status_code=201)
