@@ -71,22 +71,6 @@ export default function SellerOrders() {
     } finally { setUpdating(null); }
   };
 
-  const dispatchUber = async (orderId) => {
-    setUpdating(orderId + "_uber");
-    try {
-      const res = await api.post(`/uber-direct/dispatch/${orderId}`);
-      if (res.data.sandbox) {
-        toast.success("🚗 Sandbox: Driver dispatch simulated! In production a real Uber driver is sent.");
-      } else {
-        toast.success("🚗 Uber driver dispatched! Customer is being notified.");
-      }
-      fetchOrders();
-    } catch (e) {
-      toast.error(e.response?.data?.detail || "Dispatch failed");
-    } finally {
-      setUpdating(null); 
-    }
-  };
 
   const updateStatus = async (orderId, status) => {
     setUpdating(orderId);
