@@ -7,10 +7,25 @@ import { storesAPI } from "../../lib/api";
 import { useAuth } from "../_app";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { FiSave, FiArrowLeft, FiShoppingBag } from "react-icons/fi";
+import { FiSave, FiArrowLeft, FiStore, FiTruck, FiPackage, FiMapPin } from "react-icons/fi";
 
 const COUNTRIES = ["USA", "Canada", "UK", "Germany", "France", "Netherlands", "Belgium", "Sweden", "Other"];
 const BUSINESS_TYPES = ["Food & Groceries", "Fashion & Clothing", "Beauty & Hair", "Arts & Crafts", "Electronics", "Books & Media", "Health & Wellness", "Home & Living", "Other"];
+
+const VENDOR_TYPES = [
+  { value: "grocery",    label: "🛒 Grocery / Shelf-stable Food", desc: "Fufu, garri, spices, canned goods — ships nationwide via USPS" },
+  { value: "restaurant", label: "🍽️ Restaurant / Hot Food",        desc: "Jollof rice, suya, pepper soup — local delivery only" },
+  { value: "fashion",    label: "👗 Fashion & Clothing",            desc: "Ankara, Kente, traditional wear — ships nationwide" },
+  { value: "beauty",     label: "💄 Beauty & Hair",                 desc: "African hair products, cosmetics — ships nationwide" },
+  { value: "other",      label: "📦 Other",                         desc: "Anything else" },
+];
+
+const DELIVERY_TYPES = [
+  { value: "shipping",       icon: "📬", label: "Ships Nationwide",   desc: "USPS / Shippo — customers anywhere in your country" },
+  { value: "local_delivery", icon: "🛵", label: "Local Delivery",     desc: "You deliver within your city/area (Uber Direct coming soon)" },
+  { value: "pickup",         icon: "🏪", label: "Pickup Only",        desc: "Customers come to your location to pick up" },
+  { value: "both",           icon: "🚀", label: "Ships + Local",      desc: "Offer both shipping and local delivery" },
+];
 
 export default function StoreSettings() {
   const { user } = useAuth();
@@ -21,6 +36,8 @@ export default function StoreSettings() {
   const [form, setForm] = useState({
     name: "", description: "", country: "USA", city: "",
     address: "", business_type: "", phone: "", website: "",
+    vendor_type: "other", delivery_type: "shipping",
+    delivery_radius_miles: "", delivery_note: "",
   });
 
   useEffect(() => {
@@ -38,6 +55,10 @@ export default function StoreSettings() {
           business_type: r.data.business_type || "",
           phone: r.data.phone || "",
           website: r.data.website || "",
+          vendor_type: r.data.vendor_type || "other",
+          delivery_type: r.data.delivery_type || "shipping",
+          delivery_radius_miles: r.data.delivery_radius_miles || "",
+          delivery_note: r.data.delivery_note || "",
         });
       })
       .catch(() => toast.error("Failed to load store"))
@@ -47,7 +68,11 @@ export default function StoreSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await storesAPI.updateMyStore(form);
+      const payload = {
+        ...form,
+        delivery_radius_miles: form.delivery_radius_miles ? parseInt(form.delivery_radius_miles) : null,
+      };
+      const res = await storesAPI.updateMyStore(payload);
       setStore(res.data);
       toast.success("Store updated!");
     } catch (err) {
@@ -72,6 +97,9 @@ export default function StoreSettings() {
     setStore((s) => ({ ...s, banner_url: res.data.banner_url }));
     return res.data.banner_url;
   };
+
+  const isLocalDelivery = ["local_delivery", "both"].includes(form.delivery_type);
+  const isRestaurant = form.vendor_type === "restaurant";
 
   if (loading) return (
     <>
@@ -101,12 +129,22 @@ export default function StoreSettings() {
           </div>
         )}
 
+        {/* Restaurant notice */}
+        {isRestaurant && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 text-sm text-green-800 flex gap-3">
+            <span className="text-2xl">🍽️</span>
+            <div>
+              <p className="font-bold">Restaurant vendor — local delivery mode</p>
+              <p className="mt-0.5 text-green-700">Your store will only show to customers in your delivery area. We are integrating Uber Direct for automated driver dispatch — you will be notified when it goes live in your city.</p>
+            </div>
+          </div>
+        )}
+
         {/* Store Images */}
         <div className="bg-white rounded-2xl border shadow-sm p-6 mb-6">
           <h2 className="font-bold text-gray-900 mb-5 flex items-center gap-2">
-            <FiShoppingBag size={18} /> Store Images
+            <FiStore size={18} /> Store Images
           </h2>
-
           <div className="mb-5">
             <ImageUpload
               label="Store Banner (shown at top of your store page)"
@@ -115,7 +153,6 @@ export default function StoreSettings() {
               aspect="banner"
             />
           </div>
-
           <div className="max-w-[160px]">
             <ImageUpload
               label="Store Logo"
@@ -179,6 +216,111 @@ export default function StoreSettings() {
                 className="w-full border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-900 text-sm" />
             </div>
           </div>
+        </div>
+
+        {/* Vendor Type */}
+        <div className="bg-white rounded-2xl border shadow-sm p-6 mb-6">
+          <h2 className="font-bold text-gray-900 mb-1 flex items-center gap-2">
+            <FiPackage size={18} /> What do you sell?
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">This determines how your orders are fulfilled and which delivery options are available to you.</p>
+          <div className="grid gap-3">
+            {VENDOR_TYPES.map((v) => (
+              <label key={v.value}
+                className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  form.vendor_type === v.value
+                    ? "border-green-700 bg-green-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}>
+                <input type="radio" name="vendor_type" value={v.value}
+                  checked={form.vendor_type === v.value}
+                  onChange={(e) => {
+                    const vt = e.target.value;
+                    setForm(f => ({
+                      ...f,
+                      vendor_type: vt,
+                      // Auto-set delivery type for restaurant
+                      delivery_type: vt === "restaurant" ? "local_delivery" : f.delivery_type === "local_delivery" ? "shipping" : f.delivery_type,
+                    }));
+                  }}
+                  className="mt-1 accent-green-700" />
+                <div>
+                  <p className="font-semibold text-gray-800 text-sm">{v.label}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{v.desc}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Delivery Type */}
+        <div className="bg-white rounded-2xl border shadow-sm p-6 mb-6">
+          <h2 className="font-bold text-gray-900 mb-1 flex items-center gap-2">
+            <FiTruck size={18} /> How do you deliver?
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">Choose how you fulfil orders for customers.</p>
+
+          <div className="grid grid-cols-2 gap-3 mb-5">
+            {DELIVERY_TYPES.filter(d => isRestaurant ? d.value !== "shipping" : true).map((d) => (
+              <label key={d.value}
+                className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  form.delivery_type === d.value
+                    ? "border-green-700 bg-green-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}>
+                <input type="radio" name="delivery_type" value={d.value}
+                  checked={form.delivery_type === d.value}
+                  onChange={(e) => setForm({ ...form, delivery_type: e.target.value })}
+                  className="mt-1 accent-green-700" />
+                <div>
+                  <p className="font-semibold text-gray-800 text-sm">{d.icon} {d.label}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{d.desc}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          {/* Local delivery extra fields */}
+          {isLocalDelivery && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+              <p className="text-sm font-bold text-blue-800 flex items-center gap-2">
+                <FiMapPin size={14} /> Local Delivery Details
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Delivery Radius (miles)</label>
+                  <input
+                    type="number" min="1" max="50"
+                    value={form.delivery_radius_miles}
+                    onChange={(e) => setForm({ ...form, delivery_radius_miles: e.target.value })}
+                    placeholder="e.g. 10"
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Store Address</label>
+                  <input
+                    value={form.address}
+                    onChange={(e) => setForm({ ...form, address: e.target.value })}
+                    placeholder="123 Main St, Houston TX"
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">Delivery Note for Customers</label>
+                <input
+                  value={form.delivery_note}
+                  onChange={(e) => setForm({ ...form, delivery_note: e.target.value })}
+                  placeholder="e.g. Min order $20 · Free delivery within 5 miles · 45–60 min"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                />
+              </div>
+              <p className="text-xs text-blue-600">
+                🚀 Uber Direct automated driver dispatch is coming soon. For now, arrange your own delivery driver and update the order to <strong>Shipped</strong> when they pick up.
+              </p>
+            </div>
+          )}
         </div>
 
         <button onClick={handleSave} disabled={saving}

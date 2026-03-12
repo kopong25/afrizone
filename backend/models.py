@@ -76,6 +76,21 @@ class User(Base):
 # STORE (Seller's shop)
 # ─────────────────────────────────────────────
 
+class VendorType(str, enum.Enum):
+    grocery    = "grocery"      # Shelf-stable: fufu, garri, spices → USPS/Shippo
+    restaurant = "restaurant"   # Hot food: jollof rice, suya → local delivery
+    fashion    = "fashion"      # Clothing, fabric → USPS/Shippo
+    beauty     = "beauty"       # Hair, cosmetics → USPS/Shippo
+    other      = "other"
+
+
+class DeliveryType(str, enum.Enum):
+    shipping       = "shipping"        # Ships nationwide via USPS/Shippo
+    local_delivery = "local_delivery"  # Seller delivers locally (prep for Uber Direct)
+    pickup         = "pickup"          # Customer picks up in person
+    both           = "both"            # Ships + local delivery available
+
+
 class Store(Base):
     __tablename__ = "stores"
 
@@ -94,6 +109,17 @@ class Store(Base):
 
     # Business info
     business_type = Column(String, nullable=True)     # Grocery, Fashion, etc.
+    vendor_type   = Column(Enum(VendorType, native_enum=False), default=VendorType.other)
+    delivery_type = Column(Enum(DeliveryType, native_enum=False), default=DeliveryType.shipping)
+
+    # Local delivery settings (for restaurant vendors / Uber Direct prep)
+    delivery_radius_miles = Column(Integer, nullable=True)   # How far they deliver
+    delivery_note  = Column(String, nullable=True)             # e.g. "Min order $20, free delivery within 5 miles"
+    delivery_fee          = Column(Float, nullable=True)     # Flat delivery fee they charge
+    min_order_amount      = Column(Float, nullable=True)     # Minimum order for delivery
+    prep_time_minutes     = Column(Integer, nullable=True)   # Avg prep time for hot food
+    is_open_now           = Column(Boolean, default=True)    # Restaurant open/closed toggle
+    opening_hours         = Column(String, nullable=True)    # e.g. "Mon-Fri 11am-9pm"
     phone = Column(String, nullable=True)
     website = Column(String, nullable=True)
 

@@ -36,6 +36,10 @@ class UserOut(BaseModel):
     is_active: bool
     avatar_url: Optional[str]
     country: Optional[str]
+    vendor_type: Optional[str] = None
+    delivery_type: Optional[str] = None
+    delivery_radius_miles: Optional[int] = None
+    delivery_note: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -68,6 +72,10 @@ class StoreUpdate(BaseModel):
     business_type: Optional[str] = None
     phone: Optional[str] = None
     website: Optional[str] = None
+    vendor_type: Optional[str] = None
+    delivery_type: Optional[str] = None
+    delivery_radius_miles: Optional[int] = None
+    delivery_note: Optional[str] = None
 
 
 class StoreOut(BaseModel):
@@ -92,6 +100,10 @@ class StoreOut(BaseModel):
     phone: Optional[str] = None
     address: Optional[str] = None
     total_revenue: Optional[float] = None
+    vendor_type: Optional[str] = None
+    delivery_type: Optional[str] = None
+    delivery_radius_miles: Optional[int] = None
+    delivery_note: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -164,6 +176,10 @@ class ProductOut(BaseModel):
     review_count: int
     store: Optional[StoreOut] = None
     category: Optional[CategoryOut] = None
+    vendor_type: Optional[str] = None
+    delivery_type: Optional[str] = None
+    delivery_radius_miles: Optional[int] = None
+    delivery_note: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -182,6 +198,10 @@ class ProductListOut(BaseModel):
     avg_rating: float
     review_count: int
     store_id: int
+    vendor_type: Optional[str] = None
+    delivery_type: Optional[str] = None
+    delivery_radius_miles: Optional[int] = None
+    delivery_note: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -258,6 +278,10 @@ class OrderOut(BaseModel):
     stripe_payment_intent_id: Optional[str]
     items: List[OrderItemOut]
     store: Optional[StoreOut]
+    vendor_type: Optional[str] = None
+    delivery_type: Optional[str] = None
+    delivery_radius_miles: Optional[int] = None
+    delivery_note: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -296,6 +320,10 @@ class ReviewOut(BaseModel):
     photos: Optional[List[str]] = []
     helpful_count: Optional[int] = 0
     user: UserOut
+    vendor_type: Optional[str] = None
+    delivery_type: Optional[str] = None
+    delivery_radius_miles: Optional[int] = None
+    delivery_note: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -321,6 +349,10 @@ class PayoutOut(BaseModel):
     status: PayoutStatus
     stripe_transfer_id: Optional[str]
     paid_at: Optional[datetime]
+    vendor_type: Optional[str] = None
+    delivery_type: Optional[str] = None
+    delivery_radius_miles: Optional[int] = None
+    delivery_note: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

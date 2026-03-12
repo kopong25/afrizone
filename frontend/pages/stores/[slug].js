@@ -109,6 +109,23 @@ export default function StorePage() {
                 {store.total_sales > 0 && (
                   <span className="flex items-center gap-1"><FiPackage size={13} /> {store.total_sales} sales</span>
                 )}
+                {store.delivery_type === "shipping" && (
+                  <span className="flex items-center gap-1 text-blue-600 font-medium"><span>📬</span> Ships Nationwide</span>
+                )}
+                {store.delivery_type === "local_delivery" && (
+                  <span className="flex items-center gap-1 text-orange-600 font-medium">
+                    <span>🛵</span> Local Delivery {store.delivery_radius_miles ? `· ${store.delivery_radius_miles} mile radius` : ""}
+                  </span>
+                )}
+                {store.delivery_type === "pickup" && (
+                  <span className="flex items-center gap-1 text-purple-600 font-medium"><span>🏪</span> Pickup Only</span>
+                )}
+                {store.delivery_type === "both" && (
+                  <span className="flex items-center gap-1 text-green-600 font-medium"><span>🚀</span> Ships + Local Delivery</span>
+                )}
+                {store.delivery_note && (
+                  <span className="text-xs text-gray-400 italic">{store.delivery_note}</span>
+                )}
                 {store.website && (
                   <a href={store.website} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-green-700 hover:underline">
                     <FiGlobe size={13} /> Website
