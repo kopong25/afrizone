@@ -73,20 +73,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle 401 — DO NOT auto-redirect (let components handle it)
-// Just clear the token so next requests don't keep failing
+// Handle 401 — never wipe stored tokens on 401
+// Wiping tokens on /auth/me 401 caused a cascade: one failed check destroyed
+// the entire session for all subsequent requests.
+// Token cleanup is ONLY done by explicit logout() in _app.js.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Never auto-redirect — let the component show the error
-      // Only clear tokens if this was an explicit /auth/ call
-      const url = error.config?.url || "";
-      if (url.includes("/auth/me") || url.includes("/auth/login")) {
-        _memoryToken = null;
-        _write(null);
-      }
-    }
     return Promise.reject(error);
   }
 );

@@ -21,9 +21,13 @@ function AuthProvider({ children }) {
       setToken(stored); // put token in React state immediately
       authAPI.me()
         .then((res) => setUser(res.data))
-        .catch(() => {
-          setAuthToken(null);
-          setToken(null);
+        .catch((err) => {
+          // Only clear token on explicit 401 (invalid/expired token)
+          // NOT on network errors or server errors — those are temporary
+          if (err.response?.status === 401) {
+            setAuthToken(null);
+            setToken(null);
+          }
           setUser(null);
         })
         .finally(() => setLoading(false));
