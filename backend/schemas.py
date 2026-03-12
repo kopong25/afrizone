@@ -36,10 +36,6 @@ class UserOut(BaseModel):
     is_active: bool
     avatar_url: Optional[str]
     country: Optional[str]
-    vendor_type: Optional[str] = None
-    delivery_type: Optional[str] = None
-    delivery_radius_miles: Optional[int] = None
-    delivery_note: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
