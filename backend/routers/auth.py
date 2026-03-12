@@ -41,15 +41,20 @@ def register(request: Request, user_in: schemas.UserCreate, db: Session = Depend
 
     # If registering as seller, create an empty store (pending approval)
     if user_in.role == models.UserRole.seller:
-        store = models.Store(
-            owner_id=user.id,
-            name=f"{user.full_name}'s Store",
-            slug=slugify(f"{user.full_name}-store-{user.id}"),
-            country=user_in.country or "USA",
-            status=models.SellerStatus.pending,
-        )
-        db.add(store)
-        db.commit()
+        try:
+            store = models.Store(
+                owner_id=user.id,
+                name=f"{user.full_name}'s Store",
+                slug=slugify(f"{user.full_name}-store-{user.id}"),
+                country=user_in.country or "USA",
+                status=models.SellerStatus.pending,
+            )
+            db.add(store)
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"[WARN] Store creation failed for user {user.id}: {e}")
+            # Store will be auto-created on first visit to /sellers/my-store
 
     token = auth_utils.create_access_token({"sub": user.id})
     return {"access_token": token, "user": user}

@@ -34,10 +34,20 @@ def get_my_store(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.require_seller)
 ):
-    """Get the current seller's store."""
+    """Get the current seller's store. Auto-creates one if missing."""
     store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     if not store:
-        raise HTTPException(status_code=404, detail="Store not found")
+        # Auto-create store if it was never created (e.g. failed during registration)
+        store = models.Store(
+            owner_id=current_user.id,
+            name=f"{current_user.full_name}'s Store",
+            slug=slugify(f"{current_user.full_name}-store-{current_user.id}"),
+            country="USA",
+            status=models.SellerStatus.pending,
+        )
+        db.add(store)
+        db.commit()
+        db.refresh(store)
     return store
 
 
