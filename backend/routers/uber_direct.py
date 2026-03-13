@@ -589,7 +589,7 @@ async def get_delivery_options(
             "label":        "Store Pickup",
             "icon":         "🏪",
             "price":        0,
-            "eta":          getattr(store, "prep_time_minutes", None) and f"Ready in ~{getattr(store, "prep_time_minutes", None)} mins" or "Ready in ~30 mins",
+            "eta":          f"Ready in ~{getattr(store, 'prep_time_minutes', 30) or 30} mins",
             "description":  f"Pick up at {store.address or store.city}.",
             "provider":     "pickup",
             "available":    True,
