@@ -214,8 +214,19 @@ export default function CartPage() {
           product_id: i.product.id,
           quantity: i.quantity,
         }));
+        // Get store_id reliably — from store object or directly from product
+        const resolvedStoreId = parseInt(storeGroup.store?.id) || 
+          parseInt(storeGroup.items[0]?.product?.store_id) ||
+          parseInt(items[0]?.product?.store_id);
+        
+        if (!resolvedStoreId) {
+          toast.error("Could not determine store. Please refresh and try again.");
+          setCheckingOut(false);
+          return;
+        }
+
         const orderPayload = {
-          store_id: parseInt(storeGroup.store.id) || items[0]?.product?.store_id,
+          store_id: resolvedStoreId,
           items: orderItems,
           shipping: {
             name: shipping.name || "Customer",
