@@ -6,10 +6,16 @@ import Footer from "../../components/layout/Footer";
 import { useAuth } from "../_app";
 import api from "../../lib/api";
 import toast from "react-hot-toast";
-import { FiPackage, FiArrowLeft, FiTruck, FiCheck, FiClock, FiX, FiDownload, FiNavigation } from "react-icons/fi";
+import { FiPackage, FiArrowLeft, FiTruck, FiCheck, FiClock, FiX, FiDownload } from "react-icons/fi";
 
-// Best practice: sellers should package within 24hrs of payment
-// Amazon standard: ship within 2 business days or risk penalty
+// Safe error extractor — handles Pydantic arrays, strings, and undefined
+const apiErr = (e, fallback = "Something went wrong") => {
+  const d = e?.response?.data?.detail;
+  if (Array.isArray(d)) return d.map(x => x.msg || JSON.stringify(x)).join(", ");
+  if (typeof d === "string") return d;
+  return fallback;
+};
+
 function getPackagingUrgency(order) {
   if (order.status !== "paid") return null;
   const paid = new Date(order.updated_at || order.created_at);
@@ -57,6 +63,7 @@ export default function SellerOrders() {
   };
 
   const dispatchUber = async (orderId) => {
+    if (!orderId) return;
     setUpdating(orderId + "_uber");
     try {
       const res = await api.post(`/uber-direct/dispatch/${orderId}`);
@@ -67,10 +74,9 @@ export default function SellerOrders() {
       }
       fetchOrders();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Dispatch failed");
+      toast.error(apiErr(e, "Dispatch failed"));
     } finally { setUpdating(null); }
   };
-
 
   const updateStatus = async (orderId, status) => {
     setUpdating(orderId);
@@ -84,27 +90,23 @@ export default function SellerOrders() {
       toast.success(`Order marked as ${status}`);
       fetchOrders();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Update failed");
+      toast.error(apiErr(e, "Update failed"));
     } finally { setUpdating(null); }
   };
 
   const downloadLabel = async (orderId) => {
     setUpdating(orderId + "_label");
     try {
-      // Try to get existing label first
       let labelUrl = null;
       try {
         const existing = await api.get(`/shipping/label/${orderId}`);
         labelUrl = existing.data?.label_url;
-      } catch {
-        // No label yet — create one automatically
-      }
+      } catch {}
 
       if (!labelUrl) {
-        // Auto-create label with default USPS Priority rate
         const created = await api.post(`/shipping/label/${orderId}?rate_id=auto`);
         labelUrl = created.data?.label_url;
-        toast.success("Shipping label created! Seller will receive email with PDF.");
+        toast.success("Shipping label created!");
         fetchOrders();
       }
 
@@ -114,7 +116,7 @@ export default function SellerOrders() {
         toast.error("Could not generate label. Try again.");
       }
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Label generation failed");
+      toast.error(apiErr(e, "Label generation failed"));
     } finally {
       setUpdating(null);
     }
@@ -131,7 +133,6 @@ export default function SellerOrders() {
     <>
       <Navbar />
       <div className="max-w-5xl mx-auto px-4 py-8">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-6 flex-wrap">
           <Link href="/seller/dashboard" className="text-gray-400 hover:text-gray-600">
             <FiArrowLeft size={20} />
@@ -142,7 +143,6 @@ export default function SellerOrders() {
           <span className="ml-1 text-sm text-gray-400">{orders.length} total</span>
         </div>
 
-        {/* Action required banner */}
         {orders.filter(o => o.status === "paid").length > 0 && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-6 flex items-start gap-3">
             <span className="text-2xl">📦</span>
@@ -151,14 +151,13 @@ export default function SellerOrders() {
                 {orders.filter(o => o.status === "paid").length} order{orders.filter(o => o.status === "paid").length > 1 ? "s" : ""} need packaging
               </p>
               <p className="text-sm text-yellow-700 mt-0.5">
-                Best practice: Package and hand to courier within <strong>24 hours</strong> of payment to maintain your seller rating.
+                Package and hand to courier within <strong>24 hours</strong> of payment.
                 Mark as <strong>Processing</strong> when packaging, <strong>Shipped</strong> once handed to courier.
               </p>
             </div>
           </div>
         )}
 
-        {/* Filter tabs */}
         <div className="flex gap-2 mb-6 flex-wrap">
           {["all", "pending", "paid", "processing", "shipped", "delivered", "cancelled"].map(s => (
             <button key={s} onClick={() => setFilter(s)}
@@ -186,11 +185,10 @@ export default function SellerOrders() {
               const s = STATUS_STYLES[order.status] || STATUS_STYLES.pending;
               const isExpanded = expanded === order.id;
               const nextStatus = STATUS_FLOW[STATUS_FLOW.indexOf(order.status) + 1];
+              const isUberOrder = order.delivery_method === "uber_express";
 
               return (
                 <div key={order.id} className="bg-white border rounded-2xl shadow-sm overflow-hidden">
-                  {/* Order row */}
-                  {/* Packaging urgency banner */}
                   {getPackagingUrgency(order) && (
                     <div className={`px-4 py-2 border-b text-xs font-bold flex items-center gap-2 ${getPackagingUrgency(order).color}`}>
                       {getPackagingUrgency(order).label}
@@ -203,6 +201,7 @@ export default function SellerOrders() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-black text-gray-900">Order #{order.id}</span>
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${s.bg}`}>{s.label}</span>
+                        {isUberOrder && <span className="text-xs bg-black text-white px-2 py-0.5 rounded-full">🛵 Uber</span>}
                         {order.tracking_number && (
                           <span className="text-xs text-gray-400 font-mono">{order.tracking_number}</span>
                         )}
@@ -219,10 +218,8 @@ export default function SellerOrders() {
                     <span className="text-gray-400 text-xs">{isExpanded ? "▲" : "▼"}</span>
                   </div>
 
-                  {/* Expanded detail */}
                   {isExpanded && (
                     <div className="border-t bg-gray-50 p-4">
-                      {/* Items */}
                       <div className="mb-4">
                         <p className="text-xs font-bold text-gray-500 uppercase mb-2">Items</p>
                         <div className="space-y-2">
@@ -241,17 +238,17 @@ export default function SellerOrders() {
                         </div>
                       </div>
 
-                      {/* Shipping address */}
                       {order.shipping_address && (
                         <div className="mb-4 bg-white rounded-xl p-3 border">
-                          <p className="text-xs font-bold text-gray-500 uppercase mb-1">Ship To</p>
+                          <p className="text-xs font-bold text-gray-500 uppercase mb-1">
+                            {isUberOrder ? "🛵 Deliver To" : "📦 Ship To"}
+                          </p>
                           <p className="text-sm text-gray-700">{order.shipping_name}</p>
                           <p className="text-sm text-gray-500">{order.shipping_address}, {order.shipping_city}, {order.shipping_state} {order.shipping_zip}</p>
                         </div>
                       )}
 
-                      {/* Tracking input */}
-                      {order.status !== "delivered" && order.status !== "cancelled" && (
+                      {!isUberOrder && order.status !== "delivered" && order.status !== "cancelled" && (
                         <div className="mb-4 grid grid-cols-2 gap-2">
                           <input
                             placeholder="Tracking number (optional)"
@@ -268,7 +265,6 @@ export default function SellerOrders() {
                         </div>
                       )}
 
-                      {/* Action buttons */}
                       <div className="flex gap-2 flex-wrap">
                         {nextStatus && order.status !== "cancelled" && (
                           <button onClick={() => updateStatus(order.id, nextStatus)}
@@ -278,31 +274,25 @@ export default function SellerOrders() {
                             Mark as {nextStatus.charAt(0).toUpperCase() + nextStatus.slice(1)}
                           </button>
                         )}
-                        {/* Show Dispatch Driver for restaurant/Uber orders */}
-                        {order.delivery_method === "uber_express" && order.status === "processing" && (
+
+                        {/* Uber dispatch — only for uber_express orders in processing status */}
+                        {isUberOrder && order.status === "processing" && (
                           <button onClick={() => dispatchUber(order.id)}
                             disabled={updating === order.id + "_uber"}
                             className="flex items-center gap-2 bg-black hover:bg-gray-800 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors">
                             🛵 {updating === order.id + "_uber" ? "Dispatching..." : "Dispatch Uber Driver"}
                           </button>
                         )}
-                        {/* Show shipping label only for non-Uber orders */}
-                        {order.delivery_method !== "uber_express" && (
+
+                        {/* Shipping label — only for non-Uber orders */}
+                        {!isUberOrder && (
                           <button onClick={() => downloadLabel(order.id)}
                             disabled={updating === order.id + "_label"}
                             className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-green-900 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
                             <FiDownload size={14} /> {updating === order.id + "_label" ? "Generating..." : "Shipping Label"}
                           </button>
                         )}
-                        {/* Uber Direct dispatch — shown for local delivery orders */}
-                        {["paid","processing"].includes(order.status) && (
-                          <button onClick={() => dispatchUber(order.id)}
-                            disabled={updating === order.id + "_uber"}
-                            className="flex items-center gap-2 bg-black hover:bg-gray-900 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors">
-                            <FiNavigation size={14} />
-                            {updating === order.id + "_uber" ? "Dispatching..." : "🚗 Dispatch Uber Driver"}
-                          </button>
-                        )}
+
                         {order.status === "pending" && (
                           <button onClick={() => updateStatus(order.id, "cancelled")}
                             disabled={updating === order.id}
