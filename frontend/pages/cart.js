@@ -110,15 +110,20 @@ export default function CartPage() {
         }
       } catch {}
 
-      const res = await api.post("/uber-direct/delivery-options", {
-        store_id: storeId,
-        customer_lat: customerLat,
-        customer_lng: customerLng,
-        customer_address: `${shipping.address}, ${shipping.city}, ${shipping.state}`,
-      });
-
-      setDistanceInfo(res.data);
-      const distanceMiles = res.data.distance_miles;
+      let uberData = { options: [], distance_miles: null };
+      try {
+        const res = await api.post("/uber-direct/delivery-options", {
+          store_id: storeId,
+          customer_lat: customerLat,
+          customer_lng: customerLng,
+          customer_address: `${shipping.address}, ${shipping.city}, ${shipping.state}`,
+        });
+        uberData = res.data;
+        setDistanceInfo(res.data);
+      } catch {
+        // Uber endpoint unavailable - use defaults
+      }
+      const distanceMiles = uberData.distance_miles;
       const isLongDistance = !distanceMiles || distanceMiles >= 15;
 
       let options = [];
@@ -130,11 +135,11 @@ export default function CartPage() {
             id: "uber_express",
             label: "Uber Express Delivery",
             icon: "🛵",
-            price: res.data.options?.find(o => o.id === "uber_express")?.price || 9.99,
-            eta: res.data.options?.find(o => o.id === "uber_express")?.eta || "~45 minutes",
+            price: uberData.options?.find(o => o.id === "uber_express")?.price || 9.99,
+            eta: uberData.options?.find(o => o.id === "uber_express")?.eta || "~45 minutes",
             description: "Hot food delivered fresh to your door.",
             provider: "uber_direct",
-            quote_id: res.data.options?.find(o => o.id === "uber_express")?.quote_id || null,
+            quote_id: uberData.options?.find(o => o.id === "uber_express")?.quote_id || null,
           }
         ];
       } else {
@@ -145,7 +150,7 @@ export default function CartPage() {
             id: "uber_express",
             label: "Uber Express Delivery",
             icon: "🛵",
-            price: res.data.options?.find(o => o.id === "uber_express")?.price || 8.99,
+            price: uberData.options?.find(o => o.id === "uber_express")?.price || 8.99,
             eta: "2–4 hours",
             description: "Same-day local delivery.",
             provider: "uber_direct",
@@ -571,9 +576,9 @@ export default function CartPage() {
                       }
                       const ok = await fetchDeliveryOptions();
                       if (ok) setStep("delivery");
-                    }} className="w-full btn-primary py-3 flex items-center justify-center gap-2">
-                      {loadingDelivery ? <FiLoader className="animate-spin" /> : null}
-                      Choose Delivery <FiArrowRight />
+                    }} disabled={loadingDelivery}
+                    className="w-full btn-primary py-3 flex items-center justify-center gap-2 disabled:opacity-60">
+                      {loadingDelivery ? <><FiLoader className="animate-spin" /> Loading options...</> : <>Choose Delivery <FiArrowRight /></>}
                     </button>
                     <button onClick={() => setStep("cart")} className="w-full btn-secondary py-2.5 text-sm">← Back to Cart</button>
                   </div>
