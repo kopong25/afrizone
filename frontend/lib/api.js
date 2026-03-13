@@ -116,10 +116,22 @@ export const storesAPI = {
   myStore: () => api.get("/sellers/my-store"),
   analytics: (days = 30) => api.get(`/sellers/my-store/analytics?days=${days}`),
   updateMyStore: (data) => api.put("/sellers/my-store", data),
-  uploadLogo: (formData) =>
-    api.post("/sellers/my-store/logo", formData),
-  uploadBanner: (formData) =>
-    api.post("/sellers/my-store/banner", formData),
+  uploadLogo: (formData) => {
+    const token = _memoryToken || _read();
+    return fetch(`${api.defaults.baseURL}/sellers/my-store/logo`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    }).then(r => r.json()).then(data => ({ data }));
+  },
+  uploadBanner: (formData) => {
+    const token = _memoryToken || _read();
+    return fetch(`${api.defaults.baseURL}/sellers/my-store/banner`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    }).then(r => r.json()).then(data => ({ data }));
+  },
 };
 
 // ── Orders ──
