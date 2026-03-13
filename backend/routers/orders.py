@@ -87,14 +87,19 @@ def create_order(
         product.sale_count += qty
 
     # Clear ordered items from cart
-    ordered_product_ids = [item.product_id for item in order.items]
+    ordered_product_ids = [item.product_id for item in order_in.items]
     db.query(models.CartItem).filter(
         models.CartItem.user_id == current_user.id,
         models.CartItem.product_id.in_(ordered_product_ids)
     ).delete(synchronize_session=False)
 
     db.commit()
-    db.refresh(order)
+
+    # Reload order with all relationships needed for serialization
+    order = db.query(models.Order).options(
+        joinedload(models.Order.items).joinedload(models.OrderItem.product).joinedload(models.Product.store),
+        joinedload(models.Order.store),
+    ).filter(models.Order.id == order.id).first()
 
     # Send email notifications (non-blocking)
     try:
@@ -110,15 +115,17 @@ def create_order(
             total=order.total,
             store_name=store.name,
         )
-        send_new_order_to_seller(
-            seller_email=store.owner.email,
-            store_name=store.name,
-            order_id=order.id,
-            items=email_items,
-            total=order.total,
-            seller_amount=order.seller_amount,
-            buyer_name=current_user.full_name,
-        )
+        seller_email = store.owner.email if store.owner else None
+        if seller_email:
+            send_new_order_to_seller(
+                seller_email=seller_email,
+                store_name=store.name,
+                order_id=order.id,
+                items=email_items,
+                total=order.total,
+                seller_amount=order.seller_amount,
+                buyer_name=current_user.full_name,
+            )
     except Exception as e:
         print(f"Email error: {e}")
 
@@ -239,7 +246,12 @@ def update_order_status(
         store.total_revenue += order.seller_amount
 
     db.commit()
-    db.refresh(order)
+
+    # Reload order with all relationships needed for serialization
+    order = db.query(models.Order).options(
+        joinedload(models.Order.items).joinedload(models.OrderItem.product).joinedload(models.Product.store),
+        joinedload(models.Order.store),
+    ).filter(models.Order.id == order.id).first()
 
     # Send status-change emails
     try:
