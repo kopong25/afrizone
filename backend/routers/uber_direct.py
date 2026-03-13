@@ -518,6 +518,17 @@ async def get_delivery_options(
                 "available":     True,
                 "shipping_cost": 4.99,
             })
+            options.append({
+                "id":            "usps_priority",
+                "label":         "USPS Priority Shipping",
+                "icon":          "📬",
+                "price":         6.99,
+                "eta":           "1–2 business days",
+                "description":   "Faster shipping with Shippo label generation.",
+                "provider":      "usps",
+                "available":     True,
+                "shipping_cost": 6.99,
+            })
 
         # ── Uber fast delivery — available to ALL non-restaurant stores ───────
         # Customers can choose fast local delivery even for grocery/fashion/beauty
