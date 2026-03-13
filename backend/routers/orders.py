@@ -68,9 +68,13 @@ def create_order(
         shipping_state=order_in.shipping.state,
         shipping_country=order_in.shipping.country,
         shipping_zip=order_in.shipping.zip,
-        delivery_method=order_in.delivery_method,
-        delivery_fee=shipping_cost,
     )
+    # Set delivery fields safely (in case migration hasn't run yet)
+    try:
+        order.delivery_method = order_in.delivery_method
+        order.delivery_fee = shipping_cost
+    except Exception:
+        pass
     db.add(order)
     db.flush()  # Get order.id before committing
 

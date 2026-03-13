@@ -30,15 +30,22 @@ UBER_CUSTOMER_ID   = os.getenv("UBER_CUSTOMER_ID", "")   # From Uber Direct dash
 UBER_SANDBOX       = os.getenv("UBER_SANDBOX", "true").lower() == "true"
 UBER_BASE          = "https://api.uber.com"
 
-# ── Zone Pricing Table ─────────────────────────────────────────────────────────
-# (max_miles, customer_charge, uber_cost_estimate, afrizone_profit)
-DELIVERY_ZONES = [
-    {"zone": 1, "label": "Nearby",    "max_miles": 3,  "charge": 5.99,  "uber_est": 3.50,  "profit": 2.49},
-    {"zone": 2, "label": "Local",     "max_miles": 7,  "charge": 8.99,  "uber_est": 5.50,  "profit": 3.49},
-    {"zone": 3, "label": "Extended",  "max_miles": 12, "charge": 12.99, "uber_est": 8.50,  "profit": 4.49},
-    {"zone": 4, "label": "Far",       "max_miles": 20, "charge": 16.99, "uber_est": 12.00, "profit": 4.99},
-]
+# ── Pricing Config ─────────────────────────────────────────────────────────────
+# Afrizone adds $2.00 margin on top of actual Uber cost
+AFRIZONE_MARGIN    = 2.00
 MAX_DELIVERY_MILES = 20
+
+# Sandbox cost estimate: base fee + per-mile rate (mirrors Uber Direct sandbox pricing)
+SANDBOX_BASE_FEE   = 3.50   # dollars
+SANDBOX_PER_MILE   = 0.90   # dollars per mile
+
+def estimate_uber_cost(distance_miles: float) -> float:
+    """Estimate Uber Direct cost for sandbox mode."""
+    return round(SANDBOX_BASE_FEE + (SANDBOX_PER_MILE * distance_miles), 2)
+
+def customer_price(uber_cost: float) -> float:
+    """What customer pays = Uber cost + $2 Afrizone margin, rounded to nearest cent."""
+    return round(uber_cost + AFRIZONE_MARGIN, 2)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -52,12 +59,61 @@ def haversine_miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float
     return R * 2 * math.asin(math.sqrt(a))
 
 
-def get_zone_for_distance(miles: float) -> dict | None:
-    """Return pricing zone for a given distance, or None if out of range."""
-    for zone in DELIVERY_ZONES:
-        if miles <= zone["max_miles"]:
-            return zone
-    return None
+def get_zone_label(miles: float) -> str:
+    """Return a human-readable zone label."""
+    if miles <= 3:   return "Nearby"
+    if miles <= 7:   return "Local"
+    if miles <= 12:  return "Extended"
+    return "Far"
+
+
+async def get_uber_fee(store, customer_lat: float, customer_lng: float, customer_address: str = "") -> float:
+    """
+    Get actual Uber Direct delivery fee.
+    - If Uber credentials configured: calls live/sandbox Uber API
+    - Otherwise: estimates using distance-based formula (sandbox testing)
+    Returns the Uber cost BEFORE Afrizone margin.
+    """
+    store_lat = getattr(store, 'latitude', None)
+    store_lng = getattr(store, 'longitude', None)
+
+    # Calculate distance for sandbox estimate
+    if store_lat and store_lng and customer_lat and customer_lng:
+        distance = haversine_miles(store_lat, store_lng, customer_lat, customer_lng)
+    else:
+        distance = 4.2  # sandbox default
+
+    # Try live Uber API first
+    if UBER_CLIENT_ID and UBER_CLIENT_SECRET and UBER_CUSTOMER_ID:
+        try:
+            token = await get_uber_token()
+            async with httpx.AsyncClient() as client:
+                r = await client.post(
+                    f"{UBER_BASE}/v1/customers/{UBER_CUSTOMER_ID}/delivery_quotes",
+                    json={
+                        "pickup_address": store.address or f"{store.city}, USA",
+                        "dropoff_address": customer_address,
+                        "pickup_latitude": store_lat or customer_lat,
+                        "pickup_longitude": store_lng or customer_lng,
+                        "dropoff_latitude": customer_lat,
+                        "dropoff_longitude": customer_lng,
+                        "pickup_name": store.name,
+                        "manifest_items": [{"name": "Order", "quantity": 1, "size": "small", "price": 1000}],
+                    },
+                    headers={"Authorization": f"Bearer {token}"},
+                    timeout=10,
+                )
+                if r.status_code == 200:
+                    data = r.json()
+                    # Uber returns fee in cents
+                    fee_cents = data.get("fee", 0)
+                    if fee_cents:
+                        return round(fee_cents / 100, 2)
+        except Exception as e:
+            print(f"[Uber Fee] API call failed: {e} — using sandbox estimate")
+
+    # Sandbox / fallback: distance-based estimate
+    return estimate_uber_cost(distance)
 
 
 async def get_uber_token() -> str:
@@ -119,9 +175,17 @@ async def get_delivery_quote(
 
     store = db.query(models.Store).filter(models.Store.id == store_id).first()
     if not store:
-        raise HTTPException(status_code=404, detail="Store not found")
+        # Store not found — return safe USPS fallback instead of 404
+        return {
+            "distance_miles": None,
+            "store_vendor_type": None,
+            "options": [
+                {"id": "usps_standard", "label": "USPS Standard Shipping", "icon": "📦", "price": 4.99, "eta": "2–3 business days", "provider": "usps", "available": True},
+                {"id": "usps_priority", "label": "USPS Priority Mail", "icon": "📬", "price": 6.99, "eta": "1–2 business days", "provider": "usps", "available": True},
+            ]
+        }
 
-    if store.delivery_type not in ["local_delivery", "both"]:
+    if getattr(store, "delivery_type", None) not in ["local_delivery", "both"]:
         raise HTTPException(status_code=400, detail="This store does not offer local delivery")
 
     # Use store address coords if available — fallback to city-center mock for sandbox
@@ -186,9 +250,9 @@ async def get_delivery_quote(
     return {
         "available": True,
         "distance_miles": round(distance_miles, 1),
-        "zone": zone["zone"],
+        "zone": get_zone_label(distance_miles),
         "zone_label": zone["label"],
-        "delivery_fee": zone["charge"],
+        "delivery_fee": customer_price(estimate_uber_cost(distance_miles)),
         "estimated_minutes": estimated_minutes,
         "uber_quote_id": uber_quote_id,
         "sandbox": UBER_SANDBOX,
@@ -422,20 +486,28 @@ async def get_delivery_options(
 
     store = db.query(models.Store).filter(models.Store.id == store_id).first()
     if not store:
-        raise HTTPException(status_code=404, detail="Store not found")
+        # Store not found — return safe USPS fallback instead of 404
+        return {
+            "distance_miles": None,
+            "store_vendor_type": None,
+            "options": [
+                {"id": "usps_standard", "label": "USPS Standard Shipping", "icon": "📦", "price": 4.99, "eta": "2–3 business days", "provider": "usps", "available": True},
+                {"id": "usps_priority", "label": "USPS Priority Mail", "icon": "📬", "price": 6.99, "eta": "1–2 business days", "provider": "usps", "available": True},
+            ]
+        }
 
     # ── Calculate distance ─────────────────────────────────────────────────────
-    if store.latitude and store.longitude and customer_lat and customer_lng:
-        distance_miles = haversine_miles(store.latitude, store.longitude, customer_lat, customer_lng)
+    if getattr(store, "latitude", None) and getattr(store, "longitude", None) and customer_lat and customer_lng:
+        distance_miles = haversine_miles(getattr(store, "latitude", 0), getattr(store, "longitude", 0), customer_lat, customer_lng)
     elif UBER_SANDBOX:
         # Sandbox: use mock distance so checkout can be tested without real coords
         distance_miles = 4.2
     else:
         distance_miles = None
 
-    is_restaurant  = store.vendor_type == "restaurant"
-    offers_local   = store.delivery_type in ["local_delivery", "both"]
-    offers_shipping = store.delivery_type in ["shipping", "both"]
+    is_restaurant  = getattr(store, "vendor_type", None) == "restaurant"
+    offers_local   = getattr(store, "delivery_type", None) in ["local_delivery", "both"]
+    offers_shipping = getattr(store, "delivery_type", None) in ["shipping", "both"]
 
     options = []
 
@@ -454,7 +526,7 @@ async def get_delivery_options(
         return {
             "distance_miles": round(distance_miles, 1) if distance_miles else None,
             "distance_zone": "long_distance",
-            "store_vendor_type": store.vendor_type,
+            "store_vendor_type": getattr(store, "vendor_type", None),
             "options": options,
             "note": "This store is more than 15 miles away — shipping only.",
             "sandbox": UBER_SANDBOX,
@@ -464,21 +536,25 @@ async def get_delivery_options(
     zone = get_zone_for_distance(distance_miles)
 
     if is_restaurant and offers_local:
-        # Restaurant + local delivery → Uber Express is PRIMARY option
+        # Restaurant + local delivery → Uber Express, price = Uber cost + $2 margin
+        uber_cost = await get_uber_fee(store, customer_lat, customer_lng, payload.get("customer_address", ""))
+        uber_price = customer_price(uber_cost)
+        zone_label = get_zone_label(distance_miles)
         options.append({
             "id":           "uber_express",
             "label":        "Uber Express Delivery",
             "icon":         "🛵",
-            "price":        zone["charge"] if zone else 9.99,
+            "price":        uber_price,
             "eta":          "~45 minutes",
-            "description":  f"Hot food delivered fresh to your door. {zone['label'] if zone else ''} delivery zone.",
+            "description":  f"Hot food delivered fresh to your door. ({zone_label} zone)",
             "provider":     "uber_direct",
             "available":    True,
-            "zone":         zone["zone"] if zone else None,
+            "uber_cost":    uber_cost,
+            "margin":       AFRIZONE_MARGIN,
             "sandbox":      UBER_SANDBOX,
         })
 
-    if not is_restaurant and (offers_shipping or store.delivery_type == "both"):
+    if not is_restaurant and (offers_shipping or getattr(store, "delivery_type", None) == "both"):
         # Non-restaurant within 15 miles → USPS Standard
         options.append({
             "id":           "usps_standard",
@@ -491,13 +567,15 @@ async def get_delivery_options(
             "available":    True,
         })
 
-    if store.delivery_type == "both" and not is_restaurant:
+    if getattr(store, "delivery_type", None) == "both" and not is_restaurant:
         # Grocery/other offering both — also show local delivery as an option
+        uber_cost2 = await get_uber_fee(store, customer_lat, customer_lng, payload.get("customer_address", ""))
+        uber_price2 = customer_price(uber_cost2)
         options.append({
             "id":           "uber_express",
             "label":        "Same-Day Local Delivery",
             "icon":         "🛵",
-            "price":        zone["charge"] if zone else 8.99,
+            "price":        uber_price2,
             "eta":          "2–4 hours",
             "description":  "Local courier delivery today.",
             "provider":     "uber_direct",
@@ -505,13 +583,13 @@ async def get_delivery_options(
             "zone":         zone["zone"] if zone else None,
         })
 
-    if store.delivery_type in ["pickup"]:
+    if getattr(store, "delivery_type", None) in ["pickup"]:
         options.append({
             "id":           "pickup",
             "label":        "Store Pickup",
             "icon":         "🏪",
             "price":        0,
-            "eta":          store.prep_time_minutes and f"Ready in ~{store.prep_time_minutes} mins" or "Ready in ~30 mins",
+            "eta":          getattr(store, "prep_time_minutes", None) and f"Ready in ~{getattr(store, "prep_time_minutes", None)} mins" or "Ready in ~30 mins",
             "description":  f"Pick up at {store.address or store.city}.",
             "provider":     "pickup",
             "available":    True,
@@ -533,7 +611,7 @@ async def get_delivery_options(
     return {
         "distance_miles":    round(distance_miles, 1),
         "distance_zone":     "local",
-        "store_vendor_type": store.vendor_type,
+        "store_vendor_type": getattr(store, "vendor_type", None),
         "options":           options,
         "sandbox":           UBER_SANDBOX,
     }
