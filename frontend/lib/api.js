@@ -117,13 +117,9 @@ export const storesAPI = {
   analytics: (days = 30) => api.get(`/sellers/my-store/analytics?days=${days}`),
   updateMyStore: (data) => api.put("/sellers/my-store", data),
   uploadLogo: (formData) =>
-    api.post("/sellers/my-store/logo", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    }),
+    api.post("/sellers/my-store/logo", formData),
   uploadBanner: (formData) =>
-    api.post("/sellers/my-store/banner", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    }),
+    api.post("/sellers/my-store/banner", formData),
 };
 
 // ── Orders ──
