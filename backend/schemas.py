@@ -274,10 +274,6 @@ class OrderCreate(BaseModel):
     delivery_method: Optional[str] = None
     uber_quote_id: Optional[str] = None
 
-: List[CartItemCreate]
-    shipping: ShippingAddress
-
-
 class OrderItemOut(BaseModel):
     id: int
     quantity: int
