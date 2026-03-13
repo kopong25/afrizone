@@ -266,10 +266,15 @@ class ShippingAddress(BaseModel):
     country: str
     zip: str
 
-
 class OrderCreate(BaseModel):
     store_id: int
     items: List[CartItemCreate]
+    shipping: ShippingAddress
+    delivery_fee: Optional[float] = 0.0
+    delivery_method: Optional[str] = None
+    uber_quote_id: Optional[str] = None
+
+: List[CartItemCreate]
     shipping: ShippingAddress
 
 

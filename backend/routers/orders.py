@@ -50,7 +50,7 @@ def create_order(
         subtotal += line_total
         order_items.append((product, item.quantity, product.price, line_total))
 
-    shipping_cost = 0.0  # TODO: integrate shipping calculator
+    shipping_cost = float(getattr(order_in, "delivery_fee", None) or getattr(order_in, "shipping_cost", None) or 0.0)
     platform_fee, seller_amount, total = calculate_order_amounts(subtotal, shipping_cost)
 
     # Create order
