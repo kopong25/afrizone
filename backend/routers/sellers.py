@@ -35,9 +35,9 @@ def get_my_store(
     current_user: models.User = Depends(auth_utils.require_seller)
 ):
     """Get the current seller's store. Auto-creates one if missing."""
+    from sqlalchemy import text
     store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     if not store:
-        # Auto-create store if it was never created (e.g. failed during registration)
         store = models.Store(
             owner_id=current_user.id,
             name=f"{current_user.full_name}'s Store",
@@ -48,6 +48,14 @@ def get_my_store(
         db.add(store)
         db.commit()
         db.refresh(store)
+    # Patch enum fields directly from DB to bypass SQLAlchemy enum mapping issues
+    row = db.execute(
+        text("SELECT vendor_type, delivery_type FROM stores WHERE id = :id"),
+        {"id": store.id}
+    ).fetchone()
+    if row:
+        store.vendor_type = row[0]
+        store.delivery_type = row[1]
     return store
 
 
@@ -61,10 +69,35 @@ def update_my_store(
     store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
-    for key, value in updates.model_dump(exclude_none=True).items():
-        setattr(store, key, value)
+    data = updates.model_dump(exclude_none=True)
+
+    # Enforce business rules: restaurant must use local_delivery
+    if data.get("vendor_type") == "restaurant":
+        data["delivery_type"] = "local_delivery"
+    elif data.get("vendor_type") and data.get("vendor_type") != "restaurant":
+        # Non-restaurant: if they were on local_delivery, switch back to shipping
+        if store.delivery_type == "local_delivery" and "delivery_type" not in data:
+            data["delivery_type"] = "shipping"
+
+    for key, value in data.items():
+        # Use raw SQL update for enum columns to avoid SQLAlchemy coercion issues
+        if key in ("vendor_type", "delivery_type"):
+            from sqlalchemy import text
+            db.execute(
+                text(f"UPDATE stores SET {key} = :{key} WHERE id = :id"),
+                {key: value, "id": store.id}
+            )
+        else:
+            setattr(store, key, value)
+
     db.commit()
     db.refresh(store)
+    # Patch enum fields from raw SQL to bypass SQLAlchemy mapping issues
+    from sqlalchemy import text as _text
+    row = db.execute(_text("SELECT vendor_type, delivery_type FROM stores WHERE id = :id"), {"id": store.id}).fetchone()
+    if row:
+        store.vendor_type = row[0]
+        store.delivery_type = row[1]
     return store
 
 
