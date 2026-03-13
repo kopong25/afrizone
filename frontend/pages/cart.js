@@ -51,7 +51,7 @@ export default function CartPage() {
     } catch { toast.error("Failed to remove item"); }
   };
 
-  // ── Delivery routing ───────────────────────────────────────────────────────
+  // ── Delivery routing ────────────────────────────────────────────────────────
   const fetchDeliveryOptions = async () => {
     if (!shipping.address || !shipping.city || !shipping.zip) {
       toast.error("Please fill in your address first");
@@ -62,19 +62,7 @@ export default function CartPage() {
     setSelectedDelivery(null);
 
     try {
-      // storeId: always use product.store_id (reliably present even without store join)
       const storeId = items[0]?.product?.store_id || primaryStore?.id;
-      const isRestaurant = primaryStore?.vendor_type === "restaurant";
-      const offersLocal = ["local_delivery", "both"].includes(primaryStore?.delivery_type);
-      console.log("[Delivery Debug]", { 
-        storeId, 
-        vendor_type: primaryStore?.vendor_type, 
-        delivery_type: primaryStore?.delivery_type,
-        isRestaurant, 
-        offersLocal,
-        primaryStore,
-        cartItems: items
-      });
 
       // Geocode customer address
       let customerLat = null, customerLng = null;
@@ -99,56 +87,75 @@ export default function CartPage() {
       });
 
       setDistanceInfo(res.data);
-      const distanceMiles = res.data.distance_miles;
-      const isLongDistance = !distanceMiles || distanceMiles >= 15;
 
-      let options = [];
+      // ── Use the API response options directly — no hardcoded overrides ──────
+      // The backend already applies all routing logic correctly.
+      // We just rename "USPS Priority Shipping" label to be consistent and
+      // ensure each option has a shipping_cost field the order can use.
+      const apiOptions = (res.data.options || []).map(opt => ({
+        ...opt,
+        // Normalise label rename in case old backend version still sends old name
+        label: opt.label === "USPS Priority Mail" ? "USPS Priority Shipping" : opt.label,
+        // Ensure price is always a number
+        price: parseFloat(opt.price) || 0,
+        // shipping_cost mirrors price for order creation
+        shipping_cost: parseFloat(opt.price) || 0,
+      }));
 
-      if (isRestaurant && offersLocal && !isLongDistance) {
-        // Restaurant within 15 miles — Uber ONLY, no USPS for hot food
-        options = [
-          {
-            id: "uber_express",
-            label: "Uber Express Delivery",
-            icon: "🛵",
-            price: res.data.options?.find(o => o.id === "uber_express")?.price || 9.99,
-            eta: "~45 minutes",
-            description: "Hot food delivered fresh to your door.",
-            provider: "uber_direct",
-          }
-        ];
-      } else if (isLongDistance) {
-        // >15 miles — USPS Priority only
-        options = [
-          { id: "usps_priority", label: "USPS Priority Mail", icon: "📬", price: 6.99, eta: "1–3 business days", description: "Ships nationwide. Tracking included.", provider: "usps" }
-        ];
+      if (apiOptions.length > 0) {
+        setDeliveryOptions(apiOptions);
+        setSelectedDelivery(apiOptions[0]);
       } else {
-        // Non-restaurant within 15 miles — USPS Standard as default
-        options = [
-          { id: "usps_standard", label: "USPS Standard Shipping", icon: "📦", price: 4.99, eta: "2–3 business days", description: "Reliable shipping with tracking.", provider: "usps" },
-          { id: "usps_priority", label: "USPS Priority Mail", icon: "📬", price: 6.99, eta: "1–2 business days", description: "Faster shipping with tracking.", provider: "usps" },
+        // Fallback only if API returned nothing at all
+        const fallback = [
+          {
+            id: "usps_standard",
+            label: "USPS Standard Shipping",
+            icon: "📦",
+            price: 4.99,
+            shipping_cost: 4.99,
+            eta: "2–3 business days",
+            description: "Standard shipping with tracking.",
+            provider: "usps",
+          },
+          {
+            id: "usps_priority",
+            label: "USPS Priority Shipping",
+            icon: "📬",
+            price: 6.99,
+            shipping_cost: 6.99,
+            eta: "1–2 business days",
+            description: "Faster shipping with tracking.",
+            provider: "usps",
+          },
         ];
-        // If store also offers local delivery, add Uber Express as optional fast choice
-        if (offersLocal) {
-          options.push({
-            id: "uber_express",
-            label: "Uber Express Delivery",
-            icon: "🛵",
-            price: res.data.options?.find(o => o.id === "uber_express")?.price || 8.99,
-            eta: "2–4 hours",
-            description: "Same-day local delivery. Faster but costs more.",
-            provider: "uber_direct",
-          });
-        }
+        setDeliveryOptions(fallback);
+        setSelectedDelivery(fallback[0]);
       }
-
-      setDeliveryOptions(options);
-      setSelectedDelivery(options[0]);
       return true;
     } catch (err) {
+      console.error("[Delivery options error]", err);
       const fallback = [
-        { id: "usps_standard", label: "USPS Standard Shipping", icon: "📦", price: 4.99, eta: "2–3 business days", provider: "usps" },
-        { id: "usps_priority", label: "USPS Priority Mail", icon: "📬", price: 6.99, eta: "1–2 business days", provider: "usps" },
+        {
+          id: "usps_standard",
+          label: "USPS Standard Shipping",
+          icon: "📦",
+          price: 4.99,
+          shipping_cost: 4.99,
+          eta: "2–3 business days",
+          description: "Standard shipping with tracking.",
+          provider: "usps",
+        },
+        {
+          id: "usps_priority",
+          label: "USPS Priority Shipping",
+          icon: "📬",
+          price: 6.99,
+          shipping_cost: 6.99,
+          eta: "1–2 business days",
+          description: "Faster shipping with tracking.",
+          provider: "usps",
+        },
       ];
       setDeliveryOptions(fallback);
       setSelectedDelivery(fallback[0]);
@@ -159,24 +166,23 @@ export default function CartPage() {
   };
 
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const shippingCost = selectedDelivery ? selectedDelivery.price : (subtotal > 50 ? 0 : 4.99);
+
+  // ── FIX: always use the selected delivery price — never default to free ─────
+  const shippingCost = selectedDelivery ? parseFloat(selectedDelivery.price) : 0;
+
   const discountAmount = discount?.discount_amount || 0;
   const total = subtotal + shippingCost - discountAmount;
 
   const byStore = items.reduce((acc, item) => {
     const storeId = item.product.store?.id || item.product.store_id || "unknown";
-    if (!acc[storeId]) acc[storeId] = { 
-      store: item.product.store || { id: storeId, name: "Store" }, 
-      items: [] 
+    if (!acc[storeId]) acc[storeId] = {
+      store: item.product.store || { id: storeId, name: "Store" },
+      items: []
     };
     acc[storeId].items.push(item);
     return acc;
   }, {});
 
-  // Determine if ANY store in cart is a restaurant
-  const hasRestaurant = Object.values(byStore).some(
-    ({ store }) => store.vendor_type === "restaurant"
-  );
   const primaryStore = Object.values(byStore)[0]?.store;
 
   const applyDiscount = async () => {
@@ -227,7 +233,9 @@ export default function CartPage() {
             zip: shipping.zip,
           },
           delivery_method: selectedDelivery?.id || "usps_standard",
+          // ── FIX: send the actual selected delivery price ───────────────────
           delivery_fee: shippingCost,
+          shipping_cost: shippingCost,
           uber_quote_id: selectedDelivery?.quote_id || null,
         }, { headers: authHeaders });
         createdOrders.push(r.data);
@@ -417,10 +425,12 @@ export default function CartPage() {
                           <div className="flex-1">
                             <div className="flex items-center justify-between">
                               <span className="font-bold text-gray-800">{opt.icon} {opt.label}</span>
-                              <span className="font-black text-green-900">${opt.price.toFixed(2)}</span>
+                              <span className="font-black text-green-900">${parseFloat(opt.price).toFixed(2)}</span>
                             </div>
                             <p className="text-sm text-gray-500 mt-0.5">{opt.eta}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">{opt.description}</p>
+                            {opt.description && (
+                              <p className="text-xs text-gray-400 mt-0.5">{opt.description}</p>
+                            )}
                             {opt.provider === "uber_direct" && (
                               <span className="inline-block mt-1 text-xs bg-black text-white px-2 py-0.5 rounded-full font-medium">
                                 Powered by Uber
@@ -448,7 +458,7 @@ export default function CartPage() {
                       <span className="text-2xl">{selectedDelivery.icon}</span>
                       <div>
                         <p className="font-bold text-green-800 text-sm">{selectedDelivery.label}</p>
-                        <p className="text-xs text-green-600">{selectedDelivery.eta} · ${selectedDelivery.price.toFixed(2)}</p>
+                        <p className="text-xs text-green-600">{selectedDelivery.eta} · ${parseFloat(selectedDelivery.price).toFixed(2)}</p>
                       </div>
                     </div>
                   )}
@@ -481,10 +491,17 @@ export default function CartPage() {
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Delivery</span>
-                    <span>{selectedDelivery ? `$${shippingCost.toFixed(2)}` : <span className="text-gray-400 text-xs">Select delivery</span>}</span>
+                    <span>
+                      {selectedDelivery
+                        ? `$${shippingCost.toFixed(2)}`
+                        : <span className="text-gray-400 text-xs">Select delivery</span>
+                      }
+                    </span>
                   </div>
                   {selectedDelivery && (
-                    <p className="text-xs text-gray-400">{selectedDelivery.icon} {selectedDelivery.label} · {selectedDelivery.eta}</p>
+                    <p className="text-xs text-gray-400">
+                      {selectedDelivery.icon} {selectedDelivery.label} · {selectedDelivery.eta}
+                    </p>
                   )}
                   {/* Discount */}
                   <div className="pt-2">
