@@ -329,3 +329,53 @@ def remove_from_cart(
         raise HTTPException(status_code=404, detail="Cart item not found")
     db.delete(item)
     db.commit()
+
+
+@router.post("/{order_id}/send-confirmation")
+def send_order_confirmation_email(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.get_current_user)
+):
+    """Send order confirmation email. Called from frontend after payment succeeds."""
+    order = db.query(models.Order).options(
+        joinedload(models.Order.items).joinedload(models.OrderItem.product),
+        joinedload(models.Order.store).joinedload(models.Store.owner),
+    ).filter(
+        models.Order.id == order_id,
+        models.Order.buyer_id == current_user.id,
+    ).first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    try:
+        from utils.email import send_order_confirmation, send_new_order_to_seller
+        email_items = [{"name": oi.product.name, "quantity": oi.quantity, "price": oi.unit_price} for oi in order.items]
+        
+        send_order_confirmation(
+            buyer_email=current_user.email,
+            buyer_name=current_user.full_name,
+            order_id=order.id,
+            items=email_items,
+            subtotal=order.subtotal,
+            shipping=order.shipping_cost,
+            total=order.total,
+            store_name=order.store.name if order.store else "Afrizone",
+        )
+
+        seller_email = order.store.owner.email if order.store and order.store.owner else None
+        if seller_email:
+            send_new_order_to_seller(
+                seller_email=seller_email,
+                store_name=order.store.name,
+                order_id=order.id,
+                items=email_items,
+                total=order.total,
+                seller_amount=order.seller_amount,
+                buyer_name=current_user.full_name,
+            )
+    except Exception as e:
+        print(f"Email error: {e}")
+
+    return {"sent": True}
