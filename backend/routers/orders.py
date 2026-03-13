@@ -105,33 +105,8 @@ def create_order(
         joinedload(models.Order.store),
     ).filter(models.Order.id == order.id).first()
 
-    # Send email notifications (non-blocking)
-    try:
-        from utils.email import send_order_confirmation, send_new_order_to_seller
-        email_items = [{"name": oi.product.name, "quantity": oi.quantity, "price": oi.unit_price} for oi in order.items]
-        send_order_confirmation(
-            buyer_email=current_user.email,
-            buyer_name=current_user.full_name,
-            order_id=order.id,
-            items=email_items,
-            subtotal=order.subtotal,
-            shipping=order.shipping_cost,
-            total=order.total,
-            store_name=store.name,
-        )
-        seller_email = store.owner.email if store.owner else None
-        if seller_email:
-            send_new_order_to_seller(
-                seller_email=seller_email,
-                store_name=store.name,
-                order_id=order.id,
-                items=email_items,
-                total=order.total,
-                seller_amount=order.seller_amount,
-                buyer_name=current_user.full_name,
-            )
-    except Exception as e:
-        print(f"Email error: {e}")
+    # NOTE: Emails are sent after payment confirmed via Stripe webhook (payments.py)
+    # Do NOT send confirmation here — order is not yet paid
 
     return order
 

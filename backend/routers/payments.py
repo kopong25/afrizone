@@ -139,15 +139,35 @@ async def stripe_webhook(
                 )
                 db.add(payout)
                 db.commit()
-                # Email seller
+                # Email buyer confirmation + seller notification after payment confirmed
                 try:
-                    from utils.email import send_new_order_to_seller
+                    from utils.email import send_order_confirmation, send_new_order_to_seller
                     email_items = [{"name": i.product.name, "quantity": i.quantity, "price": i.unit_price} for i in order.items]
-                    send_new_order_to_seller(
-                        seller_email=store.owner.email, store_name=store.name,
-                        order_id=order.id, items=email_items,
-                        total=order.total, seller_amount=order.seller_amount,
-                    )
+                    buyer = db.query(models.User).filter(models.User.id == order.buyer_id).first()
+                    # Buyer confirmation
+                    if buyer:
+                        send_order_confirmation(
+                            buyer_email=buyer.email,
+                            buyer_name=buyer.full_name,
+                            order_id=order.id,
+                            items=email_items,
+                            subtotal=order.subtotal,
+                            shipping=order.shipping_cost,
+                            total=order.total,
+                            store_name=store.name if store else "Afrizone",
+                        )
+                    # Seller notification
+                    seller_email = store.owner.email if store and store.owner else None
+                    if seller_email:
+                        send_new_order_to_seller(
+                            seller_email=seller_email,
+                            store_name=store.name,
+                            order_id=order.id,
+                            items=email_items,
+                            total=order.total,
+                            seller_amount=order.seller_amount,
+                            buyer_name=buyer.full_name if buyer else "Customer",
+                        )
                 except Exception as e:
                     print(f"Email error: {e}")
 
