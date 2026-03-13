@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Navbar from "../../components/layout/Navbar";
 import Footer from "../../components/layout/Footer";
-import { adminAPI } from "../../lib/api";
 import { useAuth } from "../_app";
 import toast from "react-hot-toast";
 import { FiUsers, FiShoppingBag, FiPackage, FiDollarSign, FiCheck, FiX, FiSearch, FiUserCheck, FiUserX, FiEye, FiStar } from "react-icons/fi";
