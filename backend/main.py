@@ -3,15 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from dotenv import load_dotenv 
+from dotenv import load_dotenv
 import os
 
 load_dotenv()
 
 from routers import (
     auth, sellers, products, orders, payments,
+    uber_direct,
     reviews, admin, wishlist, discounts, variants,
-    shipping, messages, subscriptions, referrals,uber_direct
+    shipping, messages, subscriptions, referrals
 )
 
 from database import engine
@@ -43,7 +44,23 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": [{"msg": e["msg"], "loc": e["loc"]} for e in exc.errors()]},
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    print(f"[500 Error] {type(exc).__name__}: {exc}")
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 # Phase 1 & 2
 app.include_router(auth.router,          prefix="/auth",          tags=["Auth"])
@@ -62,7 +79,7 @@ app.include_router(shipping.router,      prefix="/shipping",      tags=["Shippin
 app.include_router(messages.router,      prefix="/messages",      tags=["Messages"])
 app.include_router(subscriptions.router, prefix="/subscriptions", tags=["Subscriptions"])
 app.include_router(referrals.router,     prefix="/referrals",     tags=["Referrals"])
-app.include_router(uber_direct.router,   prefix="/uber-direct", tags=["Uber Direct"])
+app.include_router(uber_direct.router,    prefix="/uber-direct",   tags=["Uber Direct"])
 
 @app.get("/", tags=["Health"])
 def root():
