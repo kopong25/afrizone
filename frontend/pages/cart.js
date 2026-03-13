@@ -45,7 +45,7 @@ export default function CartPage() {
 
   const removeItem = async (itemId) => {
     try {
-      await api.delete(`/orders/cart/items/${itemId}`);
+      await api.delete(`/orders/cart/${itemId}`);
       setItems(prev => prev.filter(i => i.id !== itemId));
       toast.success("Item removed");
     } catch { toast.error("Failed to remove item"); }
