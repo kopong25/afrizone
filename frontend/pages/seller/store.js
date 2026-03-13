@@ -82,7 +82,18 @@ export default function StoreSettings() {
     }
   };
 
-  const handleLogoUpload = async (file) => {
+  const handleLogoUpload = async (file, directUrl) => {
+    if (directUrl) {
+      // Image was uploaded directly to Cloudinary — save URL to backend
+      try {
+        await storesAPI.updateMyStore({ logo_url: directUrl });
+        setStore((s) => ({ ...s, logo_url: directUrl }));
+      } catch (e) {
+        toast.error("Could not save logo to store");
+      }
+      return directUrl;
+    }
+    // Fallback: upload via backend
     const formData = new FormData();
     formData.append("file", file);
     const res = await storesAPI.uploadLogo(formData);
@@ -90,7 +101,18 @@ export default function StoreSettings() {
     return res.data.logo_url;
   };
 
-  const handleBannerUpload = async (file) => {
+  const handleBannerUpload = async (file, directUrl) => {
+    if (directUrl) {
+      // Image was uploaded directly to Cloudinary — save URL to backend
+      try {
+        await storesAPI.updateMyStore({ banner_url: directUrl });
+        setStore((s) => ({ ...s, banner_url: directUrl }));
+      } catch (e) {
+        toast.error("Could not save banner to store");
+      }
+      return directUrl;
+    }
+    // Fallback: upload via backend
     const formData = new FormData();
     formData.append("file", file);
     const res = await storesAPI.uploadBanner(formData);
