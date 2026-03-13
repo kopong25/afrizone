@@ -169,6 +169,17 @@ class StoreMinimal(BaseModel):
 
     model_config = {"from_attributes": True}
 
+class StoreMinimal(BaseModel):
+    id: int
+    name: str
+    slug: str
+    vendor_type: Optional[str] = None
+    delivery_type: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    logo_url: Optional[str] = None
+
+    model_config = {"from_attributes": True}
 
 class ProductOut(BaseModel):
     id: int
@@ -212,6 +223,7 @@ class ProductListOut(BaseModel):
     avg_rating: float
     review_count: int
     store_id: int
+    store: Optional[StoreMinimal] = None
     store: Optional[StoreMinimal] = None
     created_at: datetime
 
