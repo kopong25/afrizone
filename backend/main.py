@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from dotenv import load_dotenv
+from dotenv import load_dotenv 
 import os
 
 load_dotenv()
@@ -11,7 +11,7 @@ load_dotenv()
 from routers import (
     auth, sellers, products, orders, payments,
     reviews, admin, wishlist, discounts, variants,
-    shipping, messages, subscriptions, referrals
+    shipping, messages, subscriptions, referrals,uber_direct
 )
 
 from database import engine
@@ -62,6 +62,7 @@ app.include_router(shipping.router,      prefix="/shipping",      tags=["Shippin
 app.include_router(messages.router,      prefix="/messages",      tags=["Messages"])
 app.include_router(subscriptions.router, prefix="/subscriptions", tags=["Subscriptions"])
 app.include_router(referrals.router,     prefix="/referrals",     tags=["Referrals"])
+app.include_router(uber_direct.router,   prefix="/uber-direct", tags=["Uber Direct"])
 
 @app.get("/", tags=["Health"])
 def root():
