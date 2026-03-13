@@ -50,7 +50,7 @@ def create_order(
         subtotal += line_total
         order_items.append((product, item.quantity, product.price, line_total))
 
-    shipping_cost = float(getattr(order_in, "delivery_fee", None) or getattr(order_in, "shipping_cost", None) or 0.0)
+    shipping_cost = order_in.delivery_fee or 0.0
     platform_fee, seller_amount, total = calculate_order_amounts(subtotal, shipping_cost)
 
     # Create order
@@ -68,6 +68,8 @@ def create_order(
         shipping_state=order_in.shipping.state,
         shipping_country=order_in.shipping.country,
         shipping_zip=order_in.shipping.zip,
+        delivery_method=order_in.delivery_method,
+        delivery_fee=shipping_cost,
     )
     db.add(order)
     db.flush()  # Get order.id before committing

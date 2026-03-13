@@ -261,6 +261,9 @@ class OrderCreate(BaseModel):
     store_id: int
     items: List[CartItemCreate]
     shipping: ShippingAddress
+    delivery_method: Optional[str] = None
+    delivery_fee: Optional[float] = None
+    uber_quote_id: Optional[str] = None
 
 
 class OrderItemOut(BaseModel):
