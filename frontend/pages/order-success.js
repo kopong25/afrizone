@@ -1,381 +1,170 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload
-from typing import List
-from database import get_db
-import models, schemas, auth as auth_utils
-import os
-import math
+import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import Link from "next/link";
+import Navbar from "../components/layout/Navbar";
+import { useAuth } from "./_app";
+import api from "../lib/api";
 
-PLATFORM_FEE_PERCENT = float(os.getenv("PLATFORM_FEE_PERCENT", "8"))
+function getDeliveryDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + Math.floor(Math.random() * 3) + 5); // 5-7 days
+  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+}
 
-router = APIRouter()
+const AFRICAN_PROVERBS = [
+  "\"If you want to go fast, go alone. If you want to go far, go together.\"",
+  "\"Ubuntu: I am because we are.\"",
+  "\"A child who is not embraced by the village will burn it down to feel its warmth.\"",
+];
 
+export default function OrderSuccessPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const { order_id } = router.query;
+  const [order, setOrder] = useState(null);
+  const [confetti, setConfetti] = useState(true);
+  const deliveryDate = getDeliveryDate();
+  const proverb = AFRICAN_PROVERBS[Math.floor(Math.random() * AFRICAN_PROVERBS.length)];
+  const firstName = user?.full_name?.split(" ")[0] || "Friend";
 
-def calculate_order_amounts(subtotal: float, shipping: float = 0.0):
-    platform_fee = round(subtotal * (PLATFORM_FEE_PERCENT / 100), 2)
-    seller_amount = round(subtotal - platform_fee, 2)
-    total = round(subtotal + shipping, 2)
-    return platform_fee, seller_amount, total
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) { router.push("/login"); return; }
+    if (order_id) {
+      api.get(`/orders/${order_id}`).then(r => setOrder(r.data)).catch(() => {});
+      // Send confirmation email (fires after Stripe redirects here)
+      api.post(`/orders/${order_id}/send-confirmation`).catch(() => {});
+    }
+    const t = setTimeout(() => setConfetti(false), 4000);
+    return () => clearTimeout(t);
+  }, [user, authLoading, order_id]);
 
+  return (
+    <>
+      <Navbar />
 
-@router.post("/", response_model=schemas.OrderOut, status_code=201)
-def create_order(
-    order_in: schemas.OrderCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.get_current_user)
-):
-    """Create a new order. All items must belong to the same store."""
-    store = db.query(models.Store).filter(
-        models.Store.id == order_in.store_id,
-        models.Store.status == models.SellerStatus.approved
-    ).first()
-    if not store:
-        raise HTTPException(status_code=404, detail="Store not found or not active")
+      {/* Confetti animation */}
+      {confetti && (
+        <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+          {[...Array(40)].map((_, i) => (
+            <div key={i} style={{
+              position: "absolute",
+              left: `${Math.random() * 100}%`,
+              top: `-20px`,
+              width: `${8 + Math.random() * 8}px`,
+              height: `${8 + Math.random() * 8}px`,
+              background: ["#FFD700","#1A5C38","#FF6B35","#E91E63","#2196F3","#FF9800"][i % 6],
+              borderRadius: Math.random() > 0.5 ? "50%" : "2px",
+              animation: `fall ${2 + Math.random() * 3}s linear ${Math.random() * 2}s forwards`,
+              transform: `rotate(${Math.random() * 360}deg)`,
+            }} />
+          ))}
+        </div>
+      )}
 
-    # Validate products and calculate subtotal
-    order_items = []
-    subtotal = 0.0
-    for item in order_in.items:
-        product = db.query(models.Product).filter(
-            models.Product.id == item.product_id,
-            models.Product.store_id == order_in.store_id,
-            models.Product.is_active == True
-        ).first()
-        if not product:
-            raise HTTPException(status_code=400, detail=f"Product {item.product_id} not found in this store")
-        if product.stock < item.quantity:
-            raise HTTPException(status_code=400, detail=f"Insufficient stock for '{product.name}'")
+      <style>{`
+        @keyframes fall {
+          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes slide-up { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .pop { animation: pop 0.6s ease forwards; }
+        .slide-up { animation: slide-up 0.5s ease forwards; }
+        .slide-up-2 { animation: slide-up 0.5s ease 0.15s forwards; opacity: 0; }
+        .slide-up-3 { animation: slide-up 0.5s ease 0.3s forwards; opacity: 0; }
+        .slide-up-4 { animation: slide-up 0.5s ease 0.45s forwards; opacity: 0; }
+      `}</style>
 
-        line_total = product.price * item.quantity
-        subtotal += line_total
-        order_items.append((product, item.quantity, product.price, line_total))
+      <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
+        <div className="max-w-xl mx-auto px-4 py-12 text-center">
 
-    shipping_cost = order_in.delivery_fee or 0.0
-    platform_fee, seller_amount, total = calculate_order_amounts(subtotal, shipping_cost)
+          {/* Success icon */}
+          <div className="pop mb-6">
+            <div className="w-24 h-24 bg-green-900 rounded-full flex items-center justify-center mx-auto shadow-xl shadow-green-900/30">
+              <span className="text-5xl">🛍️</span>
+            </div>
+          </div>
 
-    # Create order
-    order = models.Order(
-        buyer_id=current_user.id,
-        store_id=store.id,
-        subtotal=subtotal,
-        shipping_cost=shipping_cost,
-        platform_fee=platform_fee,
-        seller_amount=seller_amount,
-        total=total,
-        shipping_name=order_in.shipping.name,
-        shipping_address=order_in.shipping.address,
-        shipping_city=order_in.shipping.city,
-        shipping_state=order_in.shipping.state,
-        shipping_country=order_in.shipping.country,
-        shipping_zip=order_in.shipping.zip,
-    )
-    # Set delivery fields safely (in case migration hasn't run yet)
-    try:
-        order.delivery_method = order_in.delivery_method
-        order.delivery_fee = shipping_cost
-    except Exception:
-        pass
-    db.add(order)
-    db.flush()  # Get order.id before committing
+          {/* Personal greeting */}
+          <div className="slide-up">
+            <h1 className="text-3xl font-black text-gray-900 mb-2">
+              Thank you, {firstName}! 🎉
+            </h1>
+            <p className="text-green-700 font-bold text-lg">Your order is confirmed!</p>
+          </div>
 
-    # Create order items and deduct stock
-    for product, qty, unit_price, line_total in order_items:
-        db.add(models.OrderItem(
-            order_id=order.id,
-            product_id=product.id,
-            quantity=qty,
-            unit_price=unit_price,
-            total_price=line_total,
-        ))
-        product.stock -= qty
-        product.sale_count += qty
+          {/* Order card */}
+          <div className="slide-up-2 bg-white rounded-2xl border border-green-100 shadow-lg p-6 mt-8 text-left">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs text-gray-400 uppercase font-bold tracking-wide">Order</p>
+                <p className="font-black text-gray-900 text-lg">#{order_id || order?.id}</p>
+              </div>
+              <span className="bg-green-100 text-green-800 text-xs font-black px-3 py-1.5 rounded-full">✓ Confirmed</span>
+            </div>
 
-    # Clear ordered items from cart
-    ordered_product_ids = [item.product_id for item in order_in.items]
-    db.query(models.CartItem).filter(
-        models.CartItem.user_id == current_user.id,
-        models.CartItem.product_id.in_(ordered_product_ids)
-    ).delete(synchronize_session=False)
+            {/* Delivery timeline */}
+            <div className="bg-green-50 rounded-xl p-4 mb-4">
+              <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">📦 Estimated Delivery</p>
+              <p className="text-xl font-black text-green-900">{deliveryDate}</p>
+              <p className="text-xs text-green-700 mt-1">We'll email you tracking info once shipped</p>
+            </div>
 
-    db.commit()
+            {/* Order items if available */}
+            {order?.items?.length > 0 && (
+              <div className="space-y-2 mb-4">
+                {order.items.map(item => (
+                  <div key={item.id} className="flex justify-between text-sm">
+                    <span className="text-gray-600">{item.product?.name} × {item.quantity}</span>
+                    <span className="font-bold">${Number(item.total_price).toFixed(2)}</span>
+                  </div>
+                ))}
+                <div className="border-t pt-2 flex justify-between font-black text-gray-900">
+                  <span>Total</span>
+                  <span>${Number(order?.total).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
 
-    # Reload order with all relationships needed for serialization
-    order = db.query(models.Order).options(
-        joinedload(models.Order.items).joinedload(models.OrderItem.product).joinedload(models.Product.store),
-        joinedload(models.Order.store),
-    ).filter(models.Order.id == order.id).first()
+            <div className="border-t pt-3 text-sm text-gray-500">
+              <p>📧 Confirmation sent to <strong>{user?.email}</strong></p>
+            </div>
+          </div>
 
-    # NOTE: Emails are sent after payment confirmed via Stripe webhook (payments.py)
-    # Do NOT send confirmation here — order is not yet paid
+          {/* Exciting message */}
+          <div className="slide-up-3 mt-8">
+            <div className="bg-yellow-400 rounded-2xl p-6 text-green-900">
+              <p className="text-2xl mb-2">🌍</p>
+              <p className="font-black text-lg mb-1">You're supporting African businesses!</p>
+              <p className="text-sm font-medium opacity-80">
+                Every purchase helps African entrepreneurs in the diaspora thrive. 
+                Share Afrizone with a friend and earn $10!
+              </p>
+            </div>
 
-    return order
+            {/* Proverb */}
+            <p className="text-gray-400 text-sm italic mt-6 px-4">{proverb}</p>
+            <p className="text-gray-300 text-xs mt-1">— African Proverb</p>
+          </div>
 
-
-@router.get("/my-orders", response_model=schemas.PaginatedOrders)
-def get_my_orders(
-    page: int = 1,
-    size: int = 10,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.get_current_user)
-):
-    """Get all orders placed by the current buyer."""
-    query = db.query(models.Order).filter(models.Order.buyer_id == current_user.id)
-    total = query.count()
-    orders = query.order_by(models.Order.created_at.desc()).offset((page - 1) * size).limit(size).all()
-    return {"items": orders, "total": total, "page": page, "pages": math.ceil(total / size), "size": size}
-
-
-@router.get("/seller/orders", response_model=schemas.PaginatedOrders)
-def get_seller_orders(
-    status: str = None,
-    page: int = 1,
-    size: int = 10,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.require_seller)
-):
-    """Get all orders for the seller's store."""
-    store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
-    if not store:
-        raise HTTPException(status_code=404, detail="Store not found")
-
-    query = db.query(models.Order).filter(models.Order.store_id == store.id)
-    if status:
-        query = query.filter(models.Order.status == status)
-
-    total = query.count()
-    orders = query.order_by(models.Order.created_at.desc()).offset((page - 1) * size).limit(size).all()
-    return {"items": orders, "total": total, "page": page, "pages": math.ceil(total / size), "size": size}
-
-
-
-
-@router.get("/store-orders")
-def get_store_orders(
-    page: int = 1,
-    size: int = 50,
-    status: str = None,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.require_seller)
-):
-    """Get all orders for the seller's store."""
-    store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
-    if not store:
-        raise HTTPException(status_code=404, detail="Store not found")
-
-    query = db.query(models.Order).options(
-        joinedload(models.Order.items).joinedload(models.OrderItem.product),
-        joinedload(models.Order.buyer)
-    ).filter(models.Order.store_id == store.id)
-    if status:
-        query = query.filter(models.Order.status == status)
-    query = query.order_by(models.Order.created_at.desc())
-
-    total = query.count()
-    orders = query.offset((page - 1) * size).limit(size).all()
-    return {"items": orders, "total": total, "page": page, "size": size}
-
-@router.get("/{order_id}", response_model=schemas.OrderOut)
-def get_order(
-    order_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.get_current_user)
-):
-    """Get a single order (buyer sees their own; seller sees their store's orders)."""
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    # Check access rights
-    is_buyer = order.buyer_id == current_user.id
-    store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
-    is_seller = store and order.store_id == store.id
-    is_admin = current_user.role == models.UserRole.admin
-
-    if not (is_buyer or is_seller or is_admin):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    return order
-
-
-@router.put("/{order_id}/status", response_model=schemas.OrderOut)
-def update_order_status(
-    order_id: int,
-    update: schemas.OrderStatusUpdate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.require_seller)
-):
-    """Seller updates order status (e.g., shipped, delivered)."""
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
-    if not store or order.store_id != store.id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    order.status = update.status
-    if update.tracking_number:
-        order.tracking_number = update.tracking_number
-    if update.tracking_url:
-        order.tracking_url = update.tracking_url
-
-    # Update store stats when delivered
-    if update.status == models.OrderStatus.delivered:
-        store.total_sales += 1
-        store.total_revenue += order.seller_amount
-
-    db.commit()
-
-    # Reload order with all relationships needed for serialization
-    order = db.query(models.Order).options(
-        joinedload(models.Order.items).joinedload(models.OrderItem.product).joinedload(models.Product.store),
-        joinedload(models.Order.store),
-    ).filter(models.Order.id == order.id).first()
-
-    # Send status-change emails
-    try:
-        from utils.email import send_shipping_update, send_delivery_confirmation
-        buyer = db.query(models.User).filter(models.User.id == order.buyer_id).first()
-        if buyer:
-            if update.status == models.OrderStatus.shipped:
-                send_shipping_update(
-                    buyer_email=buyer.email,
-                    buyer_name=buyer.full_name,
-                    order_id=order.id,
-                    tracking_number=order.tracking_number,
-                    tracking_url=order.tracking_url,
-                    store_name=store.name,
-                )
-            elif update.status == models.OrderStatus.delivered:
-                send_delivery_confirmation(
-                    buyer_email=buyer.email,
-                    buyer_name=buyer.full_name,
-                    order_id=order.id,
-                    store_name=store.name,
-                )
-    except Exception as e:
-        print(f"Email error: {e}")
-
-    return order
-
-
-
-
-# ─── CART ───
-
-@router.get("/cart/items", response_model=List[schemas.CartItemOut])
-def get_cart(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.get_current_user)
-):
-    return (
-        db.query(models.CartItem)
-        .options(
-            joinedload(models.CartItem.product).joinedload(models.Product.store)
-        )
-        .filter(models.CartItem.user_id == current_user.id)
-        .all()
-    )
-
-
-@router.post("/cart/add", response_model=schemas.CartItemOut, status_code=201)
-def add_to_cart(
-    item: schemas.CartItemCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.get_current_user)
-):
-    product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
-    if not product or not product.is_active:
-        raise HTTPException(status_code=404, detail="Product not found")
-
-    # Check if already in cart
-    existing = db.query(models.CartItem).filter(
-        models.CartItem.user_id == current_user.id,
-        models.CartItem.product_id == item.product_id
-    ).first()
-    if existing:
-        existing.quantity += item.quantity
-        db.commit()
-        db.refresh(existing)
-        return existing
-
-    cart_item = models.CartItem(user_id=current_user.id, **item.model_dump())
-    db.add(cart_item)
-    db.commit()
-    db.refresh(cart_item)
-    return cart_item
-
-
-@router.delete("/cart/clear", status_code=204)
-def clear_cart(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.get_current_user)
-):
-    """Clear all items from the user's cart."""
-    db.query(models.CartItem).filter(models.CartItem.user_id == current_user.id).delete()
-    db.commit()
-
-@router.delete("/cart/{item_id}", status_code=204)
-def remove_from_cart(
-    item_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.get_current_user)
-):
-    item = db.query(models.CartItem).filter(
-        models.CartItem.id == item_id,
-        models.CartItem.user_id == current_user.id
-    ).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Cart item not found")
-    db.delete(item)
-    db.commit()
-
-
-@router.post("/{order_id}/send-confirmation")
-def send_order_confirmation_email(
-    order_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.get_current_user)
-):
-    """Send order confirmation email. Called from frontend after payment succeeds."""
-    order = db.query(models.Order).options(
-        joinedload(models.Order.items).joinedload(models.OrderItem.product),
-        joinedload(models.Order.store).joinedload(models.Store.owner),
-    ).filter(
-        models.Order.id == order_id,
-        models.Order.buyer_id == current_user.id,
-    ).first()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    try:
-        from utils.email import send_order_confirmation, send_new_order_to_seller
-        email_items = [{"name": oi.product.name, "quantity": oi.quantity, "price": oi.unit_price} for oi in order.items]
-        
-        send_order_confirmation(
-            buyer_email=current_user.email,
-            buyer_name=current_user.full_name,
-            order_id=order.id,
-            items=email_items,
-            subtotal=order.subtotal,
-            shipping=order.shipping_cost,
-            total=order.total,
-            store_name=order.store.name if order.store else "Afrizone",
-        )
-
-        seller_email = order.store.owner.email if order.store and order.store.owner else None
-        if seller_email:
-            send_new_order_to_seller(
-                seller_email=seller_email,
-                store_name=order.store.name,
-                order_id=order.id,
-                items=email_items,
-                total=order.total,
-                seller_amount=order.seller_amount,
-                buyer_name=current_user.full_name,
-            )
-    except Exception as e:
-        print(f"Email error: {e}")
-
-    return {"sent": True}
+          {/* CTAs */}
+          <div className="slide-up-4 flex flex-col gap-3 mt-8">
+            <Link href="/orders"
+              className="w-full bg-green-900 hover:bg-green-800 text-white font-black py-4 rounded-xl transition-colors text-lg">
+              Track My Order →
+            </Link>
+            <Link href="/"
+              className="w-full border-2 border-green-900 text-green-900 hover:bg-green-50 font-bold py-3 rounded-xl transition-colors">
+              Continue Shopping
+            </Link>
+            <Link href="/referral"
+              className="text-sm text-gray-400 hover:text-green-900 transition-colors">
+              🎁 Share Afrizone & earn $10 per referral
+            </Link>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
