@@ -8,6 +8,15 @@ import { useAuth } from "./_app";
 import toast from "react-hot-toast";
 import { FiTrash2, FiShoppingCart, FiArrowRight, FiLock, FiMapPin, FiTruck, FiLoader } from "react-icons/fi";
 
+const apiErr = (e, fallback = "Something went wrong") => {
+  try {
+    const d = e?.response?.data?.detail;
+    if (Array.isArray(d)) return d.map(x => x.msg || JSON.stringify(x)).join(", ");
+    if (typeof d === "string") return d;
+  } catch {}
+  return String(fallback);
+};
+
 export default function CartPage() {
   const router = useRouter();
   const { user, token, loading: authLoading } = useAuth();
