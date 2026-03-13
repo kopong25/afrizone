@@ -3,242 +3,91 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
-import api, { ordersAPI, paymentsAPI, discountsAPI } from "../lib/api";
+import { ordersAPI, paymentsAPI } from "../lib/api";
 import { useAuth } from "./_app";
 import toast from "react-hot-toast";
-import { FiTrash2, FiShoppingCart, FiArrowRight, FiLock, FiMapPin, FiTruck, FiLoader } from "react-icons/fi";
+import { FiTrash2, FiMinus, FiPlus, FiShoppingCart, FiArrowRight, FiLock } from "react-icons/fi";
 
 export default function CartPage() {
   const router = useRouter();
-  const { user, token, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
-  const [discountCode, setDiscountCode] = useState("");
-  const [discount, setDiscount] = useState(null);
-  const [applyingCode, setApplyingCode] = useState(false);
-  const [step, setStep] = useState("cart"); // cart | shipping | delivery | confirm
+  const [step, setStep] = useState("cart"); // cart | shipping | confirm
   const [shipping, setShipping] = useState({
-    name: "", address: "", city: "", state: "", country: "USA", zip: "",
+    name: user?.full_name || "",
+    address: "", city: "", state: "", country: "USA", zip: "",
   });
 
-  // Delivery routing state
-  const [deliveryOptions, setDeliveryOptions] = useState([]);
-  const [selectedDelivery, setSelectedDelivery] = useState(null);
-  const [loadingDelivery, setLoadingDelivery] = useState(false);
-  const [distanceInfo, setDistanceInfo] = useState(null);
-
   useEffect(() => {
-    if (authLoading) return;
-    if (!user) { router.push("/login?redirect=/cart"); return; }
+    if (!user) { router.push("/login"); return; }
     fetchCart();
-    if (user?.full_name) setShipping(s => ({ ...s, name: user.full_name }));
-  }, [user, authLoading]);
+  }, [user]);
 
   const fetchCart = async () => {
     try {
-      const r = await api.get("/orders/cart/items");
-      setItems(r.data?.items || r.data || []);
-    } catch { toast.error("Failed to load cart"); }
-    finally { setLoading(false); }
-  };
-
-  const removeItem = async (itemId) => {
-    try {
-      await api.delete(`/orders/cart/${itemId}`);
-      setItems(prev => prev.filter(i => i.id !== itemId));
-      toast.success("Item removed");
-    } catch { toast.error("Failed to remove item"); }
-  };
-
-  // ── Delivery routing ───────────────────────────────────────────────────────
-  const fetchDeliveryOptions = async () => {
-    if (!shipping.address || !shipping.city || !shipping.zip) {
-      toast.error("Please fill in your address first");
-      return false;
-    }
-    setLoadingDelivery(true);
-    setDeliveryOptions([]);
-    setSelectedDelivery(null);
-
-    try {
-      // storeId: always use product.store_id (reliably present even without store join)
-      const storeId = items[0]?.product?.store_id || primaryStore?.id;
-      const isRestaurant = primaryStore?.vendor_type === "restaurant";
-      const offersLocal = ["local_delivery", "both"].includes(primaryStore?.delivery_type);
-      console.log("[Delivery Debug]", { 
-        storeId, 
-        vendor_type: primaryStore?.vendor_type, 
-        delivery_type: primaryStore?.delivery_type,
-        isRestaurant, 
-        offersLocal,
-        primaryStore,
-        cartItems: items
-      });
-
-      // Geocode customer address
-      let customerLat = null, customerLng = null;
-      try {
-        const geo = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            `${shipping.address}, ${shipping.city}, ${shipping.state} ${shipping.zip}`
-          )}`
-        );
-        const geoData = await geo.json();
-        if (geoData?.[0]) {
-          customerLat = parseFloat(geoData[0].lat);
-          customerLng = parseFloat(geoData[0].lon);
-        }
-      } catch {}
-
-      const res = await api.post("/uber-direct/delivery-options", {
-        store_id: storeId,
-        customer_lat: customerLat,
-        customer_lng: customerLng,
-        customer_address: `${shipping.address}, ${shipping.city}, ${shipping.state}`,
-      });
-
-      setDistanceInfo(res.data);
-      const distanceMiles = res.data.distance_miles;
-      const isLongDistance = !distanceMiles || distanceMiles >= 15;
-
-      let options = [];
-
-      if (isRestaurant) {
-        // Restaurant — Uber ONLY regardless of distance
-        options = [
-          {
-            id: "uber_express",
-            label: "Uber Express Delivery",
-            icon: "🛵",
-            price: res.data.options?.find(o => o.id === "uber_express")?.price || 9.99,
-            eta: "~45 minutes",
-            description: "Hot food delivered fresh to your door.",
-            provider: "uber_direct",
-          }
-        ];
-      } else {
-        // Non-restaurant African store — Chippo USPS + Uber only
-        options = [
-          { id: "usps_priority", label: "Chippo USPS Shipping", icon: "📬", price: 6.99, eta: "1–2 business days", description: "Fast tracked shipping.", provider: "usps" },
-          {
-            id: "uber_express",
-            label: "Uber Express Delivery",
-            icon: "🛵",
-            price: res.data.options?.find(o => o.id === "uber_express")?.price || 8.99,
-            eta: "2–4 hours",
-            description: "Same-day local delivery.",
-            provider: "uber_direct",
-          },
-        ];
-      }
-
-      setDeliveryOptions(options);
-      setSelectedDelivery(options[0]);
-      return true;
+      const res = await ordersAPI.cart();
+      setItems(res.data);
     } catch (err) {
-      const fallback = [
-        { id: "usps_priority", label: "Chippo USPS Shipping", icon: "📬", price: 6.99, eta: "1–2 business days", provider: "usps" },
-        { id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "2–4 hours", provider: "uber_direct" },
-      ];
-      setDeliveryOptions(fallback);
-      setSelectedDelivery(fallback[0]);
-      return true;
+      toast.error("Failed to load cart");
     } finally {
-      setLoadingDelivery(false);
+      setLoading(false);
+    }
+  };
+
+  const removeItem = async (id) => {
+    try {
+      await ordersAPI.removeFromCart(id);
+      setItems((prev) => prev.filter((i) => i.id !== id));
+      toast.success("Removed from cart");
+    } catch {
+      toast.error("Failed to remove item");
     }
   };
 
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const shippingCost = selectedDelivery ? selectedDelivery.price : 0;
-  const discountAmount = discount?.discount_amount || 0;
-  const total = subtotal + shippingCost - discountAmount;
+  const platformFee = subtotal * 0.08;
+  const shipping_cost = subtotal > 50 ? 0 : 5.99;
+  const total = subtotal + shipping_cost;
 
+  // Group items by store
   const byStore = items.reduce((acc, item) => {
-    const storeId = item.product.store?.id || item.product.store_id || "unknown";
-    if (!acc[storeId]) acc[storeId] = { 
-      store: item.product.store || { id: storeId, name: "Store" }, 
-      items: [] 
-    };
+    const storeId = item.product.store?.id || "unknown";
+    if (!acc[storeId]) acc[storeId] = { store: item.product.store, items: [] };
     acc[storeId].items.push(item);
     return acc;
   }, {});
 
-  // Determine if ANY store in cart is a restaurant
-  const hasRestaurant = Object.values(byStore).some(
-    ({ store }) => store.vendor_type === "restaurant"
-  );
-  const primaryStore = Object.values(byStore)[0]?.store;
-
-  const applyDiscount = async () => {
-    if (!discountCode.trim()) return;
-    setApplyingCode(true);
-    try {
-      const res = await discountsAPI.apply(discountCode, subtotal);
-      setDiscount(res.data);
-      toast.success(`✅ Code applied! You save $${res.data.discount_amount.toFixed(2)}`);
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Invalid code");
-      setDiscount(null);
-    } finally { setApplyingCode(false); }
-  };
-
   const handleCheckout = async () => {
     if (items.length === 0) return;
-    const authToken = token || (() => {
-      let t = null;
-      try { t = sessionStorage.getItem("az_tok"); } catch {}
-      if (!t) { try { t = localStorage.getItem("afrizone_token"); } catch {} }
-      return t;
-    })();
-
-    if (!authToken) {
-      toast.error("Session expired — please sign in again");
-      router.push("/login?redirect=/cart");
-      return;
-    }
-    const authHeaders = { Authorization: `Bearer ${authToken}` };
     setCheckingOut(true);
     try {
-      const createdOrders = [];
+      // Create order for each store
       for (const storeGroup of Object.values(byStore)) {
         const orderItems = storeGroup.items.map((i) => ({
           product_id: i.product.id,
           quantity: i.quantity,
         }));
-        const r = await api.post("/orders/", {
+        await ordersAPI.create({
           store_id: storeGroup.store.id,
           items: orderItems,
-          shipping: {
-            name: shipping.name,
-            address: shipping.address,
-            city: shipping.city,
-            state: shipping.state,
-            country: shipping.country || "USA",
-            zip: shipping.zip,
-          },
-          delivery_method: selectedDelivery?.id || "usps_standard",
-          delivery_fee: shippingCost,
-          uber_quote_id: selectedDelivery?.quote_id || null,
-        }, { headers: authHeaders });
-        createdOrders.push(r.data);
+          shipping_name: shipping.name,
+          shipping_address: shipping.address,
+          shipping_city: shipping.city,
+          shipping_state: shipping.state,
+          shipping_country: shipping.country,
+          shipping_zip: shipping.zip,
+        });
       }
-      try { await api.delete("/orders/cart/clear", { headers: authHeaders }); } catch {}
-      setItems([]);
-      if (createdOrders.length > 0) {
-        router.push(`/checkout?order_id=${createdOrders[0].id}`);
-      } else {
-        router.push("/orders");
-      }
+      toast.success("🎉 Order placed successfully!");
+      router.push("/orders");
     } catch (err) {
       toast.error(err.response?.data?.detail || "Checkout failed. Please try again.");
     } finally {
       setCheckingOut(false);
     }
   };
-
-  const steps = ["cart", "shipping", "delivery", "confirm"];
-  const stepLabels = ["Cart", "Address", "Delivery", "Confirm"];
 
   if (loading) return (
     <>
@@ -259,16 +108,16 @@ export default function CartPage() {
 
         {/* Steps */}
         <div className="flex items-center gap-2 mb-8 text-sm">
-          {steps.map((s, i) => (
+          {["cart", "shipping", "confirm"].map((s, i) => (
             <div key={s} className="flex items-center gap-2">
               <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                step === s ? "bg-green-900 text-white" :
-                steps.indexOf(step) > i ? "bg-green-200 text-green-900" : "bg-gray-200 text-gray-500"
+                step === s ? "bg-green-900 text-white" : 
+                ["cart","shipping","confirm"].indexOf(step) > i ? "bg-green-200 text-green-900" : "bg-gray-200 text-gray-500"
               }`}>{i+1}</span>
-              <span className={step === s ? "font-semibold text-green-900" : "text-gray-400 hidden sm:inline"}>
-                {stepLabels[i]}
+              <span className={step === s ? "font-semibold text-green-900" : "text-gray-400"}>
+                {s.charAt(0).toUpperCase() + s.slice(1)}
               </span>
-              {i < steps.length - 1 && <span className="text-gray-300">→</span>}
+              {i < 2 && <span className="text-gray-300">→</span>}
             </div>
           ))}
         </div>
@@ -282,9 +131,8 @@ export default function CartPage() {
           </div>
         ) : (
           <div className="grid lg:grid-cols-3 gap-8">
+            {/* Cart Items / Shipping Form */}
             <div className="lg:col-span-2 space-y-4">
-
-              {/* STEP 1 — Cart Items */}
               {step === "cart" && Object.values(byStore).map(({ store, items: storeItems }) => (
                 <div key={store?.id} className="bg-white rounded-2xl shadow-sm border overflow-hidden">
                   <div className="bg-green-900 text-white px-4 py-2.5 flex items-center gap-2">
@@ -303,7 +151,9 @@ export default function CartPage() {
                         }
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-800 text-sm line-clamp-2">{item.product.name}</p>
+                        <Link href={`/products/${item.product.slug}`} className="font-semibold text-gray-800 hover:text-green-900 text-sm line-clamp-2">
+                          {item.product.name}
+                        </Link>
                         <p className="text-xs text-gray-500 mt-0.5">🌍 {item.product.country_of_origin}</p>
                         <div className="flex items-center justify-between mt-2">
                           <span className="font-bold text-green-900">${(item.product.price * item.quantity).toFixed(2)}</span>
@@ -321,10 +171,9 @@ export default function CartPage() {
                 </div>
               ))}
 
-              {/* STEP 2 — Shipping Address */}
               {step === "shipping" && (
                 <div className="bg-white rounded-2xl shadow-sm border p-6">
-                  <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><FiMapPin /> Delivery Address</h2>
+                  <h2 className="font-bold text-gray-900 mb-4">📦 Shipping Details</h2>
                   <div className="space-y-4">
                     <div>
                       <label className="text-sm font-medium text-gray-700 block mb-1">Full Name</label>
@@ -368,81 +217,15 @@ export default function CartPage() {
                 </div>
               )}
 
-              {/* STEP 3 — Delivery Options */}
-              {step === "delivery" && (
-                <div className="bg-white rounded-2xl shadow-sm border p-6">
-                  <h2 className="font-bold text-gray-900 mb-1 flex items-center gap-2"><FiTruck /> Choose Delivery</h2>
-
-                  {distanceInfo && (
-                    <div className={`text-xs px-3 py-2 rounded-lg mb-4 font-medium ${
-                      distanceInfo.distance_zone === "long_distance"
-                        ? "bg-blue-50 text-blue-700"
-                        : "bg-green-50 text-green-700"
-                    }`}>
-                      {distanceInfo.distance_miles
-                        ? `📍 Store is ${distanceInfo.distance_miles} miles from your address`
-                        : "📍 Calculating distance..."}
-                      {distanceInfo.distance_zone === "long_distance" && " — shipping only available"}
-                      {distanceInfo.sandbox && " (sandbox mode)"}
-                    </div>
-                  )}
-
-                  {loadingDelivery ? (
-                    <div className="flex items-center gap-3 py-8 justify-center text-gray-500">
-                      <FiLoader className="animate-spin" size={20} />
-                      <span>Finding delivery options for your address...</span>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {deliveryOptions.map((opt) => (
-                        <label key={opt.id}
-                          className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                            selectedDelivery?.id === opt.id
-                              ? "border-green-700 bg-green-50"
-                              : "border-gray-200 hover:border-gray-300"
-                          }`}>
-                          <input type="radio" name="delivery" value={opt.id}
-                            checked={selectedDelivery?.id === opt.id}
-                            onChange={() => setSelectedDelivery(opt)}
-                            className="mt-1 accent-green-700" />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-gray-800">{opt.icon} {opt.label}</span>
-                              <span className="font-black text-green-900">${opt.price.toFixed(2)}</span>
-                            </div>
-                            <p className="text-sm text-gray-500 mt-0.5">{opt.eta}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">{opt.description}</p>
-                            {opt.provider === "uber_direct" && (
-                              <span className="inline-block mt-1 text-xs bg-black text-white px-2 py-0.5 rounded-full font-medium">
-                                Powered by Uber
-                              </span>
-                            )}
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* STEP 4 — Confirm */}
               {step === "confirm" && (
                 <div className="bg-white rounded-2xl shadow-sm border p-6">
                   <h2 className="font-bold text-gray-900 mb-4">✅ Confirm Order</h2>
-                  <div className="bg-gray-50 rounded-xl p-4 mb-4 space-y-1">
-                    <p className="text-sm font-semibold text-gray-700">📦 Delivering to:</p>
+                  <div className="bg-gray-50 rounded-xl p-4 mb-4">
+                    <p className="text-sm font-semibold text-gray-700 mb-2">📦 Shipping to:</p>
                     <p className="text-sm text-gray-600">{shipping.name}</p>
                     <p className="text-sm text-gray-600">{shipping.address}, {shipping.city}, {shipping.state} {shipping.zip}</p>
+                    <p className="text-sm text-gray-600">{shipping.country}</p>
                   </div>
-                  {selectedDelivery && (
-                    <div className="bg-green-50 rounded-xl p-4 mb-4 flex items-center gap-3">
-                      <span className="text-2xl">{selectedDelivery.icon}</span>
-                      <div>
-                        <p className="font-bold text-green-800 text-sm">{selectedDelivery.label}</p>
-                        <p className="text-xs text-green-600">{selectedDelivery.eta} · ${selectedDelivery.price.toFixed(2)}</p>
-                      </div>
-                    </div>
-                  )}
                   <div className="space-y-2">
                     {items.map((item) => (
                       <div key={item.id} className="flex justify-between text-sm">
@@ -461,7 +244,7 @@ export default function CartPage() {
               )}
             </div>
 
-            {/* Order Summary Sidebar */}
+            {/* Order Summary */}
             <div>
               <div className="bg-white rounded-2xl shadow-sm border p-5 sticky top-24">
                 <h2 className="font-bold text-gray-900 mb-4">Order Summary</h2>
@@ -471,38 +254,11 @@ export default function CartPage() {
                     <span>${subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
-                    <span>Delivery</span>
-                    <span>{selectedDelivery ? `$${shippingCost.toFixed(2)}` : <span className="text-gray-400 text-xs">Select delivery</span>}</span>
+                    <span>Shipping</span>
+                    <span>{shipping_cost === 0 ? <span className="text-green-600 font-medium">FREE</span> : `$${shipping_cost.toFixed(2)}`}</span>
                   </div>
-                  {selectedDelivery && (
-                    <p className="text-xs text-gray-400">{selectedDelivery.icon} {selectedDelivery.label} · {selectedDelivery.eta}</p>
-                  )}
-                  {/* Discount */}
-                  <div className="pt-2">
-                    {discount ? (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-2.5 flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-bold text-green-800">{discount.code} applied!</p>
-                          <p className="text-xs text-green-600">-${discountAmount.toFixed(2)} off</p>
-                        </div>
-                        <button onClick={() => { setDiscount(null); setDiscountCode(""); }} className="text-xs text-red-400 hover:text-red-600">Remove</button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
-                        <input value={discountCode} onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
-                          placeholder="Discount code"
-                          className="flex-1 border rounded-lg px-3 py-2 text-xs font-mono uppercase focus:outline-none focus:ring-2 focus:ring-green-900" />
-                        <button onClick={applyDiscount} disabled={applyingCode || !discountCode}
-                          className="bg-green-900 text-white text-xs px-3 py-2 rounded-lg hover:bg-green-800 disabled:opacity-50">
-                          {applyingCode ? "..." : "Apply"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  {discountAmount > 0 && (
-                    <div className="flex justify-between text-green-600 font-medium text-sm">
-                      <span>Discount</span><span>-${discountAmount.toFixed(2)}</span>
-                    </div>
+                  {shipping_cost > 0 && (
+                    <p className="text-xs text-green-600">Add ${(50 - subtotal).toFixed(2)} more for free shipping!</p>
                   )}
                   <div className="border-t pt-3 flex justify-between font-bold text-base">
                     <span>Total</span>
@@ -510,35 +266,23 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                {/* Navigation buttons */}
                 {step === "cart" && (
                   <button onClick={() => setStep("shipping")}
                     className="w-full btn-primary py-3 mt-5 flex items-center justify-center gap-2">
-                    Continue to Address <FiArrowRight />
+                    Continue to Shipping <FiArrowRight />
                   </button>
                 )}
                 {step === "shipping" && (
                   <div className="space-y-2 mt-5">
-                    <button onClick={async () => {
-                      if (!shipping.name || !shipping.address || !shipping.city || !shipping.zip) {
-                        toast.error("Please fill in all address fields"); return;
+                    <button onClick={() => {
+                      if (!shipping.name || !shipping.address || !shipping.city) {
+                        toast.error("Please fill in all shipping fields"); return;
                       }
-                      const ok = await fetchDeliveryOptions();
-                      if (ok) setStep("delivery");
+                      setStep("confirm");
                     }} className="w-full btn-primary py-3 flex items-center justify-center gap-2">
-                      {loadingDelivery ? <FiLoader className="animate-spin" /> : null}
-                      Choose Delivery <FiArrowRight />
-                    </button>
-                    <button onClick={() => setStep("cart")} className="w-full btn-secondary py-2.5 text-sm">← Back to Cart</button>
-                  </div>
-                )}
-                {step === "delivery" && (
-                  <div className="space-y-2 mt-5">
-                    <button onClick={() => { if (!selectedDelivery) { toast.error("Please select a delivery option"); return; } setStep("confirm"); }}
-                      className="w-full btn-primary py-3 flex items-center justify-center gap-2">
                       Review Order <FiArrowRight />
                     </button>
-                    <button onClick={() => setStep("shipping")} className="w-full btn-secondary py-2.5 text-sm">← Back</button>
+                    <button onClick={() => setStep("cart")} className="w-full btn-secondary py-2.5 text-sm">← Back to Cart</button>
                   </div>
                 )}
                 {step === "confirm" && (
@@ -548,9 +292,10 @@ export default function CartPage() {
                       <FiLock size={14} />
                       {checkingOut ? "Placing Order..." : `Place Order · $${total.toFixed(2)}`}
                     </button>
-                    <button onClick={() => setStep("delivery")} className="w-full btn-secondary py-2.5 text-sm">← Back</button>
+                    <button onClick={() => setStep("shipping")} className="w-full btn-secondary py-2.5 text-sm">← Back</button>
                   </div>
                 )}
+
                 <p className="text-xs text-gray-400 text-center mt-3 flex items-center justify-center gap-1">
                   <FiLock size={10} /> Secure & encrypted checkout
                 </p>
