@@ -255,3 +255,17 @@ def get_store_analytics(
         "top_products": top_products,
         "status_breakdown": status_counts,
     }
+
+@router.get("/{store_id}/public", response_model=schemas.StoreOut)
+def get_store_by_id(store_id: int, db: Session = Depends(get_db)):
+    """Get store by ID (public) — includes vendor_type and delivery_type."""
+    from sqlalchemy import text
+    store = db.query(models.Store).filter(models.Store.id == store_id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="Store not found")
+    # Patch enum fields via raw SQL
+    row = db.execute(text("SELECT vendor_type, delivery_type FROM stores WHERE id = :id"), {"id": store.id}).fetchone()
+    if row:
+        store.vendor_type = row[0]
+        store.delivery_type = row[1]
+    return store

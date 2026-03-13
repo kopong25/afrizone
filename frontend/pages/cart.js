@@ -73,17 +73,27 @@ export default function CartPage() {
     try {
       // storeId: always use product.store_id (reliably present even without store join)
       const storeId = items[0]?.product?.store_id || primaryStore?.id;
-      const isRestaurant = primaryStore?.vendor_type === "restaurant";
-      const offersLocal = ["local_delivery", "both"].includes(primaryStore?.delivery_type);
-      console.log("[Delivery Debug]", { 
-        storeId, 
-        vendor_type: primaryStore?.vendor_type, 
-        delivery_type: primaryStore?.delivery_type,
-        isRestaurant, 
-        offersLocal,
-        primaryStore,
-        cartItems: items
-      });
+
+      // Fetch store details fresh to get vendor_type reliably
+      let storeVendorType = primaryStore?.vendor_type;
+      let storeDeliveryType = primaryStore?.delivery_type;
+      if (!storeVendorType && storeId) {
+        try {
+          const storeRes = await api.get(`/sellers/${storeId}/public`);
+          storeVendorType = storeRes.data?.vendor_type;
+          storeDeliveryType = storeRes.data?.delivery_type;
+        } catch {
+          // fallback — try products endpoint which has store embedded
+          try {
+            const prodRes = await api.get(`/products/?store_id=${storeId}&size=1`);
+            storeVendorType = prodRes.data?.items?.[0]?.store?.vendor_type;
+          } catch {}
+        }
+      }
+
+      const isRestaurant = storeVendorType === "restaurant";
+      const offersLocal = ["local_delivery", "both"].includes(storeDeliveryType);
+      console.log("[Delivery Debug]", { storeId, storeVendorType, storeDeliveryType, isRestaurant });
 
       // Geocode customer address
       let customerLat = null, customerLng = null;
@@ -121,9 +131,10 @@ export default function CartPage() {
             label: "Uber Express Delivery",
             icon: "🛵",
             price: res.data.options?.find(o => o.id === "uber_express")?.price || 9.99,
-            eta: "~45 minutes",
+            eta: res.data.options?.find(o => o.id === "uber_express")?.eta || "~45 minutes",
             description: "Hot food delivered fresh to your door.",
             provider: "uber_direct",
+            quote_id: res.data.options?.find(o => o.id === "uber_express")?.quote_id || null,
           }
         ];
       } else {
@@ -146,10 +157,13 @@ export default function CartPage() {
       setSelectedDelivery(options[0]);
       return true;
     } catch (err) {
-      const fallback = [
-        { id: "usps_priority", label: "Chippo USPS Shipping", icon: "📬", price: 6.99, eta: "1–2 business days", provider: "usps" },
-        { id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "2–4 hours", provider: "uber_direct" },
-      ];
+      const isRest = storeVendorType === "restaurant" || primaryStore?.vendor_type === "restaurant";
+      const fallback = isRest
+        ? [{ id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "~45 minutes", description: "Hot food delivered fresh to your door.", provider: "uber_direct" }]
+        : [
+            { id: "usps_priority", label: "Chippo USPS Shipping", icon: "📬", price: 6.99, eta: "1–2 business days", provider: "usps" },
+            { id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "2–4 hours", provider: "uber_direct" },
+          ];
       setDeliveryOptions(fallback);
       setSelectedDelivery(fallback[0]);
       return true;
