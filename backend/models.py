@@ -76,21 +76,6 @@ class User(Base):
 # STORE (Seller's shop)
 # ─────────────────────────────────────────────
 
-class VendorType(str, enum.Enum):
-    grocery    = "grocery"      # Shelf-stable: fufu, garri, spices → USPS/Shippo
-    restaurant = "restaurant"   # Hot food: jollof rice, suya → local delivery
-    fashion    = "fashion"      # Clothing, fabric → USPS/Shippo
-    beauty     = "beauty"       # Hair, cosmetics → USPS/Shippo
-    other      = "other"
-
-
-class DeliveryType(str, enum.Enum):
-    shipping       = "shipping"        # Ships nationwide via USPS/Shippo
-    local_delivery = "local_delivery"  # Seller delivers locally (prep for Uber Direct)
-    pickup         = "pickup"          # Customer picks up in person
-    both           = "both"            # Ships + local delivery available
-
-
 class Store(Base):
     __tablename__ = "stores"
 
@@ -109,19 +94,6 @@ class Store(Base):
 
     # Business info
     business_type = Column(String, nullable=True)     # Grocery, Fashion, etc.
-    vendor_type   = Column(Enum(VendorType, native_enum=False), default=VendorType.other)
-    delivery_type = Column(Enum(DeliveryType, native_enum=False), default=DeliveryType.shipping)
-
-    # Local delivery settings (for restaurant vendors / Uber Direct prep)
-    latitude  = Column(Float, nullable=True)               # Store GPS lat (for distance calc)
-    longitude = Column(Float, nullable=True)               # Store GPS lng
-    delivery_radius_miles = Column(Integer, nullable=True)   # How far they deliver
-    delivery_note  = Column(String, nullable=True)             # e.g. "Min order $20, free delivery within 5 miles"
-    delivery_fee          = Column(Float, nullable=True)     # Flat delivery fee they charge
-    min_order_amount      = Column(Float, nullable=True)     # Minimum order for delivery
-    prep_time_minutes     = Column(Integer, nullable=True)   # Avg prep time for hot food
-    is_open_now           = Column(Boolean, default=True)    # Restaurant open/closed toggle
-    opening_hours         = Column(String, nullable=True)    # e.g. "Mon-Fri 11am-9pm"
     phone = Column(String, nullable=True)
     website = Column(String, nullable=True)
 
@@ -272,7 +244,6 @@ class Order(Base):
 
     # Tracking
     tracking_number = Column(String, nullable=True)
-    uber_quote_id   = Column(String, nullable=True)   # Uber Direct quote ID
     tracking_url = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
 
@@ -314,8 +285,6 @@ class Review(Base):
     title = Column(String, nullable=True)
     body = Column(Text, nullable=True)
     is_verified_purchase = Column(Boolean, default=False)
-    photos = Column(JSON, default=list)             # ["url1", "url2"]
-    helpful_count = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="reviews")
@@ -341,167 +310,3 @@ class Payout(Base):
 
     store = relationship("Store", back_populates="payouts")
     order = relationship("Order", back_populates="payout")
-
-
-# ─────────────────────────────────────────────
-# WISHLIST
-# ─────────────────────────────────────────────
-
-class WishlistItem(Base):
-    __tablename__ = "wishlist_items"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    user = relationship("User", backref="wishlist_items")
-    product = relationship("Product", backref="wishlisted_by")
-
-
-# ─────────────────────────────────────────────
-# DISCOUNT CODES
-# ─────────────────────────────────────────────
-
-class DiscountCode(Base):
-    __tablename__ = "discount_codes"
-
-    id = Column(Integer, primary_key=True, index=True)
-    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
-    code = Column(String, unique=True, nullable=False, index=True)
-    description = Column(String, nullable=True)
-    discount_type = Column(String, default="percent")   # percent | fixed
-    discount_value = Column(Float, nullable=False)       # 10 = 10% or $10
-    min_order_amount = Column(Float, default=0.0)
-    max_uses = Column(Integer, nullable=True)            # None = unlimited
-    uses_count = Column(Integer, default=0)
-    is_active = Column(Boolean, default=True)
-    expires_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    store = relationship("Store", backref="discount_codes")
-
-
-# ─────────────────────────────────────────────
-# PRODUCT VARIANTS
-# ─────────────────────────────────────────────
-
-class ProductVariant(Base):
-    __tablename__ = "product_variants"
-
-    id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    name = Column(String, nullable=False)       # e.g. "Size" or "Color"
-    value = Column(String, nullable=False)      # e.g. "Large" or "Red"
-    price_modifier = Column(Float, default=0.0) # +/- from base price
-    stock = Column(Integer, default=0)
-    sku = Column(String, nullable=True)
-    is_active = Column(Boolean, default=True)
-
-    product = relationship("Product", backref="variants")
-
-
-# ─────────────────────────────────────────────
-# REVIEW PHOTOS
-# ─────────────────────────────────────────────
-
-# Add photos column to Review — we'll handle via migration note
-
-# ─────────────────────────────────────────────
-# MESSAGES (Buyer/Seller Chat)
-# ─────────────────────────────────────────────
-
-class Conversation(Base):
-    __tablename__ = "conversations"
-    id = Column(Integer, primary_key=True, index=True)
-    buyer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    seller_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
-    order_id = Column(Integer, ForeignKey("orders.id"), nullable=True)
-    last_message_at = Column(DateTime(timezone=True), server_default=func.now())
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    buyer = relationship("User", foreign_keys=[buyer_id], backref="buyer_conversations")
-    seller = relationship("User", foreign_keys=[seller_id], backref="seller_conversations")
-    store = relationship("Store", backref="conversations")
-    messages = relationship("Message", back_populates="conversation", order_by="Message.created_at")
-
-class Message(Base):
-    __tablename__ = "messages"
-    id = Column(Integer, primary_key=True, index=True)
-    conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False)
-    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    body = Column(Text, nullable=False)
-    is_read = Column(Boolean, default=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    conversation = relationship("Conversation", back_populates="messages")
-    sender = relationship("User", foreign_keys=[sender_id], backref="sent_messages")
-
-
-# ─────────────────────────────────────────────
-# SUBSCRIPTION TIERS
-# ─────────────────────────────────────────────
-
-class Subscription(Base):
-    __tablename__ = "subscriptions"
-    id = Column(Integer, primary_key=True, index=True)
-    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
-    tier = Column(String, default="basic")          # basic | standard | premium
-    stripe_subscription_id = Column(String, nullable=True)
-    stripe_customer_id = Column(String, nullable=True)
-    status = Column(String, default="active")       # active | cancelled | past_due
-    current_period_end = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    store = relationship("Store", backref="subscription", uselist=False)
-
-
-# ─────────────────────────────────────────────
-# SHIPPING LABELS
-# ─────────────────────────────────────────────
-
-class ShippingLabel(Base):
-    __tablename__ = "shipping_labels"
-    id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
-    shippo_transaction_id = Column(String, nullable=True)
-    tracking_number = Column(String, nullable=True)
-    uber_quote_id   = Column(String, nullable=True)   # Uber Direct quote ID
-    label_url = Column(String, nullable=True)       # PDF download URL
-    carrier = Column(String, default="USPS")
-    service = Column(String, default="Priority")
-    rate = Column(Float, nullable=True)             # Cost in USD
-    status = Column(String, default="created")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    order = relationship("Order", backref="shipping_label", uselist=False)
-
-
-# ─────────────────────────────────────────────
-# REFERRALS
-# ─────────────────────────────────────────────
-
-class Referral(Base):
-    __tablename__ = "referrals"
-    id = Column(Integer, primary_key=True, index=True)
-    referrer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    referred_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    code = Column(String, unique=True, nullable=False, index=True)
-    type = Column(String, default="seller")         # seller | buyer
-    status = Column(String, default="pending")      # pending | completed | rewarded
-    reward_amount = Column(Float, default=0.0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    referrer = relationship("User", foreign_keys=[referrer_id], backref="referrals_made")
-    referred = relationship("User", foreign_keys=[referred_id], backref="referred_by")
-
-
-# ─────────────────────────────────────────────
-# PASSWORD RESET TOKENS
-# ─────────────────────────────────────────────
-
-class PasswordResetToken(Base):
-    __tablename__ = "password_reset_tokens"
-    id         = Column(Integer, primary_key=True, index=True)
-    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
-    token      = Column(String, unique=True, nullable=False, index=True)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    used       = Column(Boolean, default=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    user       = relationship("User", backref="reset_tokens")
