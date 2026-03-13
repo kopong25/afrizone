@@ -20,21 +20,22 @@ export default function StorePage() {
   const [messaging, setMessaging] = useState(false);
 
   const startMessage = async () => {
-    if (!user) { router.push("/login"); return; }
-    if (user.role === "seller" || user.role === "admin") {
-      toast.error("Login as a buyer to message sellers");
+    if (!user) { router.push("/login?redirect=" + encodeURIComponent(router.asPath)); return; }
+    // Block sellers from messaging their OWN store
+    if (store && user.id === store.owner_id) {
+      toast.error("You cannot message your own store");
       return;
     }
     setMessaging(true);
     try {
-      const r = await api.post("/messages/start", {
+      await api.post("/messages/start", {
         seller_id: store.owner_id,
         body: `Hi! I have a question about your store ${store.name}.`,
         store_id: store.id,
       });
       router.push("/messages");
     } catch (e) {
-      toast.error("Could not start conversation");
+      toast.error("Could not start conversation. Please try again.");
     } finally { setMessaging(false); }
   };
 

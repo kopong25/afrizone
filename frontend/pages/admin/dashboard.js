@@ -5,7 +5,8 @@ import Footer from "../../components/layout/Footer";
 import { adminAPI } from "../../lib/api";
 import { useAuth } from "../_app";
 import toast from "react-hot-toast";
-import { FiUsers, FiShoppingBag, FiPackage, FiDollarSign, FiCheck, FiX, FiSearch, FiUserCheck, FiUserX, FiEye } from "react-icons/fi";
+import { FiUsers, FiShoppingBag, FiPackage, FiDollarSign, FiCheck, FiX, FiSearch, FiUserCheck, FiUserX, FiEye, FiStar } from "react-icons/fi";
+import { adminAPI, productsAPI } from "../../lib/api";
 
 const STATUS_BADGE = {
   approved: "bg-green-100 text-green-700",
@@ -23,6 +24,8 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== "admin")) router.push("/");
@@ -40,6 +43,23 @@ export default function AdminDashboard() {
         .finally(() => setLoading(false));
     }
   }, [user]);
+
+  const fetchProducts = async () => {
+    setProductsLoading(true);
+    try {
+      const r = await productsAPI.list({ size: 50, sort: "created_at" });
+      setProducts(r.data.items || []);
+    } catch { toast.error("Failed to load products"); }
+    finally { setProductsLoading(false); }
+  };
+
+  const toggleFeatured = async (productId, currentState) => {
+    try {
+      await adminAPI.featureProduct(productId);
+      setProducts(prev => prev.map(p => p.id === productId ? { ...p, is_featured: !currentState } : p));
+      toast.success(currentState ? "Removed from featured" : "⭐ Added to featured!");
+    } catch { toast.error("Failed to update"); }
+  };
 
   const approveSeller = async (storeId, status) => {
     try {
@@ -94,8 +114,11 @@ export default function AdminDashboard() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b">
-          {["overview", "sellers", "users"].map((t) => (
+        <div className="flex gap-2 mb-6 border-b" onClick={(e) => {
+          const btn = e.target.closest("button");
+          if (btn && btn.textContent.trim().startsWith("products") && products.length === 0) fetchProducts();
+        }}>
+          {["overview", "sellers", "users", "products"].map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2.5 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${
                 tab === t ? "border-green-900 text-green-900" : "border-transparent text-gray-500 hover:text-gray-700"
@@ -244,6 +267,71 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Products Tab */}
+        {tab === "products" && (
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b bg-gray-50 flex items-center justify-between">
+              <h2 className="font-bold text-gray-800">All Products
+                <span className="ml-2 text-gray-400 font-normal text-sm">({products.length})</span>
+              </h2>
+              <button onClick={fetchProducts} className="text-sm text-green-900 hover:underline">↻ Refresh</button>
+            </div>
+            {productsLoading ? (
+              <div className="py-16 text-center text-gray-400">
+                <div className="animate-spin w-8 h-8 border-4 border-green-900 border-t-transparent rounded-full mx-auto mb-3" />
+                Loading products...
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3 text-left">Product</th>
+                      <th className="px-4 py-3 text-left">Store</th>
+                      <th className="px-4 py-3 text-left">Price</th>
+                      <th className="px-4 py-3 text-left">Stock</th>
+                      <th className="px-4 py-3 text-center">Featured</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {products.map(p => (
+                      <tr key={p.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            {p.images?.[0] && <img src={p.images[0]} className="w-10 h-10 rounded-lg object-cover" />}
+                            <div>
+                              <p className="font-medium text-gray-800 max-w-xs truncate">{p.name}</p>
+                              <p className="text-xs text-gray-400">{p.slug}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 text-xs">{p.store?.name || `Store #${p.store_id}`}</td>
+                        <td className="px-4 py-3 font-bold text-gray-900">${Number(p.price).toFixed(2)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${p.stock > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+                            {p.stock > 0 ? p.stock : "Out"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button onClick={() => toggleFeatured(p.id, p.is_featured)}
+                            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                              p.is_featured
+                                ? "bg-yellow-400 text-yellow-900 hover:bg-yellow-300"
+                                : "bg-gray-100 text-gray-500 hover:bg-yellow-100 hover:text-yellow-700"
+                            }`}>
+                            <FiStar size={12} className={p.is_featured ? "fill-yellow-700" : ""} />
+                            {p.is_featured ? "Featured" : "Feature"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
