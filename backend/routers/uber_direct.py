@@ -437,7 +437,7 @@ async def get_delivery_options(
                 },
                 {
                     "id": "usps_priority",
-                    "label": "USPS Priority Mail",
+                    "label": "USPS Priority Shipping",
                     "icon": "📬",
                     "price": 6.99,
                     "eta": "1-2 business days",
@@ -466,13 +466,14 @@ async def get_delivery_options(
     if distance_miles is None or distance_miles >= 15:
         options.append({
             "id":          "usps_priority",
-            "label":       "USPS Priority Mail",
+            "label":       "USPS Priority Shipping",
             "icon":        "📬",
             "price":       6.99,
             "eta":         "1–3 business days",
             "description": "Ships nationwide. Tracking included.",
             "provider":    "usps",
             "available":   True,
+            "shipping_cost": 6.99,
         })
         return {
             "distance_miles":    round(distance_miles, 1) if distance_miles else None,
@@ -485,72 +486,93 @@ async def get_delivery_options(
 
     # ── BRANCH: distance < 15 miles ───────────────────────────────────────────
     zone = get_zone_for_distance(distance_miles)
+    uber_fee = zone["charge"] if zone else 9.99
 
     if is_restaurant and offers_local:
         # Restaurant + local delivery → Uber Express is PRIMARY option
         options.append({
-            "id":          "uber_express",
-            "label":       "Uber Express Delivery",
-            "icon":        "🛵",
-            "price":       zone["charge"] if zone else 9.99,
-            "eta":         "~45 minutes",
-            "description": f"Hot food delivered fresh to your door. {zone['label'] if zone else ''} delivery zone.",
-            "provider":    "uber_direct",
-            "available":   True,
-            "zone":        zone["zone"] if zone else None,
-            "sandbox":     UBER_SANDBOX,
+            "id":            "uber_express",
+            "label":         "Uber Express Delivery",
+            "icon":          "🛵",
+            "price":         uber_fee,
+            "eta":           "~45 minutes",
+            "description":   f"Hot food delivered fresh to your door. {zone['label'] if zone else ''} delivery zone.",
+            "provider":      "uber_direct",
+            "available":     True,
+            "zone":          zone["zone"] if zone else None,
+            "sandbox":       UBER_SANDBOX,
+            "shipping_cost": uber_fee,
         })
 
-    if not is_restaurant and (offers_shipping or store.delivery_type == "both"):
-        # Non-restaurant within 15 miles → USPS Standard
-        options.append({
-            "id":          "usps_standard",
-            "label":       "USPS Standard Shipping",
-            "icon":        "📦",
-            "price":       4.99,
-            "eta":         "2–3 business days",
-            "description": "Reliable standard shipping with tracking.",
-            "provider":    "usps",
-            "available":   True,
-        })
+    if not is_restaurant:
+        # ── USPS Standard (always available for non-restaurants) ──────────────
+        if offers_shipping or store.delivery_type == "both":
+            options.append({
+                "id":            "usps_standard",
+                "label":         "USPS Standard Shipping",
+                "icon":          "📦",
+                "price":         4.99,
+                "eta":           "2–3 business days",
+                "description":   "Reliable standard shipping with tracking.",
+                "provider":      "usps",
+                "available":     True,
+                "shipping_cost": 4.99,
+            })
 
-    if store.delivery_type == "both" and not is_restaurant:
-        # Grocery/other offering both — also show local delivery as an option
+        # ── Uber fast delivery — available to ALL non-restaurant stores ───────
+        # Customers can choose fast local delivery even for grocery/fashion/beauty
         options.append({
-            "id":          "uber_express",
-            "label":       "Same-Day Local Delivery",
-            "icon":        "🛵",
-            "price":       zone["charge"] if zone else 8.99,
-            "eta":         "2–4 hours",
-            "description": "Local courier delivery today.",
-            "provider":    "uber_direct",
-            "available":   True,
-            "zone":        zone["zone"] if zone else None,
+            "id":            "uber_express",
+            "label":         "Uber Fast Delivery",
+            "icon":          "🛵",
+            "price":         uber_fee,
+            "eta":           "2–4 hours",
+            "description":   f"Fast local courier delivery. {zone['label'] if zone else ''} delivery zone.",
+            "provider":      "uber_direct",
+            "available":     True,
+            "zone":          zone["zone"] if zone else None,
+            "sandbox":       UBER_SANDBOX,
+            "shipping_cost": uber_fee,
         })
 
     if store.delivery_type in ["pickup"]:
         options.append({
-            "id":          "pickup",
-            "label":       "Store Pickup",
-            "icon":        "🏪",
-            "price":       0,
-            "eta":         f"Ready in ~{store.prep_time_minutes} mins" if store.prep_time_minutes else "Ready in ~30 mins",
-            "description": f"Pick up at {store.address or store.city}.",
-            "provider":    "pickup",
-            "available":   True,
+            "id":            "pickup",
+            "label":         "Store Pickup",
+            "icon":          "🏪",
+            "price":         0,
+            "eta":           f"Ready in ~{store.prep_time_minutes} mins" if store.prep_time_minutes else "Ready in ~30 mins",
+            "description":   f"Pick up at {store.address or store.city}.",
+            "provider":      "pickup",
+            "available":     True,
+            "shipping_cost": 0,
         })
 
-    # Fallback: if nothing matched offer USPS
+    # Fallback: if nothing matched offer USPS Standard + Uber Fast
     if not options:
         options.append({
-            "id":          "usps_standard",
-            "label":       "USPS Standard Shipping",
-            "icon":        "📦",
-            "price":       4.99,
-            "eta":         "2–3 business days",
-            "description": "Standard shipping with tracking.",
-            "provider":    "usps",
-            "available":   True,
+            "id":            "usps_standard",
+            "label":         "USPS Standard Shipping",
+            "icon":          "📦",
+            "price":         4.99,
+            "eta":           "2–3 business days",
+            "description":   "Standard shipping with tracking.",
+            "provider":      "usps",
+            "available":     True,
+            "shipping_cost": 4.99,
+        })
+        options.append({
+            "id":            "uber_express",
+            "label":         "Uber Fast Delivery",
+            "icon":          "🛵",
+            "price":         uber_fee,
+            "eta":           "2–4 hours",
+            "description":   "Fast local courier delivery.",
+            "provider":      "uber_direct",
+            "available":     True,
+            "zone":          zone["zone"] if zone else None,
+            "sandbox":       UBER_SANDBOX,
+            "shipping_cost": uber_fee,
         })
 
     return {
