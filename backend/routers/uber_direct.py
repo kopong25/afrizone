@@ -119,10 +119,10 @@ async def get_delivery_quote(
 
     store = db.query(models.Store).filter(models.Store.id == store_id).first()
     if not store:
-        return {"sandbox": True, "distance_miles": 4.2, "zone": 1, "delivery_fee": 5.99, "eta_minutes": 45}
+        raise HTTPException(status_code=404, detail="Store not found")
 
     if store.delivery_type not in ["local_delivery", "both"]:
-        return {"sandbox": True, "distance_miles": 4.2, "zone": 1, "delivery_fee": 5.99, "eta_minutes": 45}
+        raise HTTPException(status_code=400, detail="This store does not offer local delivery")
 
     # Use store address coords if available — fallback to city-center mock for sandbox
     # In production sellers set their lat/lng on store profile
@@ -403,18 +403,18 @@ async def get_delivery_options(
 ):
     """
     Core routing logic — called from checkout when customer enters their address.
-
+    
     Logic:
     - Distance >= 15 miles → USPS Priority Mail only ($6.99, 1-3 days)
     - Distance < 15 miles + grocery/fashion/beauty store → USPS Standard ($4.99, 2-3 days)
     - Distance < 15 miles + restaurant store → Uber Express ($9.99, ~45min)
     - Distance < 15 miles + both delivery types → show both options
-
+    
     Payload: { store_id, customer_lat, customer_lng, customer_address }
     """
-    store_id         = payload.get("store_id")
-    customer_lat     = float(payload.get("customer_lat", 0))
-    customer_lng     = float(payload.get("customer_lng", 0))
+    store_id      = payload.get("store_id")
+    customer_lat  = float(payload.get("customer_lat", 0))
+    customer_lng  = float(payload.get("customer_lng", 0))
     customer_address = payload.get("customer_address", "")
 
     if not store_id:
@@ -422,30 +422,7 @@ async def get_delivery_options(
 
     store = db.query(models.Store).filter(models.Store.id == store_id).first()
     if not store:
-        return {
-            "distance_miles": None,
-            "store_vendor_type": None,
-            "options": [
-                {
-                    "id": "usps_standard",
-                    "label": "USPS Standard Shipping",
-                    "icon": "📦",
-                    "price": 4.99,
-                    "eta": "2-3 business days",
-                    "provider": "usps",
-                    "available": True,
-                },
-                {
-                    "id": "usps_priority",
-                    "label": "USPS Priority Shipping",
-                    "icon": "📬",
-                    "price": 6.99,
-                    "eta": "1-2 business days",
-                    "provider": "usps",
-                    "available": True,
-                },
-            ],
-        }
+        raise HTTPException(status_code=404, detail="Store not found")
 
     # ── Calculate distance ─────────────────────────────────────────────────────
     if store.latitude and store.longitude and customer_lat and customer_lng:
@@ -456,8 +433,8 @@ async def get_delivery_options(
     else:
         distance_miles = None
 
-    is_restaurant   = store.vendor_type == "restaurant"
-    offers_local    = store.delivery_type in ["local_delivery", "both"]
+    is_restaurant  = store.vendor_type == "restaurant"
+    offers_local   = store.delivery_type in ["local_delivery", "both"]
     offers_shipping = store.delivery_type in ["shipping", "both"]
 
     options = []
@@ -465,125 +442,92 @@ async def get_delivery_options(
     # ── BRANCH: distance unknown or >= 15 miles → USPS Priority only ──────────
     if distance_miles is None or distance_miles >= 15:
         options.append({
-            "id":          "usps_priority",
-            "label":       "USPS Priority Shipping",
-            "icon":        "📬",
-            "price":       6.99,
-            "eta":         "1–3 business days",
-            "description": "Ships nationwide. Tracking included.",
-            "provider":    "usps",
-            "available":   True,
-            "shipping_cost": 6.99,
+            "id":           "usps_priority",
+            "label":        "USPS Priority Mail",
+            "icon":         "📬",
+            "price":        6.99,
+            "eta":          "1–3 business days",
+            "description":  "Ships nationwide. Tracking included.",
+            "provider":     "usps",
+            "available":    True,
         })
         return {
-            "distance_miles":    round(distance_miles, 1) if distance_miles else None,
-            "distance_zone":     "long_distance",
+            "distance_miles": round(distance_miles, 1) if distance_miles else None,
+            "distance_zone": "long_distance",
             "store_vendor_type": store.vendor_type,
-            "options":           options,
-            "note":              "This store is more than 15 miles away — shipping only.",
-            "sandbox":           UBER_SANDBOX,
+            "options": options,
+            "note": "This store is more than 15 miles away — shipping only.",
+            "sandbox": UBER_SANDBOX,
         }
 
     # ── BRANCH: distance < 15 miles ───────────────────────────────────────────
     zone = get_zone_for_distance(distance_miles)
-    uber_fee = zone["charge"] if zone else 9.99
 
     if is_restaurant and offers_local:
         # Restaurant + local delivery → Uber Express is PRIMARY option
         options.append({
-            "id":            "uber_express",
-            "label":         "Uber Express Delivery",
-            "icon":          "🛵",
-            "price":         uber_fee,
-            "eta":           "~45 minutes",
-            "description":   f"Hot food delivered fresh to your door. {zone['label'] if zone else ''} delivery zone.",
-            "provider":      "uber_direct",
-            "available":     True,
-            "zone":          zone["zone"] if zone else None,
-            "sandbox":       UBER_SANDBOX,
-            "shipping_cost": uber_fee,
+            "id":           "uber_express",
+            "label":        "Uber Express Delivery",
+            "icon":         "🛵",
+            "price":        zone["charge"] if zone else 9.99,
+            "eta":          "~45 minutes",
+            "description":  f"Hot food delivered fresh to your door. {zone['label'] if zone else ''} delivery zone.",
+            "provider":     "uber_direct",
+            "available":    True,
+            "zone":         zone["zone"] if zone else None,
+            "sandbox":      UBER_SANDBOX,
         })
 
-    if not is_restaurant:
-        # ── USPS Standard (always available for non-restaurants) ──────────────
-        if offers_shipping or store.delivery_type == "both":
-            options.append({
-                "id":            "usps_standard",
-                "label":         "USPS Standard Shipping",
-                "icon":          "📦",
-                "price":         4.99,
-                "eta":           "2–3 business days",
-                "description":   "Reliable standard shipping with tracking.",
-                "provider":      "usps",
-                "available":     True,
-                "shipping_cost": 4.99,
-            })
-            options.append({
-                "id":            "usps_priority",
-                "label":         "USPS Priority Shipping",
-                "icon":          "📬",
-                "price":         6.99,
-                "eta":           "1–2 business days",
-                "description":   "Faster shipping with Shippo label generation.",
-                "provider":      "usps",
-                "available":     True,
-                "shipping_cost": 6.99,
-            })
-
-        # ── Uber fast delivery — available to ALL non-restaurant stores ───────
-        # Customers can choose fast local delivery even for grocery/fashion/beauty
+    if not is_restaurant and (offers_shipping or store.delivery_type == "both"):
+        # Non-restaurant within 15 miles → USPS Standard
         options.append({
-            "id":            "uber_express",
-            "label":         "Uber Fast Delivery",
-            "icon":          "🛵",
-            "price":         uber_fee,
-            "eta":           "2–4 hours",
-            "description":   f"Fast local courier delivery. {zone['label'] if zone else ''} delivery zone.",
-            "provider":      "uber_direct",
-            "available":     True,
-            "zone":          zone["zone"] if zone else None,
-            "sandbox":       UBER_SANDBOX,
-            "shipping_cost": uber_fee,
+            "id":           "usps_standard",
+            "label":        "USPS Standard Shipping",
+            "icon":         "📦",
+            "price":        4.99,
+            "eta":          "2–3 business days",
+            "description":  "Reliable standard shipping with tracking.",
+            "provider":     "usps",
+            "available":    True,
+        })
+
+    if store.delivery_type == "both" and not is_restaurant:
+        # Grocery/other offering both — also show local delivery as an option
+        options.append({
+            "id":           "uber_express",
+            "label":        "Same-Day Local Delivery",
+            "icon":         "🛵",
+            "price":        zone["charge"] if zone else 8.99,
+            "eta":          "2–4 hours",
+            "description":  "Local courier delivery today.",
+            "provider":     "uber_direct",
+            "available":    True,
+            "zone":         zone["zone"] if zone else None,
         })
 
     if store.delivery_type in ["pickup"]:
         options.append({
-            "id":            "pickup",
-            "label":         "Store Pickup",
-            "icon":          "🏪",
-            "price":         0,
-            "eta":           f"Ready in ~{store.prep_time_minutes} mins" if store.prep_time_minutes else "Ready in ~30 mins",
-            "description":   f"Pick up at {store.address or store.city}.",
-            "provider":      "pickup",
-            "available":     True,
-            "shipping_cost": 0,
+            "id":           "pickup",
+            "label":        "Store Pickup",
+            "icon":         "🏪",
+            "price":        0,
+            "eta":          store.prep_time_minutes and f"Ready in ~{store.prep_time_minutes} mins" or "Ready in ~30 mins",
+            "description":  f"Pick up at {store.address or store.city}.",
+            "provider":     "pickup",
+            "available":    True,
         })
 
-    # Fallback: if nothing matched offer USPS Standard + Uber Fast
+    # Fallback: if nothing matched offer USPS
     if not options:
         options.append({
-            "id":            "usps_standard",
-            "label":         "USPS Standard Shipping",
-            "icon":          "📦",
-            "price":         4.99,
-            "eta":           "2–3 business days",
-            "description":   "Standard shipping with tracking.",
-            "provider":      "usps",
-            "available":     True,
-            "shipping_cost": 4.99,
-        })
-        options.append({
-            "id":            "uber_express",
-            "label":         "Uber Fast Delivery",
-            "icon":          "🛵",
-            "price":         uber_fee,
-            "eta":           "2–4 hours",
-            "description":   "Fast local courier delivery.",
-            "provider":      "uber_direct",
-            "available":     True,
-            "zone":          zone["zone"] if zone else None,
-            "sandbox":       UBER_SANDBOX,
-            "shipping_cost": uber_fee,
+            "id":           "usps_standard",
+            "label":        "USPS Standard Shipping",
+            "icon":         "📦",
+            "price":        4.99,
+            "eta":          "2–3 business days",
+            "description":  "Standard shipping with tracking.",
+            "provider":     "usps",
+            "available":    True,
         })
 
     return {
