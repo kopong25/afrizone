@@ -68,6 +68,8 @@ class StoreUpdate(BaseModel):
     business_type: Optional[str] = None
     phone: Optional[str] = None
     website: Optional[str] = None
+    logo_url: Optional[str] = None
+    banner_url: Optional[str] = None
     vendor_type: Optional[str] = None
     delivery_type: Optional[str] = None
     delivery_radius_miles: Optional[int] = None
@@ -169,17 +171,6 @@ class StoreMinimal(BaseModel):
 
     model_config = {"from_attributes": True}
 
-class StoreMinimal(BaseModel):
-    id: int
-    name: str
-    slug: str
-    vendor_type: Optional[str] = None
-    delivery_type: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    logo_url: Optional[str] = None
-
-    model_config = {"from_attributes": True}
 
 class ProductOut(BaseModel):
     id: int
@@ -224,7 +215,6 @@ class ProductListOut(BaseModel):
     review_count: int
     store_id: int
     store: Optional[StoreMinimal] = None
-    store: Optional[StoreMinimal] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -266,13 +256,12 @@ class ShippingAddress(BaseModel):
     country: str
     zip: str
 
+
 class OrderCreate(BaseModel):
     store_id: int
     items: List[CartItemCreate]
     shipping: ShippingAddress
-    delivery_fee: Optional[float] = 0.0
-    delivery_method: Optional[str] = None
-    uber_quote_id: Optional[str] = None
+
 
 class OrderItemOut(BaseModel):
     id: int
