@@ -365,3 +365,20 @@ class ShippingLabel(Base):
     created_at             = Column(DateTime(timezone=True), server_default=func.now())
 
     order = relationship("Order", back_populates="shipping_label")
+# ─────────────────────────────────────────────
+# REFERRAL
+# ─────────────────────────────────────────────
+class Referral(Base):
+    __tablename__ = "referrals"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    referrer_id  = Column(Integer, ForeignKey("users.id"), nullable=False)
+    referred_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
+    code         = Column(String, unique=True, nullable=False)
+    type         = Column(String, default="seller")
+    status       = Column(String, default="pending")
+    reward_amount = Column(Float, default=0.0)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+
+    referrer = relationship("User", foreign_keys=[referrer_id])
+    referred = relationship("User", foreign_keys=[referred_id])
