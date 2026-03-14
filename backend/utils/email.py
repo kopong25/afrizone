@@ -135,7 +135,7 @@ def send_delivery_confirmation(buyer_email: str, buyer_name: str, order_id: int,
     body = f"""<h2 class="hero">Order Delivered!</h2>
     <p>Hi {buyer_name}, your order #{order_id} from <strong>{store_name}</strong> has been delivered.</p>
     <p>We hope you love your purchase! Share your experience by leaving a review.</p>
-    <a href="{FRONTEND_URL}/orders" class="btn">Leave a Review</a>"""
+    <a href="{FRONTEND_URL}/orders?review={order_id}" class="btn">Leave a Review</a>"""
     send_email(buyer_email, f"Order #{order_id} has been delivered! 📦", _wrap(body))
 
 
