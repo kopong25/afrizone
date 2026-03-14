@@ -17,7 +17,7 @@ def get_my_referral_code(db: Session = Depends(get_db), current_user: models.Use
         models.Referral.referred_id == None
     ).first()
     if not ref:
-        ref = models.Referral(referrer_id=current_user.id, code=generate_code(current_user.id))
+        ref = models.Referral(referrer_id=current_user.id, code=generate_code(current_user.id), type="seller")
         db.add(ref)
         db.commit()
         db.refresh(ref)
