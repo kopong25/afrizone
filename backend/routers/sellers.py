@@ -172,8 +172,11 @@ def get_store_analytics(
 
     since = datetime.now(timezone.utc) - timedelta(days=days)
 
-    # All orders in period
-    orders = db.query(models.Order).filter(
+    # All orders in period (eager load items + products)
+    from sqlalchemy.orm import joinedload as _jl
+    orders = db.query(models.Order).options(
+        _jl(models.Order.items).joinedload(models.OrderItem.product)
+    ).filter(
         models.Order.store_id == store.id,
         models.Order.created_at >= since,
         models.Order.status != models.OrderStatus.cancelled,
@@ -192,7 +195,8 @@ def get_store_analytics(
     # Status breakdown
     status_counts = {}
     for o in all_orders:
-        status_counts[o.status] = status_counts.get(o.status, 0) + 1
+        s = str(o.status.value) if hasattr(o.status, "value") else str(o.status)
+        status_counts[s] = status_counts.get(s, 0) + 1
 
     # Daily revenue for chart (last N days)
     daily = {}
@@ -200,7 +204,14 @@ def get_store_analytics(
         day = (datetime.now(timezone.utc) - timedelta(days=days - i - 1)).strftime("%Y-%m-%d")
         daily[day] = {"date": day, "revenue": 0.0, "orders": 0}
     for o in orders:
-        day = o.created_at.strftime("%Y-%m-%d")
+        try:
+            created = o.created_at
+            if created.tzinfo is None:
+                from datetime import timezone as _tz
+                created = created.replace(tzinfo=_tz.utc)
+            day = created.strftime("%Y-%m-%d")
+        except Exception:
+            continue
         if day in daily:
             daily[day]["revenue"] += o.seller_amount
             daily[day]["orders"] += 1
@@ -208,7 +219,11 @@ def get_store_analytics(
     # Top products by revenue
     item_stats = {}
     for o in orders:
-        for item in o.items:
+        try:
+            order_items = o.items
+        except Exception:
+            continue
+        for item in order_items:
             pid = item.product_id
             if pid not in item_stats:
                 item_stats[pid] = {
