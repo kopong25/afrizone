@@ -69,7 +69,7 @@ async def get_uber_token() -> str:
         )
     async with httpx.AsyncClient() as client:
         r = await client.post(
-            f"{UBER_BASE}/oauth/v2/token",
+            "https://auth.uber.com/oauth/v2/token",
             data={
                 "client_id": UBER_CLIENT_ID,
                 "client_secret": UBER_CLIENT_SECRET,
