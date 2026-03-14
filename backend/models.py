@@ -383,6 +383,7 @@ class Referral(Base):
     referrer = relationship("User", foreign_keys=[referrer_id])
     referred = relationship("User", foreign_keys=[referred_id])
    # ─────────────────────────────────────────────
+# ─────────────────────────────────────────────
 # WISHLIST
 # ─────────────────────────────────────────────
 class WishlistItem(Base):
@@ -393,5 +394,5 @@ class WishlistItem(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    user    = relationship("User", back_populates="wishlist")
-    product = relationship("Product", back_populates="wishlist_items")
+    user    = relationship("User", foreign_keys=[user_id])
+    product = relationship("Product", foreign_keys=[product_id])
