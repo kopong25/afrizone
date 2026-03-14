@@ -111,7 +111,13 @@ export default function SellerOrders() {
       }
 
       if (labelUrl) {
-        window.open(labelUrl, "_blank");
+        const a = document.createElement("a");
+        a.href = labelUrl;
+        a.target = "_blank";
+        a.rel = "noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       } else {
         toast.error("Could not generate label. Try again.");
       }

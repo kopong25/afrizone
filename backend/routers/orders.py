@@ -68,6 +68,7 @@ def create_order(
         shipping_state=order_in.shipping.state,
         shipping_country=order_in.shipping.country,
         shipping_zip=order_in.shipping.zip,
+        delivery_method=getattr(order_in, "delivery_method", None),
     )
     # Set delivery fields safely (in case migration hasn't run yet)
     try:

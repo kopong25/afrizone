@@ -222,6 +222,9 @@ class Order(Base):
     # Amounts
     subtotal = Column(Float, nullable=False)
     shipping_cost = Column(Float, default=0.0)
+    delivery_method = Column(String, nullable=True)
+    delivery_fee    = Column(Float, default=0.0)
+
     platform_fee = Column(Float, nullable=False)   # Afrizone commission
     seller_amount = Column(Float, nullable=False)  # What seller receives
     total = Column(Float, nullable=False)
