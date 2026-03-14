@@ -241,7 +241,7 @@ class Order(Base):
     shipping_state = Column(String, nullable=True)
     shipping_country = Column(String, nullable=True)
     shipping_zip = Column(String, nullable=True)
-    shipping_label = relationship("ShippingLabel", back_populates="order", uselist=False)
+    
 
     # Stripe
     stripe_payment_intent_id = Column(String, nullable=True)
@@ -260,6 +260,7 @@ class Order(Base):
     store = relationship("Store", back_populates="orders")
     items = relationship("OrderItem", back_populates="order")
     payout = relationship("Payout", back_populates="order", uselist=False)
+    shipping_label = relationship("ShippingLabel", back_populates="order", uselist=False)
 
 
 class OrderItem(Base):
