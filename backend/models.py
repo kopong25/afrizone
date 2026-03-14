@@ -310,3 +310,33 @@ class Payout(Base):
 
     store = relationship("Store", back_populates="payouts")
     order = relationship("Order", back_populates="payout")
+# ─────────────────────────────────────────────
+# MESSAGING
+# ─────────────────────────────────────────────
+class Conversation(Base):
+    __tablename__ = "conversations"
+    id              = Column(Integer, primary_key=True, index=True)
+    buyer_id        = Column(Integer, ForeignKey("users.id"), nullable=False)
+    seller_id       = Column(Integer, ForeignKey("users.id"), nullable=False)
+    store_id        = Column(Integer, ForeignKey("stores.id"), nullable=True)
+    order_id        = Column(Integer, ForeignKey("orders.id"), nullable=True)
+    last_message_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+
+    buyer    = relationship("User", foreign_keys=[buyer_id])
+    seller   = relationship("User", foreign_keys=[seller_id])
+    store    = relationship("Store")
+    messages = relationship("Message", back_populates="conversation", order_by="Message.created_at")
+
+
+class Message(Base):
+    __tablename__ = "messages"
+    id              = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False)
+    sender_id       = Column(Integer, ForeignKey("users.id"), nullable=False)
+    body            = Column(Text, nullable=False)
+    is_read         = Column(Boolean, default=False)
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+
+    conversation = relationship("Conversation", back_populates="messages")
+    sender       = relationship("User", foreign_keys=[sender_id])
