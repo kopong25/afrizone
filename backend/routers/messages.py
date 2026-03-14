@@ -47,23 +47,48 @@ def get_my_conversations(db: Session = Depends(get_db), current_user: models.Use
 
 @router.post("/start")
 def start_conversation(data: ConversationStart, db: Session = Depends(get_db), current_user: models.User = Depends(auth_utils.get_current_user)):
-    existing = db.query(models.Conversation).filter(
-        models.Conversation.buyer_id == current_user.id,
-        models.Conversation.seller_id == data.seller_id,
-    ).first()
-    if not existing:
-        existing = models.Conversation(
-            buyer_id=current_user.id, seller_id=data.seller_id,
-            store_id=data.store_id, order_id=data.order_id,
-        )
-        db.add(existing)
-        db.flush()
+    try:
+        # Validate seller exists
+        seller = db.query(models.User).filter(models.User.id == data.seller_id).first()
+        if not seller:
+            raise HTTPException(status_code=404, detail="Seller not found")
 
-    msg = models.Message(conversation_id=existing.id, sender_id=current_user.id, body=data.body)
-    db.add(msg)
-    existing.last_message_at = datetime.now(timezone.utc)
-    db.commit()
-    return {"conversation_id": existing.id}
+        # Prevent messaging yourself
+        if current_user.id == data.seller_id:
+            raise HTTPException(status_code=400, detail="You cannot message yourself")
+
+        # Find or create conversation
+        existing = db.query(models.Conversation).filter(
+            models.Conversation.buyer_id == current_user.id,
+            models.Conversation.seller_id == data.seller_id,
+        ).first()
+
+        if not existing:
+            existing = models.Conversation(
+                buyer_id=current_user.id,
+                seller_id=data.seller_id,
+                store_id=data.store_id if data.store_id else None,
+                order_id=data.order_id if data.order_id else None,
+            )
+            db.add(existing)
+            db.flush()
+
+        msg = models.Message(
+            conversation_id=existing.id,
+            sender_id=current_user.id,
+            body=data.body
+        )
+        db.add(msg)
+        existing.last_message_at = datetime.now(timezone.utc)
+        db.commit()
+        return {"conversation_id": existing.id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"[Messages Error] {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start conversation: {str(e)}")
 
 @router.get("/{conversation_id}")
 def get_messages(conversation_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth_utils.get_current_user)):

@@ -21,8 +21,12 @@ export default function StorePage() {
 
   const startMessage = async () => {
     if (!user) { router.push("/login?redirect=" + encodeURIComponent(router.asPath)); return; }
-    // Block sellers from messaging their OWN store
-    if (store && user.id === store.owner_id) {
+    if (!store?.owner_id) {
+      toast.error("Store owner not found. Please try again.");
+      return;
+    }
+    // Block messaging own store
+    if (user.id === store.owner_id) {
       toast.error("You cannot message your own store");
       return;
     }
@@ -33,9 +37,12 @@ export default function StorePage() {
         body: `Hi! I have a question about your store ${store.name}.`,
         store_id: store.id,
       });
+      toast.success("Message sent! Check your inbox.");
       router.push("/messages");
     } catch (e) {
-      toast.error("Could not start conversation. Please try again.");
+      const detail = e.response?.data?.detail;
+      toast.error(typeof detail === "string" ? detail : "Could not start conversation. Please try again.");
+      console.error("[Message Error]", e.response?.data);
     } finally { setMessaging(false); }
   };
 
