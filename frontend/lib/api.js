@@ -75,13 +75,23 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle 401 — never wipe stored tokens on 401
-// Wiping tokens on /auth/me 401 caused a cascade: one failed check destroyed
-// the entire session for all subsequent requests.
-// Token cleanup is ONLY done by explicit logout() in _app.js.
+// Handle 401 globally
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.response?.status === 401) {
+      const url = error.config?.url || "";
+      // If /auth/me returns 401, token is expired — let _app.js handle cleanup
+      // For other endpoints, if user appears logged out redirect to login
+      if (!url.includes("/auth/me") && !url.includes("/auth/login")) {
+        const stored = _read();
+        if (!stored) {
+          // No token at all — silently fail, user is not logged in
+        }
+        // Token exists but server rejected it — may be expired
+        // Don't redirect automatically, let each page handle it
+      }
+    }
     return Promise.reject(error);
   }
 );
