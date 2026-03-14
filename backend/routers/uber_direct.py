@@ -29,6 +29,7 @@ UBER_CLIENT_SECRET = os.getenv("UBER_CLIENT_SECRET", "")
 UBER_CUSTOMER_ID   = os.getenv("UBER_CUSTOMER_ID", "")   # From Uber Direct dashboard
 UBER_SANDBOX       = os.getenv("UBER_SANDBOX", "true").lower() == "true"
 UBER_BASE          = "https://api.uber.com"
+UBER_AUTH_BASE = "https://sandbox-api.uber.com" if UBER_SANDBOX else "https://api.uber.com"
 
 # ── Zone Pricing Table ─────────────────────────────────────────────────────────
 # (max_miles, customer_charge, uber_cost_estimate, afrizone_profit)
@@ -69,7 +70,7 @@ async def get_uber_token() -> str:
         )
     async with httpx.AsyncClient() as client:
         r = await client.post(
-            f"{UBER_BASE}/oauth/v2/token",
+            f"{UBER_AUTH_BASE}/oauth/v2/token",
             data={
                 "client_id": UBER_CLIENT_ID,
                 "client_secret": UBER_CLIENT_SECRET,
