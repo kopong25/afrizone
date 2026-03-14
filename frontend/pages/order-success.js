@@ -5,9 +5,21 @@ import Navbar from "../components/layout/Navbar";
 import { useAuth } from "./_app";
 import api from "../lib/api";
 
-function getDeliveryDate() {
-  const d = new Date();
-  d.setDate(d.getDate() + Math.floor(Math.random() * 3) + 5); // 5-7 days
+function getDeliveryEstimate(deliveryMethod) {
+  const now = new Date();
+  if (deliveryMethod === "uber_express") {
+    const minutes = Math.floor(Math.random() * 20) + 35; // 35-55 mins
+    const eta = new Date(now.getTime() + minutes * 60 * 1000);
+    return `Today by ${eta.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} (~${minutes} min)`;
+  }
+  if (deliveryMethod === "usps_priority") {
+    const d = new Date(now);
+    d.setDate(d.getDate() + Math.floor(Math.random() * 2) + 1); // 1-2 days
+    return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  }
+  // usps_standard or default
+  const d = new Date(now);
+  d.setDate(d.getDate() + Math.floor(Math.random() * 3) + 3); // 3-5 days
   return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 }
 
@@ -23,7 +35,7 @@ export default function OrderSuccessPage() {
   const { order_id } = router.query;
   const [order, setOrder] = useState(null);
   const [confetti, setConfetti] = useState(true);
-  const deliveryDate = getDeliveryDate();
+  const deliveryDate = getDeliveryEstimate(order?.delivery_method);
   const proverb = AFRICAN_PROVERBS[Math.floor(Math.random() * AFRICAN_PROVERBS.length)];
   const firstName = user?.full_name?.split(" ")[0] || "Friend";
 
@@ -108,7 +120,11 @@ export default function OrderSuccessPage() {
             <div className="bg-green-50 rounded-xl p-4 mb-4">
               <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">📦 Estimated Delivery</p>
               <p className="text-xl font-black text-green-900">{deliveryDate}</p>
-              <p className="text-xs text-green-700 mt-1">We'll email you tracking info once shipped</p>
+              <p className="text-xs text-green-700 mt-1">
+               {order?.delivery_method === "uber_express"
+              ? "🛵 Uber driver will be dispatched when your order is ready"
+              : "We'll email you tracking info once delivered"}
+            </p>
             </div>
 
             {/* Order items if available */}
