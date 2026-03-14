@@ -218,7 +218,7 @@ class Order(Base):
     id = Column(Integer, primary_key=True, index=True)
     buyer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
-
+    
     # Amounts
     subtotal = Column(Float, nullable=False)
     shipping_cost = Column(Float, default=0.0)
@@ -229,6 +229,7 @@ class Order(Base):
     seller_amount = Column(Float, nullable=False)  # What seller receives
     total = Column(Float, nullable=False)
     currency = Column(String, default="USD")
+        
 
     # Status
     status = Column(Enum(OrderStatus, native_enum=False), default=OrderStatus.pending)
@@ -240,6 +241,7 @@ class Order(Base):
     shipping_state = Column(String, nullable=True)
     shipping_country = Column(String, nullable=True)
     shipping_zip = Column(String, nullable=True)
+    shipping_label = relationship("ShippingLabel", back_populates="order", uselist=False)
 
     # Stripe
     stripe_payment_intent_id = Column(String, nullable=True)
@@ -343,3 +345,22 @@ class Message(Base):
 
     conversation = relationship("Conversation", back_populates="messages")
     sender       = relationship("User", foreign_keys=[sender_id])
+   # ─────────────────────────────────────────────
+# SHIPPING LABEL (Shippo integration)
+# ─────────────────────────────────────────────
+class ShippingLabel(Base):
+    __tablename__ = "shipping_labels"
+
+    id                     = Column(Integer, primary_key=True, index=True)
+    order_id               = Column(Integer, ForeignKey("orders.id"), nullable=False, unique=True)
+    shippo_transaction_id  = Column(String, nullable=True)
+    tracking_number        = Column(String, nullable=True)
+    tracking_url           = Column(String, nullable=True)
+    label_url              = Column(String, nullable=True)
+    carrier                = Column(String, default="USPS")
+    service                = Column(String, default="Priority Mail")
+    rate                   = Column(Float, nullable=True)
+    status                 = Column(String, default="created")
+    created_at             = Column(DateTime(timezone=True), server_default=func.now())
+
+    order = relationship("Order", back_populates="shipping_label")
