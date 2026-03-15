@@ -223,6 +223,7 @@ class Order(Base):
     subtotal = Column(Float, nullable=False)
     shipping_cost = Column(Float, default=0.0)
     delivery_method = Column(String, nullable=True)
+    uber_quote_id = Column(String, nullable=True)
     delivery_fee    = Column(Float, default=0.0)
 
     platform_fee = Column(Float, nullable=False)   # Afrizone commission
