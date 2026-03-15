@@ -74,7 +74,7 @@ async def get_uber_token() -> str:
                 "client_id": UBER_CLIENT_ID,
                 "client_secret": UBER_CLIENT_SECRET,
                 "grant_type": "client_credentials",
-                "scope=direct.deliveries direct.quotes",
+                "scope": "direct.deliveries direct.quotes",
             },
             timeout=15,
         )
