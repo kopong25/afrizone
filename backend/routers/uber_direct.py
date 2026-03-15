@@ -242,63 +242,26 @@ async def dispatch_uber_driver(
     try:
         token = await get_uber_token()
         async with httpx.AsyncClient() as client:
-            delivery_payload = {
-                "quote_id": order.uber_quote_id or None,
-                "pickup": {
-                    "name": store.name,
-                    "address": store.address or f"{store.city}, USA",
-                    "phone": store.phone or "+10000000000",
-                    "notes": f"Order #{order.id} — food should be ready and packaged",
-                },
-                "dropoff": {
-                    "name": order.shipping_name,
-                    "address": f"{order.shipping_address}, {order.shipping_city}, {order.shipping_state} {order.shipping_zip}",
-                    "phone": "+10000000000",  # Should be buyer phone — add to order model later
-                    "notes": "",
-                },
-                "manifest_items": [
-                    {
-                        "name": item.product.name if item.product else "Food item",
-                        "quantity": item.quantity,
-                        "size": "small",
-                        "price": int(item.unit_price * 100),  # cents
-                    }
-                    for item in (order.items or [])
-                ],
-            }
-
-            r = await client.post(
-                f"{UBER_BASE}/v1/customers/{UBER_CUSTOMER_ID}/deliveries",
-                json=delivery_payload,
-                headers={"Authorization": f"Bearer {token}"},
-                timeout=30,
-            )
-
-            if r.status_code not in [200, 201]:
-                raise HTTPException(status_code=502, detail=f"Uber dispatch failed: {r.text}")
-
-            data = r.json()
-            delivery_id = data.get("id")
-            tracking_url = data.get("tracking_url")
-
-            # Update order with Uber tracking
-            order.status = models.OrderStatus.shipped
-            order.tracking_number = delivery_id
-            order.tracking_url = tracking_url
-            db.commit()
-
-            return {
-                "success": True,
-                "sandbox": False,
-                "delivery_id": delivery_id,
-                "tracking_url": tracking_url,
-                "message": "Uber driver dispatched! Customer will be notified.",
-            }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Uber Direct error: {str(e)}")
+           delivery_payload = {
+    "quote_id": order.uber_quote_id or None,
+    "pickup_name": store.name,
+    "pickup_address": store.address or f"{store.city}, USA",
+    "pickup_phone_number": store.phone or "+10000000000",
+    "pickup_notes": f"Order #{order.id} — food should be ready and packaged",
+    "dropoff_name": order.shipping_name or "Customer",
+    "dropoff_address": f"{order.shipping_address}, {order.shipping_city}, {order.shipping_state} {order.shipping_zip}",
+    "dropoff_phone_number": "+10000000000",
+    "dropoff_notes": "",
+    "manifest_items": [
+        {
+            "name": item.product.name if item.product else "Food item",
+            "quantity": item.quantity,
+            "size": "small",
+            "price": int(item.unit_price * 100),
+        }
+        for item in (order.items or [])
+    ],
+}
 
 
 @router.get("/status/{order_id}")
