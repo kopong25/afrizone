@@ -215,11 +215,11 @@ async def dispatch_uber_driver(
                 "quote_id": getattr(order, "uber_quote_id", None) or None,
                 "pickup_name": store.name,
                 "pickup_address": store.address or f"{store.city}, USA",
-                "pickup_phone_number": store.phone or "+10000000000",
+                "pickup_phone_number": store.phone or "+14805550100",
                 "pickup_notes": f"Order #{order.id} — food should be ready and packaged",
                 "dropoff_name": order.shipping_name or "Customer",
                 "dropoff_address": f"{order.shipping_address}, {order.shipping_city}, {order.shipping_state} {order.shipping_zip}",
-                "dropoff_phone_number": "+10000000000",
+                "dropoff_phone_number": "+14805550100",
                 "dropoff_notes": "",
                 "manifest_items": [
                     {
