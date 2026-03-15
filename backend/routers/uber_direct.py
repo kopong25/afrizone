@@ -238,7 +238,16 @@ async def dispatch_uber_driver(
                 timeout=30,
             )
             if r.status_code not in [200, 201]:
-                raise HTTPException(status_code=502, detail=f"Uber dispatch failed: {r.text}")
+              err = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+              code = err.get("code", "")
+              metadata = err.get("metadata", {})
+              if code == "address_undeliverable":
+                details = metadata.get("details", "")
+                raise HTTPException(
+                  status_code=400,
+                  detail=f"Delivery unavailable: The customer's address is outside Uber's delivery range for this store. {details}"
+        )
+    raise HTTPException(status_code=502, detail=f"Uber dispatch failed: {r.text}")
 
             data = r.json()
             delivery_id = data.get("id")
