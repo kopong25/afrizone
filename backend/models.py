@@ -91,6 +91,8 @@ class Store(Base):
     country = Column(String, nullable=False)          # USA, Canada, UK, etc.
     city = Column(String, nullable=True)
     address = Column(String, nullable=True)
+    latitude  = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
 
     # Business info
     business_type = Column(String, nullable=True)     # Grocery, Fashion, etc.
