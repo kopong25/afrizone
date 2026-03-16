@@ -255,6 +255,8 @@ class ShippingAddress(BaseModel):
     state: str
     country: str
     zip: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class OrderCreate(BaseModel):

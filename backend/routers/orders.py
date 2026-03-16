@@ -59,6 +59,7 @@ def create_order(
         store_id=store.id,
         subtotal=subtotal,
         shipping_cost=shipping_cost,
+        delivery_fee=shipping_cost,
         platform_fee=platform_fee,
         seller_amount=seller_amount,
         total=total,
@@ -69,13 +70,11 @@ def create_order(
         shipping_country=order_in.shipping.country,
         shipping_zip=order_in.shipping.zip,
         delivery_method=getattr(order_in, "delivery_method", None),
+        uber_quote_id=getattr(order_in, "uber_quote_id", None),
+        latitude=getattr(order_in.shipping, "latitude", None),
+        longitude=getattr(order_in.shipping, "longitude", None),
     )
-    # Set delivery fields safely (in case migration hasn't run yet)
-    try:
-        order.delivery_method = order_in.delivery_method
-        order.delivery_fee = shipping_cost
-    except Exception:
-        pass
+    
     db.add(order)
     db.flush()  # Get order.id before committing
 
