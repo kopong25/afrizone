@@ -130,30 +130,36 @@ export default function CartPage() {
 
       if (isRestaurant) {
         // Restaurant — Uber ONLY regardless of distance
-        options = [
-          {
-            id: "uber_express",
-            label: "Uber Express Delivery",
-            icon: "🛵",
-            price: uberData.options?.find(o => o.id === "uber_express")?.price || 9.99,
-            eta: uberData.options?.find(o => o.id === "uber_express")?.eta || "~45 minutes",
-            description: "Hot food delivered fresh to your door.",
-            provider: "uber_direct",
-            quote_id: uberData.options?.find(o => o.id === "uber_express")?.quote_id || null,
-          }
-        ];
+        const uberOpt = uberData.options?.find(o => o.id === "uber_express");
+    options = [
+        {
+        id: "uber_express",
+        label: "Uber Express Delivery",
+        icon: "🛵",
+        price: uberOpt?.price ?? 9.99,
+        eta: uberOpt?.eta || "~45 minutes",
+        description: uberOpt?.description || "Hot food delivered fresh to your door.",
+        provider: "uber_direct",
+        uber_quote_id: uberOpt?.uber_quote_id || null,
+        latitude: customerLat,
+        longitude: customerLng,
+      }
+    ];
       } else {
         // Non-restaurant African store — Chippo USPS + Uber only
         options = [
-          { id: "usps_priority", label: "Chippo USPS Shipping", icon: "📬", price: 6.99, eta: "1–2 business days", description: "Fast tracked shipping.", provider: "usps" },
+          { id: "usps_priority", label: "Chippo USPS Shipping", icon: "📬", price: 6.99, eta: "1–2 business days", description: "Fast    tracked shipping.", provider: "usps" },
           {
             id: "uber_express",
             label: "Uber Express Delivery",
             icon: "🛵",
-            price: uberData.options?.find(o => o.id === "uber_express")?.price || 8.99,
-            eta: "2–4 hours",
+            price: uberData.options?.find(o => o.id === "uber_express")?.price ?? 8.99,
+            eta: uberData.options?.find(o => o.id === "uber_express")?.eta || "2–4 hours",
             description: "Same-day local delivery.",
             provider: "uber_direct",
+            uber_quote_id: uberData.options?.find(o => o.id === "uber_express")?.uber_quote_id || null,
+            latitude: customerLat,
+            longitude: customerLng,
           },
         ];
       }
@@ -257,16 +263,18 @@ export default function CartPage() {
           store_id: resolvedStoreId,
           items: orderItems,
           shipping: {
-            name: shipping.name || "Customer",
-            address: shipping.address,
-            city: shipping.city,
-            state: shipping.state || "N/A",
-            country: shipping.country || "USA",
-            zip: shipping.zip,
-          },
+             name: shipping.name || "Customer",
+             address: shipping.address,
+             city: shipping.city,
+             state: shipping.state || "N/A",
+             country: shipping.country || "USA",
+             zip: shipping.zip,
+             latitude: selectedDelivery?.latitude || null,
+             longitude: selectedDelivery?.longitude || null,
+        },
           delivery_method: selectedDelivery?.id || "usps_priority",
           delivery_fee: shippingCost || 0,
-          uber_quote_id: selectedDelivery?.quote_id || null,
+          uber_quote_id: selectedDelivery?.uber_quote_id || null,
         };
         console.log("[Order Payload]", JSON.stringify(orderPayload));
         const r = await api.post("/orders/", orderPayload, { headers: authHeaders });

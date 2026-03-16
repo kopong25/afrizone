@@ -1,0 +1,1 @@
+{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNSIsImV4cCI6MTc3MzUyNzY3MX0.dDFkOvBcLPOHTjK45F5aQ4js4QJwuXsjmprhKOz2kTw","token_type":"bearer","user":{"id":15,"email":"planetsguardians@gmail.com","full_name":"Nana Oppong","role":"seller","is_active":true,"avatar_url":null,"country":"USA","created_at":"2026-03-14T21:07:27.035352Z"}}
