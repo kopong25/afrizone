@@ -346,7 +346,7 @@ export default function StoreSettings() {
                 />
               </div>
               <p className="text-xs text-blue-600">
-                🚀 Uber Direct automated driver dispatch is coming soon.
+                Uber Direct automated driver dispatch is coming soon.
               </p>
             </div>
           )}
