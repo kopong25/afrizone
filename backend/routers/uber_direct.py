@@ -425,8 +425,8 @@ async def get_delivery_options(
     - Other stores: Uber + USPS, customer chooses
     """
     store_id         = payload.get("store_id")
-    customer_lat     = float(payload.get("customer_lat") or 0)
-    customer_lng     = float(payload.get("customer_lng") or 0)
+    customer_lat     = float(payload.get("customer_lat") or 0) or None
+    customer_lng     = float(payload.get("customer_lng") or 0) or None
     customer_address = payload.get("customer_address", "")
 
     if not store_id:
@@ -438,11 +438,9 @@ async def get_delivery_options(
 
     # ── Calculate distance ─────────────────────────────────────────────────────
     if store.latitude and store.longitude and customer_lat and customer_lng:
-        distance_miles = haversine_miles(store.latitude, store.longitude, customer_lat, customer_lng)
-    elif UBER_SANDBOX:
-        distance_miles = 4.2
+        distance_miles = haversine_miles(store.latitude, store.longitude, float(customer_lat), float(customer_lng))
     else:
-        distance_miles = None
+        distance_miles = 4.2  # sandbox fallback always
 
     is_restaurant = store.vendor_type == "restaurant"
 
