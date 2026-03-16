@@ -94,10 +94,22 @@ class Store(Base):
     latitude  = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
 
+    
     # Business info
     business_type = Column(String, nullable=True)     # Grocery, Fashion, etc.
     phone = Column(String, nullable=True)
     website = Column(String, nullable=True)
+
+    # Delivery config
+    vendor_type = Column(String, nullable=True)           # "restaurant" | "store"
+    delivery_type = Column(String, nullable=True)         # "local_delivery" | "shipping" | "both" | "pickup"
+    delivery_radius_miles = Column(Integer, nullable=True)
+    delivery_note = Column(String, nullable=True)
+    delivery_fee = Column(Float, nullable=True)
+    min_order_amount = Column(Float, nullable=True)
+    prep_time_minutes = Column(Integer, nullable=True)
+    is_open_now = Column(Boolean, nullable=True)
+    opening_hours = Column(JSON, nullable=True)
 
     # Afrizone platform
     status = Column(Enum(SellerStatus, native_enum=False), default=SellerStatus.pending)
