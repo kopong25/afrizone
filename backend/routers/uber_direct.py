@@ -390,7 +390,28 @@ async def uber_webhook(
 
     return {"received": True}
 
+# ── Geocode Endpoint ──────────────────────────────────────────────────────────
 
+@router.get("/geocode")
+async def geocode_address(address: str, city: str, state: str, zip: str):
+    """Geocode a US address using Census Bureau API — called from frontend to avoid CORS."""
+    try:
+        url = (
+            f"https://geocoding.geo.census.gov/geocoder/locations/address"
+            f"?street={address}&city={city}&state={state}&zip={zip}"
+            f"&benchmark=Public_AR_Current&format=json"
+        )
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(url)
+            data = r.json()
+            match = data.get("result", {}).get("addressMatches", [])
+            if match:
+                coords = match[0]["coordinates"]
+                return {"lat": coords["y"], "lng": coords["x"], "found": True}
+            return {"lat": None, "lng": None, "found": False}
+    except Exception as e:
+        print(f"[Geocode] Failed: {e}")
+        return {"lat": None, "lng": None, "found": False}
 # ── Delivery Options Endpoint ──────────────────────────────────────────────────
 
 @router.post("/delivery-options")
