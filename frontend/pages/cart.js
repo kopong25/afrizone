@@ -108,7 +108,10 @@ export default function CartPage() {
           customerLat = parseFloat(geoData[0].lat);
           customerLng = parseFloat(geoData[0].lon);
         }
-      } catch {}
+      } catch (geoErr) {
+        console.error("[Geo] Failed:", geoErr);
+      }
+      console.log("[Geo Result] lat:", customerLat, "lng:", customerLng);
 
       let uberData = { options: [], distance_miles: null };
       try {
