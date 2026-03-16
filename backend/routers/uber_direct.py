@@ -418,8 +418,8 @@ async def get_delivery_options(
     Returns delivery options with REAL dynamic Uber pricing + $2 margin.
     """
     store_id         = payload.get("store_id")
-    customer_lat     = float(payload.get("customer_lat", 0))
-    customer_lng     = float(payload.get("customer_lng", 0))
+    customer_lat     = float(payload.get("customer_lat") or 0)
+    customer_lng     = float(payload.get("customer_lng") or 0)
     customer_address = payload.get("customer_address", "")
 
     if not store_id:
