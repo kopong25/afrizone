@@ -279,9 +279,28 @@ def get_store_by_id(store_id: int, db: Session = Depends(get_db)):
     store = db.query(models.Store).filter(models.Store.id == store_id).first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
-    # Patch enum fields via raw SQL
-    row = db.execute(text("SELECT vendor_type, delivery_type FROM stores WHERE id = :id"), {"id": store.id}).fetchone()
-    if row:
-        store.vendor_type = row[0]
-        store.delivery_type = row[1]
-    return store
+
+    data = updates.model_dump(exclude_none=True)
+
+    # Auto-geocode address when address or city changes
+    if "address" in data or "city" in data:
+        try:
+            import httpx as _httpx
+            addr = data.get("address") or store.address or ""
+            city = data.get("city") or store.city or ""
+            country = data.get("country") or store.country or "USA"
+            if addr and city:
+                url = (
+                    f"https://nominatim.openstreetmap.org/search"
+                    f"?format=json&limit=1&street={addr}&city={city}&country={country}"
+                )
+                r = _httpx.get(url, headers={"User-Agent": "Afrizone/1.0 (afrizoneshop.com)"}, timeout=10)
+                geo = r.json()
+                if geo:
+                    data["latitude"] = float(geo[0]["lat"])
+                    data["longitude"] = float(geo[0]["lon"])
+                    print(f"[Geocode] Store geocoded: {data['latitude']}, {data['longitude']}")
+        except Exception as e:
+            print(f"[Geocode] Failed: {e}")
+
+    # Enforce business rules: restaurant must use local_delivery

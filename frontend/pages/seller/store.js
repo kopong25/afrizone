@@ -350,3 +350,7 @@ export default function StoreSettings() {
               </p>
             </div>
           )}
+          <Footer />
+    </>
+  );
+}
