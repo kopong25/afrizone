@@ -3,7 +3,7 @@ Uber Direct integration for Afrizone — local hot food delivery.
 
 Dynamic Pricing model:
   Customer pays = Real Uber Direct cost + $2.00 Afrizone margin
-  Example: Uber charges $5.50 → customer pays $7.50 → Afrizone earns $2.00
+  Example: Uber charges $5.50 -> customer pays $7.50 -> Afrizone earns $2.00
 
   Sandbox fallback (no Uber credentials): distance-based estimate
     Base fee $3.50 + $0.90/mile + $2.00 margin
@@ -20,25 +20,18 @@ import models, auth as auth_utils, schemas
 
 router = APIRouter()
 
-# ── Uber Direct Config ─────────────────────────────────────────────────────────
 UBER_CLIENT_ID     = os.getenv("UBER_CLIENT_ID", "")
 UBER_CLIENT_SECRET = os.getenv("UBER_CLIENT_SECRET", "")
 UBER_CUSTOMER_ID   = os.getenv("UBER_CUSTOMER_ID", "")
 UBER_SANDBOX       = os.getenv("UBER_SANDBOX", "true").lower() == "true"
 UBER_BASE          = "https://api.uber.com"
 
-# ── Dynamic Pricing Config ────────────────────────────────────────────────────
-AFRIZONE_MARGIN    = 2.00   # Afrizone earns $2 on every Uber delivery
+AFRIZONE_MARGIN    = 2.00
+SANDBOX_BASE_FEE   = 3.50
+SANDBOX_PER_MILE   = 0.90
 
-# Sandbox distance-based estimate (mirrors average Uber Direct rates)
-SANDBOX_BASE_FEE   = 3.50  # base fee in dollars
-SANDBOX_PER_MILE   = 0.90  # per mile rate
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def haversine_miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Calculate straight-line distance in miles between two coordinates."""
     R = 3958.8
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
@@ -47,12 +40,10 @@ def haversine_miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float
 
 
 def estimate_uber_cost(distance_miles: float) -> float:
-    """Sandbox fallback: estimate Uber cost from distance."""
     return round(SANDBOX_BASE_FEE + (SANDBOX_PER_MILE * distance_miles), 2)
 
 
 def customer_price(uber_cost: float) -> float:
-    """What customer pays = Uber cost + $2 Afrizone margin."""
     return round(uber_cost + AFRIZONE_MARGIN, 2)
 
 
@@ -64,12 +55,8 @@ def zone_label(miles: float) -> str:
 
 
 async def get_uber_token() -> str:
-    """Get OAuth2 token from Uber Direct."""
     if not UBER_CLIENT_ID or not UBER_CLIENT_SECRET:
-        raise HTTPException(
-            status_code=503,
-            detail="Uber Direct not configured. Add UBER_CLIENT_ID and UBER_CLIENT_SECRET to environment."
-        )
+        raise HTTPException(status_code=503, detail="Uber Direct not configured.")
     async with httpx.AsyncClient() as client:
         r = await client.post(
             "https://auth.uber.com/oauth/v2/token",
@@ -82,7 +69,7 @@ async def get_uber_token() -> str:
             timeout=15,
         )
         if r.status_code != 200:
-            raise HTTPException(status_code=502, detail=f"Uber auth failed: {r.text}")
+            raise HTTPException(status_code=502, detail="Uber auth failed: " + r.text)
         return r.json()["access_token"]
 
 
@@ -90,11 +77,6 @@ async def get_live_uber_quote(
     store, customer_lat: float, customer_lng: float,
     customer_address: str = "", distance_miles: float = 4.2
 ) -> dict:
-    """
-    Get real Uber Direct delivery quote.
-    Returns: { uber_cost, customer_charge, uber_quote_id, eta_minutes, source }
-    Falls back to distance estimate if API unavailable.
-    """
     store_lat = getattr(store, 'latitude', None)
     store_lng = getattr(store, 'longitude', None)
 
@@ -117,7 +99,7 @@ async def get_live_uber_quote(
                         "dropoff_phone_number": "+14805550100",
                         "manifest_items": [{"name": "Delivery", "quantity": 1, "size": "small", "price": 1000}],
                     },
-                    headers={"Authorization": f"Bearer {token}"},
+                    headers={"Authorization": "Bearer " + token},
                     timeout=10,
                 )
                 if r.status_code == 200:
@@ -134,28 +116,24 @@ async def get_live_uber_quote(
                             "source":          "live",
                         }
         except Exception as e:
-            print(f"[Uber Quote] Live API failed: {e} — using estimate")
+            print("Uber Quote live API failed: " + str(e))
 
-    # Fallback: distance-based estimate
     uber_cost = estimate_uber_cost(distance_miles)
     return {
         "uber_cost":       uber_cost,
         "customer_charge": customer_price(uber_cost),
         "uber_quote_id":   None,
-        "eta_minutes":     45,
+        "eta_minutes":     max(20, int(distance_miles * 5)),
         "source":          "estimate",
     }
 
 
-# ── Endpoints ──────────────────────────────────────────────────────────────────
-
 @router.get("/zones")
 def get_delivery_zones():
-    """Return dynamic pricing info. No auth required."""
     return {
         "pricing_model":      "dynamic",
         "afrizone_margin":    AFRIZONE_MARGIN,
-        "note":               f"Delivery fee = real Uber cost + ${AFRIZONE_MARGIN:.2f} Afrizone service fee. Final price shown at checkout.",
+        "note":               "Delivery fee = real Uber cost + $2.00 Afrizone service fee.",
         "sandbox":            UBER_SANDBOX,
         "zones": [
             {"zone": 1, "label": "Nearby",   "max_miles": 3,  "est_charge": customer_price(estimate_uber_cost(1.5))},
@@ -171,7 +149,6 @@ async def get_delivery_quote(
     payload: dict,
     db: Session = Depends(get_db),
 ):
-    """Get a real-time delivery quote. Returns actual Uber cost + $2 margin."""
     store_id     = payload.get("store_id")
     customer_lat = payload.get("customer_lat")
     customer_lng = payload.get("customer_lng")
@@ -189,10 +166,8 @@ async def get_delivery_quote(
 
     if store_lat and store_lng and customer_lat and customer_lng:
         distance_miles = haversine_miles(store_lat, store_lng, float(customer_lat), float(customer_lng))
-    elif UBER_SANDBOX:
-        distance_miles = 4.2
     else:
-        raise HTTPException(status_code=400, detail="Store location not set.")
+        distance_miles = 4.2
 
     quote = await get_live_uber_quote(
         store, float(customer_lat), float(customer_lng),
@@ -220,7 +195,6 @@ async def dispatch_uber_driver(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.require_seller),
 ):
-    """Seller triggers Uber driver dispatch once food is ready."""
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -230,11 +204,11 @@ async def dispatch_uber_driver(
         raise HTTPException(status_code=403, detail="Not your order")
 
     if order.status not in ["paid", "processing"]:
-        raise HTTPException(status_code=400, detail=f"Cannot dispatch — order is {order.status}")
+        raise HTTPException(status_code=400, detail="Cannot dispatch order with status: " + str(order.status))
 
     if not UBER_CLIENT_ID or not UBER_CLIENT_SECRET or not UBER_CUSTOMER_ID:
         order.status          = models.OrderStatus.shipped
-        order.tracking_number = f"UBER-SANDBOX-{order_id}"
+        order.tracking_number = "UBER-SANDBOX-" + str(order_id)
         order.tracking_url    = "https://uber.com/track/sandbox"
         db.commit()
         return {
@@ -243,7 +217,7 @@ async def dispatch_uber_driver(
             "message":         "Sandbox mode: Driver dispatch simulated.",
             "tracking_number": order.tracking_number,
             "tracking_url":    order.tracking_url,
-            "delivery_id":     f"sandbox-delivery-{order_id}",
+            "delivery_id":     "sandbox-delivery-" + str(order_id),
         }
 
     try:
@@ -254,9 +228,9 @@ async def dispatch_uber_driver(
                 "pickup_name":          store.name,
                 "pickup_address":       store.address or f"{store.city}, USA",
                 "pickup_phone_number":  store.phone or "+14805550100",
-                "pickup_notes":         f"Order #{order.id} — food should be ready and packaged",
+                "pickup_notes":         "Order #" + str(order.id) + " - food should be ready and packaged",
                 "dropoff_name":         order.shipping_name or "Customer",
-                "dropoff_address":      f"{order.shipping_address}, {order.shipping_city}, {order.shipping_state} {order.shipping_zip}",
+                "dropoff_address":      str(order.shipping_address) + ", " + str(order.shipping_city) + ", " + str(order.shipping_state) + " " + str(order.shipping_zip),
                 "dropoff_phone_number": "+14805550100",
                 "dropoff_notes":        "",
                 "manifest_items": [
@@ -272,7 +246,7 @@ async def dispatch_uber_driver(
             r = await client.post(
                 f"{UBER_BASE}/v1/customers/{UBER_CUSTOMER_ID}/deliveries",
                 json=delivery_payload,
-                headers={"Authorization": f"Bearer {token}"},
+                headers={"Authorization": "Bearer " + token},
                 timeout=30,
             )
             if r.status_code not in [200, 201]:
@@ -281,11 +255,8 @@ async def dispatch_uber_driver(
                 metadata = err.get("metadata", {})
                 if code == "address_undeliverable":
                     details = metadata.get("details", "")
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Delivery unavailable: The customer's address is outside Uber's delivery range. {details}"
-                    )
-                raise HTTPException(status_code=502, detail=f"Uber dispatch failed: {r.text}")
+                    raise HTTPException(status_code=400, detail="Delivery unavailable: " + details)
+                raise HTTPException(status_code=502, detail="Uber dispatch failed: " + r.text)
 
             data         = r.json()
             delivery_id  = data.get("id")
@@ -304,7 +275,7 @@ async def dispatch_uber_driver(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Uber Direct error: {str(e)}")
+        raise HTTPException(status_code=502, detail="Uber Direct error: " + str(e))
 
 
 @router.get("/status/{order_id}")
@@ -313,7 +284,6 @@ async def get_delivery_status(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.get_current_user),
 ):
-    """Get live Uber delivery status for an order."""
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -339,7 +309,7 @@ async def get_delivery_status(
         async with httpx.AsyncClient() as client:
             r = await client.get(
                 f"{UBER_BASE}/v1/customers/{UBER_CUSTOMER_ID}/deliveries/{delivery_id}",
-                headers={"Authorization": f"Bearer {token}"},
+                headers={"Authorization": "Bearer " + token},
                 timeout=15,
             )
             if r.status_code != 200:
@@ -361,13 +331,9 @@ async def uber_webhook(
     payload: dict,
     db: Session = Depends(get_db),
 ):
-    """
-    Uber Direct webhook — receives delivery status updates.
-    Register URL: https://afrizone-loqr.onrender.com/uber-direct/webhook
-    """
     event_type  = payload.get("event_type", "")
     delivery_id = payload.get("delivery_id", "")
-    print(f"[Uber Webhook] {event_type} — delivery {delivery_id}")
+    print("Uber Webhook: " + event_type + " delivery " + delivery_id)
 
     order = db.query(models.Order).filter(
         models.Order.tracking_number == delivery_id
@@ -391,40 +357,35 @@ async def uber_webhook(
 
     return {"received": True}
 
-# ── Geocode Endpoint ──────────────────────────────────────────────────────────
 
 @router.get("/geocode")
 async def geocode_address(address: str, city: str, state: str, zip: str):
-    """Geocode a US address using Census Bureau API — called from frontend to avoid CORS."""
     try:
         url = (
-            f"https://geocoding.geo.census.gov/geocoder/locations/address"
-            f"?street={address}&city={city}&state={state}&zip={zip}"
-            f"&benchmark=Public_AR_Current&format=json"
+            "https://nominatim.openstreetmap.org/search"
+            "?format=json&limit=1"
+            "&street=" + address +
+            "&city=" + city +
+            "&state=" + state +
+            "&postalcode=" + zip +
+            "&country=USA"
         )
         async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.get(url)
+            r = await client.get(url, headers={"User-Agent": "Afrizone/1.0 (afrizoneshop.com)"})
             data = r.json()
-            match = data.get("result", {}).get("addressMatches", [])
-            if match:
-                coords = match[0]["coordinates"]
-                return {"lat": coords["y"], "lng": coords["x"], "found": True}
+            if data:
+                return {"lat": float(data[0]["lat"]), "lng": float(data[0]["lon"]), "found": True}
             return {"lat": None, "lng": None, "found": False}
     except Exception as e:
-        print(f"[Geocode] Failed: {e}")
+        print("Geocode failed: " + str(e))
         return {"lat": None, "lng": None, "found": False}
-# ── Delivery Options Endpoint ──────────────────────────────────────────────────
+
 
 @router.post("/delivery-options")
 async def get_delivery_options(
     payload: dict,
     db: Session = Depends(get_db),
 ):
-    """
-    Core routing logic — called from checkout when customer enters address.
-    - Restaurants: Uber ONLY, no distance cap, no fallback
-    - Other stores: Uber + USPS, customer chooses
-    """
     store_id         = payload.get("store_id")
     customer_lat     = float(payload.get("customer_lat") or 0) or None
     customer_lng     = float(payload.get("customer_lng") or 0) or None
@@ -437,32 +398,27 @@ async def get_delivery_options(
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
 
-    # ── Calculate distance ─────────────────────────────────────────────────────
     if store.latitude and store.longitude and customer_lat and customer_lng:
         distance_miles = haversine_miles(store.latitude, store.longitude, float(customer_lat), float(customer_lng))
     else:
-        distance_miles = 4.2  # sandbox fallback always
+        distance_miles = 4.2
 
     is_restaurant = store.vendor_type == "restaurant"
 
-    # ── Get real Uber quote ────────────────────────────────────────────────────
-   print("[Debug] dist=" + str(distance_miles) + " lat=" + str(customer_lat) + " lng=" + str(customer_lng))
-   quote    = await get_live_uber_quote(store, customer_lat, customer_lng, customer_address, distance_miles or 4.2)
-   print("[Debug] quote=" + str(quote))
-   uber_fee = quote["customer_charge"]
-   z_label  = zone_label(distance_miles or 4.2)
+    quote    = await get_live_uber_quote(store, customer_lat or 0, customer_lng or 0, customer_address, distance_miles)
+    uber_fee = quote["customer_charge"]
+    z_label  = zone_label(distance_miles)
 
     options = []
 
     if is_restaurant:
-        # Restaurants: Uber ONLY — no distance cap, no USPS fallback
         options.append({
             "id":            "uber_express",
             "label":         "Uber Express Delivery",
             "icon":          "🛵",
             "price":         uber_fee,
             "shipping_cost": uber_fee,
-            "eta":           f"~{quote['eta_minutes']} minutes",
+            "eta":           "~" + str(quote["eta_minutes"]) + " minutes",
             "description":   "Hot food delivered fresh to your door.",
             "provider":      "uber_direct",
             "available":     True,
@@ -470,15 +426,14 @@ async def get_delivery_options(
             "sandbox":       UBER_SANDBOX,
         })
     else:
-        # Other stores: Uber + USPS — customer chooses
         options.append({
             "id":            "uber_express",
             "label":         "Uber Express Delivery",
             "icon":          "🛵",
             "price":         uber_fee,
             "shipping_cost": uber_fee,
-            "eta":           f"~{quote['eta_minutes']} minutes",
-            "description":   f"Fast same-day delivery to your door.",
+            "eta":           "~" + str(quote["eta_minutes"]) + " minutes",
+            "description":   "Fast same-day delivery to your door.",
             "provider":      "uber_direct",
             "available":     True,
             "uber_quote_id": quote["uber_quote_id"],
@@ -490,7 +445,7 @@ async def get_delivery_options(
             "icon":          "📦",
             "price":         4.99,
             "shipping_cost": 4.99,
-            "eta":           "2–3 business days",
+            "eta":           "2-3 business days",
             "description":   "Reliable tracked shipping nationwide.",
             "provider":      "usps",
             "available":     True,
@@ -501,14 +456,14 @@ async def get_delivery_options(
             "icon":          "📬",
             "price":         6.99,
             "shipping_cost": 6.99,
-            "eta":           "1–2 business days",
+            "eta":           "1-2 business days",
             "description":   "Faster tracked shipping with Shippo label.",
             "provider":      "usps",
             "available":     True,
         })
 
     return {
-        "distance_miles":    round(distance_miles, 1) if distance_miles else None,
+        "distance_miles":    round(distance_miles, 1),
         "distance_zone":     z_label,
         "store_vendor_type": store.vendor_type,
         "options":           options,
