@@ -98,18 +98,17 @@ export default function CartPage() {
       // Geocode customer address
       let customerLat = null, customerLng = null;
       try {
-        const censusUrl = `https://geocoding.geo.census.gov/geocoder/locations/address?` +
-          `street=${encodeURIComponent(shipping.address)}` +
-          `&city=${encodeURIComponent(shipping.city)}` +
-          `&state=${encodeURIComponent(shipping.state)}` +
-          `&zip=${encodeURIComponent(shipping.zip)}` +
-          `&benchmark=Public_AR_Current&format=json`;
-        const geo = await fetch(censusUrl);
-        const geoData = await geo.json();
-        const match = geoData?.result?.addressMatches?.[0];
-        if (match) {
-          customerLat = match.coordinates.y;
-          customerLng = match.coordinates.x;
+        const geo = await api.get("/uber-direct/geocode", {
+          params: {
+            address: shipping.address,
+            city: shipping.city,
+            state: shipping.state,
+            zip: shipping.zip,
+          }
+        });
+        if (geo.data?.found) {
+          customerLat = geo.data.lat;
+          customerLng = geo.data.lng;
         }
       } catch (geoErr) {
         console.error("[Geo] Failed:", geoErr);
