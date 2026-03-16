@@ -151,18 +151,29 @@ export default function CartPage() {
       }
     ];
       } else {
-        // Non-restaurant African store — Chippo USPS + Uber only
+        // Non-restaurant store — USPS + Uber, both dynamic
+        const uberOpt = uberData.options?.find(o => o.id === "uber_express");
+        const uspsStandard = uberData.options?.find(o => o.id === "usps_standard");
+        const uspsPriority = uberData.options?.find(o => o.id === "usps_priority");
         options = [
-          { id: "usps_priority", label: "Chippo USPS Shipping", icon: "📬", price: 6.99, eta: "1–2 business days", description: "Fast    tracked shipping.", provider: "usps" },
+          {
+            id: "usps_priority",
+            label: "Chippo USPS Shipping",
+            icon: "📬",
+            price: uspsPriority?.price ?? 6.99,
+            eta: uspsPriority?.eta || "1–2 business days",
+            description: "Fast tracked shipping.",
+            provider: "usps",
+          },
           {
             id: "uber_express",
             label: "Uber Express Delivery",
             icon: "🛵",
-            price: uberData.options?.find(o => o.id === "uber_express")?.price ?? 8.99,
-            eta: uberData.options?.find(o => o.id === "uber_express")?.eta || "2–4 hours",
+            price: uberOpt?.price ?? 8.99,
+            eta: uberOpt?.eta || "~45 minutes",
             description: "Same-day local delivery.",
             provider: "uber_direct",
-            uber_quote_id: uberData.options?.find(o => o.id === "uber_express")?.uber_quote_id || null,
+            uber_quote_id: uberOpt?.uber_quote_id || null,
             latitude: customerLat,
             longitude: customerLng,
           },
