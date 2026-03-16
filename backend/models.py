@@ -244,6 +244,8 @@ class Order(Base):
     shipping_state = Column(String, nullable=True)
     shipping_country = Column(String, nullable=True)
     shipping_zip = Column(String, nullable=True)
+    latitude  = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
     
 
     # Stripe
