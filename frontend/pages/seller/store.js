@@ -322,7 +322,7 @@ export default function StoreSettings() {
 
           {/* Local delivery extra fields */}
           {isLocalDelivery && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3 mt-4">
               <p className="text-sm font-bold text-blue-800 flex items-center gap-2">
                 <FiMapPin size={14} /> Local Delivery Details
               </p>
@@ -341,7 +341,7 @@ export default function StoreSettings() {
                 <input
                   value={form.delivery_note}
                   onChange={(e) => setForm({ ...form, delivery_note: e.target.value })}
-                  placeholder="e.g. Min order $20 · Free delivery within 5 miles · 45–60 min"
+                  placeholder="e.g. Min order $20 · Free delivery within 5 miles · 45-60 min"
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
                 />
               </div>
@@ -350,7 +350,15 @@ export default function StoreSettings() {
               </p>
             </div>
           )}
-          <Footer />
+        </div>
+
+        <button onClick={handleSave} disabled={saving}
+          className="w-full btn-primary py-3 flex items-center justify-center gap-2 text-base disabled:opacity-60">
+          <FiSave size={18} />
+          {saving ? "Saving..." : "Save Store Settings"}
+        </button>
+      </div>
+      <Footer />
     </>
   );
 }
