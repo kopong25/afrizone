@@ -303,31 +303,38 @@ export default function StoreSettings() {
           </div>
 
           {/* Local delivery extra fields */}
+          {/* Store address — always visible, used for delivery distance calculation */}
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+            <p className="text-sm font-bold text-gray-700 flex items-center gap-2">
+              <FiMapPin size={14} /> Store Location
+            </p>
+            <p className="text-xs text-gray-500">Your address is used to calculate delivery distance and pricing for customers. It is never shown publicly.</p>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 block mb-1">Store Address *</label>
+              <input
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                placeholder="123 Main St"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+              />
+            </div>
+          </div>
+
+          {/* Local delivery extra fields */}
           {isLocalDelivery && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
               <p className="text-sm font-bold text-blue-800 flex items-center gap-2">
                 <FiMapPin size={14} /> Local Delivery Details
               </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">Delivery Radius (miles)</label>
-                  <input
-                    type="number" min="1" max="50"
-                    value={form.delivery_radius_miles}
-                    onChange={(e) => setForm({ ...form, delivery_radius_miles: e.target.value })}
-                    placeholder="e.g. 10"
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">Store Address</label>
-                  <input
-                    value={form.address}
-                    onChange={(e) => setForm({ ...form, address: e.target.value })}
-                    placeholder="123 Main St, Houston TX"
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
-                  />
-                </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">Delivery Radius (miles)</label>
+                <input
+                  type="number" min="1" max="50"
+                  value={form.delivery_radius_miles}
+                  onChange={(e) => setForm({ ...form, delivery_radius_miles: e.target.value })}
+                  placeholder="e.g. 10"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                />
               </div>
               <div>
                 <label className="text-xs font-semibold text-gray-600 block mb-1">Delivery Note for Customers</label>
@@ -339,19 +346,7 @@ export default function StoreSettings() {
                 />
               </div>
               <p className="text-xs text-blue-600">
-                🚀 Uber Direct automated driver dispatch is coming soon. For now, arrange your own delivery driver and update the order to <strong>Shipped</strong> when they pick up.
+                🚀 Uber Direct automated driver dispatch is coming soon.
               </p>
             </div>
           )}
-        </div>
-
-        <button onClick={handleSave} disabled={saving}
-          className="w-full btn-primary py-3 flex items-center justify-center gap-2 text-base disabled:opacity-60">
-          <FiSave size={18} />
-          {saving ? "Saving..." : "Save Store Settings"}
-        </button>
-      </div>
-      <Footer />
-    </>
-  );
-}
