@@ -125,11 +125,12 @@ async def get_live_uber_quote(
                     fee_cents = data.get("fee", 0)
                     if fee_cents:
                         uber_cost = round(fee_cents / 100, 2)
+                        eta_raw = data.get("duration", 2700) // 60
                         return {
                             "uber_cost":       uber_cost,
                             "customer_charge": customer_price(uber_cost),
                             "uber_quote_id":   data.get("quote_id"),
-                            "eta_minutes":     data.get("duration", 2700) // 60,
+                            "eta_minutes":     max(eta_raw, 20),
                             "source":          "live",
                         }
         except Exception as e:
