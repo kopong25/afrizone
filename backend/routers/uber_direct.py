@@ -446,7 +446,7 @@ async def get_delivery_options(
     is_restaurant = store.vendor_type == "restaurant"
 
     # ── Get real Uber quote ────────────────────────────────────────────────────
-    print(f"[Debug] distance_miles={distance_miles}, customer_lat={customer_lat}, customer_lng={customer_lng}, 
+    print(f"[Debug] dist={distance_miles} lat={customer_lat} lng={customer_lng} store_lat={store.latitude} store_lng={store.longitude}"), 
     store_lat={store.latitude},store_lng={store.longitude}")
     quote    = await get_live_uber_quote(store, customer_lat, customer_lng, customer_address, distance_miles or 4.2)
     print(f"[Debug] quote={quote}")
