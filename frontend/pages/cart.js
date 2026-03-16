@@ -98,15 +98,18 @@ export default function CartPage() {
       // Geocode customer address
       let customerLat = null, customerLng = null;
       try {
-        const geo = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            `${shipping.address}, ${shipping.city}, ${shipping.state} ${shipping.zip}`
-          )}`
-        );
+        const censusUrl = `https://geocoding.geo.census.gov/geocoder/locations/address?` +
+          `street=${encodeURIComponent(shipping.address)}` +
+          `&city=${encodeURIComponent(shipping.city)}` +
+          `&state=${encodeURIComponent(shipping.state)}` +
+          `&zip=${encodeURIComponent(shipping.zip)}` +
+          `&benchmark=Public_AR_Current&format=json`;
+        const geo = await fetch(censusUrl);
         const geoData = await geo.json();
-        if (geoData?.[0]) {
-          customerLat = parseFloat(geoData[0].lat);
-          customerLng = parseFloat(geoData[0].lon);
+        const match = geoData?.result?.addressMatches?.[0];
+        if (match) {
+          customerLat = match.coordinates.y;
+          customerLng = match.coordinates.x;
         }
       } catch (geoErr) {
         console.error("[Geo] Failed:", geoErr);
