@@ -141,7 +141,7 @@ export default function CartPage() {
         id: "uber_express",
         label: "Uber Express Delivery",
         icon: "🛵",
-        price: uberOpt?.price ?? 9.99,
+        price: uberOpt?.price ?? 9.28,
         eta: uberOpt?.eta || "~45 minutes",
         description: uberOpt?.description || "Hot food delivered fresh to your door.",
         provider: "uber_direct",
