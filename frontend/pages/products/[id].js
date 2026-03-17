@@ -55,6 +55,24 @@ export default function ProductDetail() {
     if (!user) { router.push("/login"); return; }
     setAddingToCart(true);
     try {
+      // Check if cart has items from a different store
+      const cartRes = await ordersAPI.cart();
+      const cartItems = cartRes.data?.items || cartRes.data || [];
+      if (cartItems.length > 0) {
+        const cartStoreId = cartItems[0]?.product?.store_id || cartItems[0]?.product?.store?.id;
+        const thisStoreId = product.store_id || product.store?.id;
+        if (cartStoreId && thisStoreId && String(cartStoreId) !== String(thisStoreId)) {
+          const cartStoreName = cartItems[0]?.product?.store?.name || "another store";
+          const confirmed = window.confirm(
+            `Your cart has items from "${cartStoreName}".\n\nAfrzone only supports one store per checkout.\n\nClear cart and add this item instead?`
+          );
+          if (!confirmed) {
+            setAddingToCart(false);
+            return;
+          }
+          await ordersAPI.clearCart();
+        }
+      }
       await ordersAPI.addToCart({ product_id: product.id, quantity });
       setAddedToCart(true);
       toast.success("Added to cart!");
