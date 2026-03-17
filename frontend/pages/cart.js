@@ -587,10 +587,25 @@ export default function CartPage() {
 
                 {/* Navigation buttons */}
                 {step === "cart" && (
-                  <button onClick={() => setStep("shipping")}
-                    className="w-full btn-primary py-3 mt-5 flex items-center justify-center gap-2">
-                    Continue to Address <FiArrowRight />
-                  </button>
+                  <>
+                    {Object.keys(byStore).length > 1 && (
+                      <div className="bg-red-50 border border-red-200 rounded-xl p-3 mt-4 text-sm text-red-700">
+                        <p className="font-bold mb-1">Multiple stores in cart</p>
+                        <p>Afrizone only supports one store per checkout. Please remove items from one store to continue.</p>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (Object.keys(byStore).length > 1) {
+                          toast.error("Please keep items from one store only to checkout.");
+                          return;
+                        }
+                        setStep("shipping");
+                      }}
+                      className="w-full btn-primary py-3 mt-5 flex items-center justify-center gap-2">
+                      Continue to Address <FiArrowRight />
+                    </button>
+                  </>
                 )}
                 {step === "shipping" && (
                   <div className="space-y-2 mt-5">
