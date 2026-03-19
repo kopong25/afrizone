@@ -9,10 +9,10 @@ import toast from "react-hot-toast";
 import { FiArrowLeft, FiNavigation, FiDollarSign, FiMapPin, FiClock, FiAlertCircle } from "react-icons/fi";
 
 const ZONES = [
-  { zone: 1, label: "Nearby",   miles: "0–3",  charge: "$5.99",  uber: "~$3.50", profit: "~$2.49", color: "green" },
-  { zone: 2, label: "Local",    miles: "3–7",  charge: "$8.99",  uber: "~$5.50", profit: "~$3.49", color: "blue" },
-  { zone: 3, label: "Extended", miles: "7–12", charge: "$12.99", uber: "~$8.50", profit: "~$4.49", color: "yellow" },
-  { zone: 4, label: "Far",      miles: "12–20",charge: "$16.99", uber: "~$12.00",profit: "~$4.99", color: "orange" },
+  { zone: 1, label: "Nearby",   miles: "0–3",  charge: "$5.99",  color: "green" },
+  { zone: 2, label: "Local",    miles: "3–7",  charge: "$8.99",  color: "blue" },
+  { zone: 3, label: "Extended", miles: "7–12", charge: "$12.99", color: "yellow" },
+  { zone: 4, label: "Far",      miles: "12–20",charge: "$16.99", color: "orange" },
 ];
 
 const colorMap = {
@@ -114,7 +114,7 @@ export default function UberDeliveryPage() {
             <FiDollarSign size={18} className="text-green-700" /> Zone Pricing Model
           </h2>
           <p className="text-sm text-gray-500 mb-5">
-            Customers pay a flat delivery fee based on distance. Afrizone collects the fee, pays Uber, and keeps the margin.
+            Customers pay a delivery fee based on distance. Afrizone handles all Uber payments automatically.
             No surprises for customers — they see the price before ordering.
           </p>
 
@@ -139,8 +139,8 @@ export default function UberDeliveryPage() {
                     </td>
                     <td className="py-3 px-3 text-gray-600">{z.miles} miles</td>
                     <td className="py-3 px-3 font-black text-gray-900">{z.charge}</td>
-                    <td className="py-3 px-3 text-red-600">{z.uber}</td>
-                    <td className="py-3 px-3 font-bold text-blue-700">{z.profit}</td>
+                    
+                    
                   </tr>
                 ))}
               </tbody>
@@ -148,7 +148,7 @@ export default function UberDeliveryPage() {
           </div>
           <p className="text-xs text-gray-400 mt-3">
             * Uber costs are estimates. Actual costs vary by city, time of day, and demand. 
-            Afrizone margin is guaranteed since you charge a fixed zone fee regardless of actual Uber cost.
+            Delivery fees are handled automatically — no action needed from you.
           </p>
         </div>
 
@@ -210,7 +210,7 @@ export default function UberDeliveryPage() {
                   <p className="mt-2 font-bold text-gray-700">Breakdown:</p>
                   <p><span className="text-gray-500">Customer pays:</span> ${testResult.quote.breakdown?.customer_pays}</p>
                   <p><span className="text-gray-500">Uber cost (est):</span> ${testResult.quote.breakdown?.uber_cost_estimate}</p>
-                  <p><span className="text-gray-500">Afrizone margin:</span> ${testResult.quote.breakdown?.afrizone_margin}</p>
+
                 </div>
               )}
             </div>
