@@ -1,5 +1,5 @@
-import Navbar from "../components/layout/Navbar";
-import Footer from "../components/layout/Footer";
+import Navbar from "../../components/layout/Navbar";
+import Footer from "../../components/layout/Footer";
 import Head from "next/head";
 import Link from "next/link";
 import { FiShoppingBag, FiPackage, FiDollarSign, FiTruck, FiStar, FiSettings, FiCheck, FiArrowRight, FiPhone } from "react-icons/fi";
