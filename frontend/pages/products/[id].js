@@ -14,7 +14,7 @@ import { FiShoppingCart, FiMapPin, FiPackage, FiShare2, FiHeart, FiCheck } from 
 
 export default function ProductDetail() {
   const router = useRouter();
-  const { id: slug } = router.query;
+  const { slug } = router.query;
   const { user } = useAuth();
   const [product, setProduct] = useState(null);
   const [reviews, setReviews] = useState([]);
@@ -53,29 +53,30 @@ export default function ProductDetail() {
 
   const addToCart = async () => {
     if (!user) { router.push("/login"); return; }
+    // Require variant selection if variants exist
+    const requiredGroups = Object.keys(variantGroups);
+    if (requiredGroups.length > 0) {
+      const missing = requiredGroups.filter(g => !selectedVariants[g]);
+      if (missing.length > 0) {
+        toast.error(`Please select: ${missing.join(", ")}`);
+        return;
+      }
+    }
     setAddingToCart(true);
     try {
-      // Check if cart has items from a different store
-      const cartRes = await ordersAPI.cart();
-      const cartItems = cartRes.data?.items || cartRes.data || [];
-      if (cartItems.length > 0) {
-        const cartStoreId = cartItems[0]?.product?.store_id || cartItems[0]?.product?.store?.id;
-        const thisStoreId = product.store_id || product.store?.id;
-        if (cartStoreId && thisStoreId && String(cartStoreId) !== String(thisStoreId)) {
-          const cartStoreName = cartItems[0]?.product?.store?.name || "another store";
-          const confirmed = window.confirm(
-            `Your cart has items from "${cartStoreName}".\n\nAfrzone only supports one store per checkout.\n\nClear cart and add this item instead?`
-          );
-          if (!confirmed) {
-            setAddingToCart(false);
-            return;
-          }
-          await ordersAPI.clearCart();
-        }
-      }
-      await ordersAPI.addToCart({ product_id: product.id, quantity });
+      // Get the first selected variant id (if any) for cart storage
+      const firstVariant = Object.values(selectedVariants)[0];
+      const variantLabel = Object.entries(selectedVariants)
+        .map(([name, v]) => `${name}: ${v.value}`)
+        .join(", ");
+      await ordersAPI.addToCart({
+        product_id: product.id,
+        quantity,
+        variant_id: firstVariant?.id || null,
+        variant_label: variantLabel || null,
+      });
       setAddedToCart(true);
-      toast.success("Added to cart!");
+      toast.success(`Added to cart!${variantLabel ? ` (${variantLabel})` : ""}`);
       setTimeout(() => setAddedToCart(false), 3000);
     } catch (err) {
       toast.error(err.response?.data?.detail || "Failed to add to cart");

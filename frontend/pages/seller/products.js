@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
+import Link from "next/link";
 import Navbar from "../../components/layout/Navbar";
-import api, { productsAPI } from "../../lib/api";
+import Footer from "../../components/layout/Footer";
+import api, { productsAPI, variantsAPI } from "../../lib/api";
 import { useAuth } from "../_app";
 import toast from "react-hot-toast";
-import { FiPlus, FiEdit2, FiTrash2, FiUpload, FiX, FiPackage } from "react-icons/fi";
+import { FiPlus, FiEdit2, FiTrash2, FiUpload, FiX, FiPackage, FiArrowLeft, FiTag } from "react-icons/fi";
 
 const INITIAL_FORM = {
   name: "", description: "", price: "", compare_price: "",
@@ -12,8 +14,266 @@ const INITIAL_FORM = {
   currency: "USD", ships_from: "",
 };
 
-const COUNTRIES = ["Nigeria", "Ghana", "Ethiopia", "Kenya", "Senegal", "Cameroon", "South Africa", "Congo", "Ivory Coast", "Tanzania"];
+// Industry-standard size presets
+const SIZE_PRESETS = {
+  "Clothing": ["XS", "S", "M", "L", "XL", "2XL", "3XL"],
+  "Shoes": ["5", "6", "7", "8", "9", "10", "11", "12", "13"],
+  "Kids": ["0-3M", "3-6M", "6-12M", "1Y", "2Y", "3Y", "4Y", "5Y", "6Y"],
+  "One Size": ["One Size"],
+};
 
+const COLOR_PRESETS = [
+  "Black", "White", "Red", "Blue", "Green", "Yellow", "Orange", "Purple",
+  "Pink", "Brown", "Gray", "Navy", "Beige", "Gold", "Silver",
+  "Kente Gold", "Ankara Blue", "Earth Brown", "Safari Green",
+];
+
+const COUNTRIES = ["Nigeria", "Ghana", "Ethiopia", "Kenya", "Senegal", "Cameroon",
+  "South Africa", "Congo", "Ivory Coast", "Tanzania", "Uganda", "Rwanda",
+  "Mali", "Burkina Faso", "Togo", "Benin", "Gambia", "Sierra Leone", "Guinea"];
+
+// ── Variant Manager Component ─────────────────────────────────────────────────
+function VariantManager({ productId, productName }) {
+  const [variants, setVariants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [newVariant, setNewVariant] = useState({ name: "Size", value: "", price_modifier: 0, stock: 0, sku: "" });
+  const [variantType, setVariantType] = useState("Size"); // Size | Color | Custom
+  const [sizeCategory, setSizeCategory] = useState("Clothing");
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState([]);
+
+  useEffect(() => {
+    loadVariants();
+  }, [productId]);
+
+  const loadVariants = async () => {
+    try {
+      const r = await variantsAPI.getForProduct(productId);
+      setVariants(Array.isArray(r.data) ? r.data : []);
+    } catch { toast.error("Failed to load variants"); }
+    finally { setLoading(false); }
+  };
+
+  // Group variants by name for display
+  const grouped = variants.reduce((acc, v) => {
+    if (!acc[v.name]) acc[v.name] = [];
+    acc[v.name].push(v);
+    return acc;
+  }, {});
+
+  const addSingle = async () => {
+    if (!newVariant.value.trim()) { toast.error("Please enter a value"); return; }
+    setAdding(true);
+    try {
+      await variantsAPI.create(productId, {
+        name: variantType === "Custom" ? newVariant.name : variantType,
+        value: newVariant.value.trim(),
+        price_modifier: parseFloat(newVariant.price_modifier) || 0,
+        stock: parseInt(newVariant.stock) || 0,
+        sku: newVariant.sku || "",
+      });
+      toast.success("Variant added!");
+      setNewVariant({ name: variantType, value: "", price_modifier: 0, stock: 0, sku: "" });
+      loadVariants();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Failed to add variant");
+    } finally { setAdding(false); }
+  };
+
+  const addBulk = async () => {
+    if (bulkSelected.length === 0) { toast.error("Select at least one option"); return; }
+    setAdding(true);
+    try {
+      for (const value of bulkSelected) {
+        await variantsAPI.create(productId, {
+          name: variantType,
+          value,
+          price_modifier: 0,
+          stock: parseInt(newVariant.stock) || 0,
+          sku: "",
+        });
+      }
+      toast.success(`Added ${bulkSelected.length} variants!`);
+      setBulkSelected([]);
+      loadVariants();
+    } catch (e) {
+      toast.error("Failed to add some variants");
+    } finally { setAdding(false); }
+  };
+
+  const deleteVariant = async (id) => {
+    if (!confirm("Remove this variant?")) return;
+    try {
+      await variantsAPI.delete(id);
+      setVariants(v => v.filter(x => x.id !== id));
+      toast.success("Variant removed");
+    } catch { toast.error("Failed to remove"); }
+  };
+
+  const presets = variantType === "Size" ? SIZE_PRESETS[sizeCategory] : COLOR_PRESETS;
+
+  return (
+    <div className="mt-6 border-t pt-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-bold text-gray-900 flex items-center gap-2">
+          <FiTag size={16} /> Variants
+          <span className="text-xs font-normal text-gray-400 ml-1">(sizes, colors, etc.)</span>
+        </h3>
+        {variants.length > 0 && (
+          <span className="text-xs text-gray-400">{variants.length} variant{variants.length !== 1 ? "s" : ""}</span>
+        )}
+      </div>
+
+      {/* Existing variants grouped */}
+      {Object.entries(grouped).length > 0 && (
+        <div className="space-y-4 mb-6">
+          {Object.entries(grouped).map(([groupName, groupVariants]) => (
+            <div key={groupName} className="bg-gray-50 rounded-xl p-4">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">{groupName}</p>
+              <div className="flex flex-wrap gap-2">
+                {groupVariants.map(v => (
+                  <div key={v.id} className="flex items-center gap-2 bg-white border rounded-lg px-3 py-1.5 text-sm group">
+                    {groupName === "Color" && (
+                      <span className="w-3 h-3 rounded-full border border-gray-200 flex-shrink-0"
+                        style={{ backgroundColor: v.value.toLowerCase().replace(/\s/g, "") }} />
+                    )}
+                    <span className="font-medium text-gray-800">{v.value}</span>
+                    {v.price_modifier !== 0 && (
+                      <span className={`text-xs ${v.price_modifier > 0 ? "text-green-600" : "text-red-500"}`}>
+                        {v.price_modifier > 0 ? "+" : ""}${v.price_modifier.toFixed(2)}
+                      </span>
+                    )}
+                    <span className="text-xs text-gray-400">Stock: {v.stock}</span>
+                    <button onClick={() => deleteVariant(v.id)}
+                      className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                      <FiX size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add variant UI */}
+      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+        <p className="text-sm font-bold text-blue-900 mb-3">Add Variants</p>
+
+        {/* Variant type selector */}
+        <div className="flex gap-2 mb-3 flex-wrap">
+          {["Size", "Color", "Custom"].map(t => (
+            <button key={t} type="button"
+              onClick={() => { setVariantType(t); setBulkMode(t !== "Custom"); setBulkSelected([]); }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                variantType === t ? "bg-blue-700 text-white" : "bg-white text-gray-600 hover:bg-gray-100 border"
+              }`}>
+              {t === "Size" ? "📐 Size" : t === "Color" ? "🎨 Color" : "✏️ Custom"}
+            </button>
+          ))}
+        </div>
+
+        {/* Size category for size variants */}
+        {variantType === "Size" && (
+          <div className="mb-3">
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Size Category</label>
+            <select value={sizeCategory} onChange={e => { setSizeCategory(e.target.value); setBulkSelected([]); }}
+              className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {Object.keys(SIZE_PRESETS).map(k => <option key={k}>{k}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* Bulk preset picker for Size/Color */}
+        {variantType !== "Custom" && (
+          <div className="mb-3">
+            <label className="text-xs font-semibold text-gray-600 block mb-2">
+              Select {variantType}s <span className="font-normal text-gray-400">(click to toggle)</span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {presets.map(p => (
+                <button key={p} type="button"
+                  onClick={() => setBulkSelected(prev =>
+                    prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]
+                  )}
+                  className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                    bulkSelected.includes(p)
+                      ? "bg-blue-700 text-white border-blue-700"
+                      : variants.find(v => v.name === variantType && v.value === p)
+                        ? "bg-gray-100 text-gray-400 border-gray-200 line-through cursor-not-allowed"
+                        : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
+                  }`}
+                  disabled={!!variants.find(v => v.name === variantType && v.value === p)}>
+                  {variantType === "Color" && (
+                    <span className="inline-block w-3 h-3 rounded-full border border-gray-300 mr-1 align-middle"
+                      style={{ backgroundColor: p.toLowerCase().replace(/\s/g, "") }} />
+                  )}
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Stock per variant */}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">
+              Stock per variant
+            </label>
+            <input type="number" min="0" value={newVariant.stock}
+              onChange={e => setNewVariant(v => ({ ...v, stock: e.target.value }))}
+              className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="0" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">
+              Price modifier (optional)
+            </label>
+            <input type="number" step="0.01" value={newVariant.price_modifier}
+              onChange={e => setNewVariant(v => ({ ...v, price_modifier: e.target.value }))}
+              className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="+2.00 or -1.50" />
+          </div>
+        </div>
+
+        {/* Custom variant name+value */}
+        {variantType === "Custom" && (
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-600 block mb-1">Variant Name</label>
+              <input value={newVariant.name} onChange={e => setNewVariant(v => ({ ...v, name: e.target.value }))}
+                placeholder="e.g. Material, Weight"
+                className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 block mb-1">Value</label>
+              <input value={newVariant.value} onChange={e => setNewVariant(v => ({ ...v, value: e.target.value }))}
+                placeholder="e.g. Cotton, 500g"
+                className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+        )}
+
+        {/* Add button */}
+        {variantType === "Custom" ? (
+          <button type="button" onClick={addSingle} disabled={adding}
+            className="bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-bold transition-colors">
+            {adding ? "Adding..." : "+ Add Variant"}
+          </button>
+        ) : (
+          <button type="button" onClick={addBulk} disabled={adding || bulkSelected.length === 0}
+            className="bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-bold transition-colors">
+            {adding ? "Adding..." : `+ Add ${bulkSelected.length > 0 ? bulkSelected.length : ""} Selected`}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function SellerProducts() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -26,6 +286,7 @@ export default function SellerProducts() {
   const [uploadingImg, setUploadingImg] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [savedProductId, setSavedProductId] = useState(null); // for showing variant manager
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/login");
@@ -40,9 +301,7 @@ export default function SellerProducts() {
     try {
       const res = await productsAPI.myProducts();
       setProducts(res.data);
-    } catch (err) {
-      toast.error("Failed to load products");
-    }
+    } catch { toast.error("Failed to load products"); }
   };
 
   const handleSubmit = async (e) => {
@@ -54,7 +313,7 @@ export default function SellerProducts() {
         price: parseFloat(form.price),
         compare_price: form.compare_price ? parseFloat(form.compare_price) : null,
         stock: parseInt(form.stock),
-        tags: form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
+        tags: form.tags ? form.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
       };
 
       let product;
@@ -65,38 +324,25 @@ export default function SellerProducts() {
       } else {
         const res = await productsAPI.create(data);
         product = res.data;
-        toast.success("Product created!");
+        toast.success("Product created! Now add variants below.");
       }
 
-      // Upload images separately so product save always succeeds
       if (images.length > 0) {
         try {
-          // Check if images are already URLs (from direct Cloudinary upload)
           const fileImages = images.filter(i => i instanceof File);
           const urlImages = images.filter(i => typeof i === "string");
-
-          // Save any direct URL images to backend
-          if (urlImages.length > 0) {
-            await api.post(`/products/seller/${product.id}/image-urls`, { urls: urlImages });
-          }
-
-          // Upload any File objects via backend
+          if (urlImages.length > 0) await api.post(`/products/seller/${product.id}/image-urls`, { urls: urlImages });
           if (fileImages.length > 0) {
             const formData = new FormData();
-            fileImages.forEach((f) => formData.append("files", f));
+            fileImages.forEach(f => formData.append("files", f));
             await productsAPI.uploadImages(product.id, formData);
           }
-        } catch (imgErr) {
-          console.error("Image upload failed:", imgErr);
-          toast.error("Product saved but image upload failed — try uploading images again from Edit");
-        }
+        } catch { toast.error("Product saved but image upload failed"); }
       }
 
-      setShowForm(false);
-      setForm(INITIAL_FORM);
+      setSavedProductId(product.id);
       setImages([]);
       setImagePreviews([]);
-      setEditingId(null);
       fetchProducts();
     } catch (err) {
       toast.error(err.response?.data?.detail || "Failed to save product");
@@ -113,8 +359,10 @@ export default function SellerProducts() {
       country_of_origin: product.country_of_origin || "",
       tags: (product.tags || []).join(", "),
       currency: product.currency, ships_from: product.ships_from || "",
+      existing_images: product.images || [],
     });
     setEditingId(product.id);
+    setSavedProductId(product.id);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -124,10 +372,9 @@ export default function SellerProducts() {
     try {
       await productsAPI.delete(id);
       toast.success("Product archived");
-      setProducts(products.filter((p) => p.id !== id));
-    } catch {
-      toast.error("Failed to archive product");
-    }
+      setProducts(products.filter(p => p.id !== id));
+      if (savedProductId === id) setSavedProductId(null);
+    } catch { toast.error("Failed to archive product"); }
   };
 
   return (
@@ -135,14 +382,24 @@ export default function SellerProducts() {
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-black text-gray-900">My Products</h1>
-            <p className="text-gray-500 text-sm">{products.length} products listed</p>
+          <div className="flex items-center gap-3">
+            <Link href="/seller/dashboard" className="text-gray-400 hover:text-gray-600">
+              <FiArrowLeft size={20} />
+            </Link>
+            <div>
+              <h1 className="text-2xl font-black text-gray-900">My Products</h1>
+              <p className="text-gray-500 text-sm">{products.length} products listed</p>
+            </div>
           </div>
-          <button
-            onClick={() => { setShowForm(!showForm); setEditingId(null); setForm(INITIAL_FORM); }}
-            className="btn-primary flex items-center gap-2 py-2 px-4"
-          >
+          <button onClick={() => {
+            setShowForm(!showForm);
+            setEditingId(null);
+            setSavedProductId(null);
+            setForm(INITIAL_FORM);
+            setImages([]);
+            setImagePreviews([]);
+          }}
+            className="bg-green-900 hover:bg-green-800 text-white font-bold py-2 px-4 rounded-xl flex items-center gap-2 transition-colors">
             {showForm ? <FiX /> : <FiPlus />}
             {showForm ? "Cancel" : "Add Product"}
           </button>
@@ -158,62 +415,64 @@ export default function SellerProducts() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
-                  <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-900"
-                    placeholder="e.g. Ofada Rice (5kg)" />
+                    placeholder="e.g. Ankara Print Dress" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                  <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  <textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-900"
                     placeholder="Describe your product..." />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price (USD) *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Base Price (USD) *</label>
                   <input required type="number" step="0.01" min="0.01" value={form.price}
-                    onChange={(e) => setForm({ ...form, price: e.target.value })}
+                    onChange={e => setForm({ ...form, price: e.target.value })}
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-900" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Compare Price (original, optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Compare Price (crossed out)</label>
                   <input type="number" step="0.01" min="0" value={form.compare_price}
-                    onChange={(e) => setForm({ ...form, compare_price: e.target.value })}
+                    onChange={e => setForm({ ...form, compare_price: e.target.value })}
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-900"
-                    placeholder="Shows as crossed out" />
+                    placeholder="Original price (optional)" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock Quantity *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Total Stock *
+                    <span className="font-normal text-gray-400 ml-1">(across all variants)</span>
+                  </label>
                   <input required type="number" min="0" value={form.stock}
-                    onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                    onChange={e => setForm({ ...form, stock: e.target.value })}
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-900" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">SKU (optional)</label>
-                  <input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                  <input value={form.sku} onChange={e => setForm({ ...form, sku: e.target.value })}
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-900"
                     placeholder="Your product code" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Country of Origin</label>
-                  <select value={form.country_of_origin} onChange={(e) => setForm({ ...form, country_of_origin: e.target.value })}
+                  <select value={form.country_of_origin} onChange={e => setForm({ ...form, country_of_origin: e.target.value })}
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-900">
                     <option value="">Select country...</option>
-                    {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    {COUNTRIES.map(c => <option key={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tags (comma separated)</label>
-                  <input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })}
+                  <input value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })}
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-900"
-                    placeholder="jollof, rice, nigerian food" />
+                    placeholder="ankara, dress, african fashion" />
                 </div>
               </div>
 
               {/* Image upload */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Product Images (max 5)</label>
-                <div className="grid grid-cols-3 gap-3 mb-3">
-                  {/* Existing images */}
+                <div className="grid grid-cols-3 md:grid-cols-5 gap-3 mb-3">
                   {form.existing_images && form.existing_images.map((url, i) => (
                     <div key={i} className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden group">
                       <img src={url} className="w-full h-full object-cover" />
@@ -224,7 +483,6 @@ export default function SellerProducts() {
                       </button>
                     </div>
                   ))}
-                  {/* New image previews */}
                   {imagePreviews.map((src, i) => (
                     <div key={i} className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden group">
                       <img src={src} className="w-full h-full object-cover" />
@@ -235,7 +493,6 @@ export default function SellerProducts() {
                       </button>
                     </div>
                   ))}
-                  {/* Upload button */}
                   {(images.length + (form.existing_images?.length || 0)) < 5 && (
                     <label className="aspect-square border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-green-900 hover:bg-green-50 transition-colors">
                       {uploadingImg ? (
@@ -244,32 +501,23 @@ export default function SellerProducts() {
                           <p className="text-xs text-green-900">{uploadProgress}%</p>
                         </div>
                       ) : (
-                        <>
-                          <FiUpload size={20} className="text-gray-400 mb-1" />
-                          <p className="text-xs text-gray-400 text-center px-2">Add photo</p>
-                        </>
+                        <><FiUpload size={20} className="text-gray-400 mb-1" /><p className="text-xs text-gray-400">Add photo</p></>
                       )}
                       <input type="file" multiple accept="image/jpeg,image/png,image/webp" className="hidden"
                         onChange={async (e) => {
                           const files = Array.from(e.target.files).slice(0, 5 - (form.existing_images?.length || 0) - images.length);
                           const CLOUD = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
                           const PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-
                           for (const file of files) {
-                            // Show local preview immediately
                             const localUrl = await new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(file); });
                             setImagePreviews(p => [...p, localUrl]);
-
                             if (CLOUD && PRESET) {
-                              // Upload directly to Cloudinary
                               setUploadingImg(true);
                               try {
                                 const fd = new FormData();
-                                fd.append("file", file);
-                                fd.append("upload_preset", PRESET);
-                                fd.append("folder", "afrizone/products");
+                                fd.append("file", file); fd.append("upload_preset", PRESET); fd.append("folder", "afrizone/products");
                                 const xhr = new XMLHttpRequest();
-                                xhr.upload.onprogress = (ev) => { if (ev.lengthComputable) setUploadProgress(Math.round(ev.loaded/ev.total*100)); };
+                                xhr.upload.onprogress = ev => { if (ev.lengthComputable) setUploadProgress(Math.round(ev.loaded/ev.total*100)); };
                                 const url = await new Promise((resolve, reject) => {
                                   xhr.onload = () => xhr.status === 200 ? resolve(JSON.parse(xhr.responseText).secure_url) : reject();
                                   xhr.onerror = reject;
@@ -279,35 +527,35 @@ export default function SellerProducts() {
                                 setImages(imgs => [...imgs, url]);
                                 setImagePreviews(p => [...p.slice(0, -1), url]);
                                 toast.success("Image uploaded!");
-                              } catch {
-                                toast.error("Image upload failed — check Cloudinary settings");
-                                setImagePreviews(p => p.slice(0, -1));
-                              } finally {
-                                setUploadingImg(false);
-                                setUploadProgress(0);
-                              }
-                            } else {
-                              // Fallback: store File object for backend upload
-                              setImages(imgs => [...imgs, file]);
-                            }
+                              } catch { toast.error("Image upload failed"); setImagePreviews(p => p.slice(0, -1)); }
+                              finally { setUploadingImg(false); setUploadProgress(0); }
+                            } else { setImages(imgs => [...imgs, file]); }
                           }
                         }} />
                     </label>
                   )}
                 </div>
-                <p className="text-xs text-gray-400"><strong>PNG, JPG or WebP</strong> · Max 5MB · First image is the main photo · Min 800×800px recommended</p>
+                <p className="text-xs text-gray-400">PNG, JPG or WebP · First image is the main photo · Min 800×800px recommended</p>
               </div>
 
               <div className="flex gap-3">
-                <button type="submit" disabled={submitting} className="btn-primary py-2 px-8 disabled:opacity-50">
-                  {submitting ? "Saving..." : editingId ? "Update Product" : "Create Product"}
+                <button type="submit" disabled={submitting} className="bg-green-900 hover:bg-green-800 text-white font-bold py-2 px-8 rounded-xl disabled:opacity-50 transition-colors">
+                  {submitting ? "Saving..." : editingId ? "Update Product" : "Save & Add Variants"}
                 </button>
-                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }}
-                  className="btn-secondary py-2 px-6">
+                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setSavedProductId(null); }}
+                  className="border-2 border-green-900 text-green-900 font-bold py-2 px-6 rounded-xl hover:bg-green-50 transition-colors">
                   Cancel
                 </button>
               </div>
             </form>
+
+            {/* Variant manager — shown after product is saved */}
+            {savedProductId && (
+              <VariantManager
+                productId={savedProductId}
+                productName={form.name}
+              />
+            )}
           </div>
         )}
 
@@ -326,14 +574,14 @@ export default function SellerProducts() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Product</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Price</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Stock</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Variants</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Sales</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Remaining</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {products.map((p) => (
+                {products.map(p => (
                   <tr key={p.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -346,44 +594,26 @@ export default function SellerProducts() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-green-900">${p.price.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-green-900">${Number(p.price).toFixed(2)}</td>
                     <td className="px-4 py-3">
-                      <div>
-                        <span className={`text-sm font-bold ${p.stock === 0 ? "text-red-600" : p.stock <= 5 ? "text-yellow-600" : "text-gray-800"}`}>
-                          {p.stock}
-                        </span>
-                        {p.stock === 0 && <span className="ml-1 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">OUT</span>}
-                        {p.stock > 0 && p.stock <= 5 && <span className="ml-1 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-bold">LOW</span>}
-                      </div>
+                      <span className={`text-sm font-bold ${p.stock === 0 ? "text-red-600" : p.stock <= 5 ? "text-yellow-600" : "text-gray-800"}`}>
+                        {p.stock}
+                      </span>
+                      {p.stock === 0 && <span className="ml-1 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">OUT</span>}
+                      {p.stock > 0 && p.stock <= 5 && <span className="ml-1 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-bold">LOW</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`badge text-xs ${p.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                      <VariantCount productId={p.id} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${p.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                         {p.is_active ? "Active" : "Archived"}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{p.sale_count}</td>
                     <td className="px-4 py-3">
-                      {(() => {
-                        const total = (p.stock || 0) + (p.sale_count || 0);
-                        const pct = total > 0 ? Math.round((p.stock / total) * 100) : 0;
-                        const barColor = pct === 0 ? "bg-red-500" : pct <= 20 ? "bg-orange-400" : pct <= 50 ? "bg-yellow-400" : "bg-green-500";
-                        return (
-                          <div className="w-24">
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className={pct <= 20 ? "font-bold text-orange-600" : "text-gray-500"}>{pct}%</span>
-                              {pct <= 20 && pct > 0 && <span className="text-orange-500 font-bold">Restock!</span>}
-                              {pct === 0 && <span className="text-red-600 font-bold">Restock!</span>}
-                            </div>
-                            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div className={`h-full rounded-full transition-all ${barColor}`} style={{width: `${pct}%`}} />
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-4 py-3">
                       <div className="flex gap-2 justify-end">
-                        <button onClick={() => handleEdit(p)} className="p-1.5 text-gray-400 hover:text-green-900 hover:bg-green-50 rounded">
+                        <button onClick={() => handleEdit(p)} className="p-1.5 text-gray-400 hover:text-green-900 hover:bg-green-50 rounded" title="Edit & manage variants">
                           <FiEdit2 size={15} />
                         </button>
                         <button onClick={() => handleDelete(p.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
@@ -398,6 +628,20 @@ export default function SellerProducts() {
           )}
         </div>
       </div>
+      <Footer />
     </>
   );
+}
+
+// Small badge showing variant count per product row
+function VariantCount({ productId }) {
+  const [count, setCount] = useState(null);
+  useEffect(() => {
+    variantsAPI.getForProduct(productId)
+      .then(r => setCount(Array.isArray(r.data) ? r.data.length : 0))
+      .catch(() => setCount(0));
+  }, [productId]);
+  if (count === null) return <span className="text-gray-300 text-xs">—</span>;
+  if (count === 0) return <span className="text-gray-400 text-xs">None</span>;
+  return <span className="text-xs bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full">{count} variants</span>;
 }

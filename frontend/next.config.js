@@ -34,10 +34,12 @@ const withPWA = require("next-pwa")({
   ],
 });
 
-module.exports = withPWA({
+  module.exports = withPWA({
   reactStrictMode: true,
+  output: "export",
   images: {
     domains: ["res.cloudinary.com"],
+    unoptimized: true,
   },
   async headers() {
     return [
