@@ -9,7 +9,7 @@ const withPWA = require("next-pwa")({
       handler: "NetworkFirst",
       options: {
         cacheName: "api-cache",
-        expiration: { maxEntries: 50, maxAgeSeconds: 60 * 5 },
+        expiration: { maxEntries: 100, maxAgeSeconds: 60 * 2 },
         networkTimeoutSeconds: 10,
         fetchOptions: { credentials: "include" },
         matchOptions: { ignoreSearch: false },
@@ -59,4 +59,3 @@ module.exports = withPWA({
     ];
   },
 });
-
