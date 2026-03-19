@@ -6,14 +6,7 @@ const withPWA = require("next-pwa")({
   runtimeCaching: [
     {
       urlPattern: /^https:\/\/afrizone-loqr\.onrender\.com\/.*$/i,
-      handler: "NetworkFirst",
-      options: {
-        cacheName: "api-cache",
-        expiration: { maxEntries: 100, maxAgeSeconds: 60 * 2 },
-        networkTimeoutSeconds: 10,
-        fetchOptions: { credentials: "include" },
-        matchOptions: { ignoreSearch: false },
-      },
+      handler: "NetworkOnly",
     },
     {
       urlPattern: /^https:\/\/res\.cloudinary\.com\/.*$/i,
