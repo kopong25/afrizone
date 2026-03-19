@@ -206,7 +206,7 @@ export default function ProductDetail() {
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {groupVariants.map((v) => (
-                    <button key={v.id} onClick={() => setSelectedVariants((s) => ({ ...s, [groupName]: s[groupName]?.id === v.id ? null : v }))}
+                    <button key={v.id} onClick={() => setSelectedVariants((s) => ({ ...s, [groupName]: v }))}
                       disabled={v.stock === 0}
                       className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
                         selectedVariants[groupName]?.id === v.id
