@@ -29,17 +29,18 @@ export default function ProductDetail() {
 
   useEffect(() => {
     if (!slug) return;
+    // Timeout fallback in case SW hangs the request
+    const timeout = setTimeout(() => setLoading(false), 8000);
     productsAPI.get(slug).then((prodRes) => {
       const p = prodRes.data;
       setProduct(p);
       trackProductView(p);
-      // Load related data
       reviewsAPI.getForProduct(p.id).then((r) => setReviews(Array.isArray(r.data) ? r.data : [])).catch(() => {});
       variantsAPI.getForProduct(p.id).then((r) => setVariants(Array.isArray(r.data) ? r.data : [])).catch(() => {});
       if (user) {
         wishlistAPI.getIds().then((r) => setWishlisted((r.data || []).includes(p.id))).catch(() => {});
       }
-    }).catch(() => router.push("/")).finally(() => setLoading(false));
+    }).catch(() => {}).finally(() => { clearTimeout(timeout); setLoading(false); });
   }, [slug, user]);
 
   const toggleWishlist = async () => {
