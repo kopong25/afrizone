@@ -6,7 +6,7 @@ import Footer from "../../components/layout/Footer";
 import { useAuth } from "../_app";
 import api from "../../lib/api";
 import toast from "react-hot-toast";
-import { FiPackage, FiArrowLeft, FiTruck, FiCheck, FiClock, FiX, FiDownload } from "react-icons/fi";
+import { FiPackage, FiArrowLeft, FiTruck, FiCheck, FiClock, FiX, FiDownload, FiPrinter } from "react-icons/fi";
 
 // Safe error extractor — handles Pydantic arrays, strings, and undefined
 const apiErr = (e, fallback = "Something went wrong") => {
@@ -78,6 +78,83 @@ export default function SellerOrders() {
     } finally { setUpdating(null); }
   };
 
+  const printReceipt = (order) => {
+    const w = window.open("", "_blank", "width=800,height=600");
+    const items = (order.items || []).map(item => `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #eee">${item.product?.name || "Product"}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${item.quantity}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">$${Number(item.unit_price).toFixed(2)}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">$${Number(item.total_price).toFixed(2)}</td>
+      </tr>`).join("");
+    w.document.write(`<!DOCTYPE html><html><head><title>Order Receipt #${order.id}</title>
+      <style>
+        body{font-family:Arial,sans-serif;max-width:600px;margin:40px auto;padding:20px;color:#111}
+        .header{text-align:center;border-bottom:3px solid #1a5c38;padding-bottom:20px;margin-bottom:24px}
+        .logo{font-size:28px;font-weight:900;color:#1a5c38;letter-spacing:1px}
+        .tagline{color:#666;font-size:13px;margin-top:4px}
+        .order-meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;background:#f9fafb;padding:16px;border-radius:8px}
+        .meta-group label{font-size:11px;color:#666;text-transform:uppercase;font-weight:bold}
+        .meta-group p{margin:4px 0 0;font-size:14px;font-weight:600}
+        table{width:100%;border-collapse:collapse;margin-bottom:20px}
+        th{background:#1a5c38;color:white;padding:10px 8px;text-align:left;font-size:13px}
+        th:nth-child(2),th:nth-child(3),th:nth-child(4){text-align:center}
+        th:last-child{text-align:right}
+        .totals{text-align:right;border-top:2px solid #1a5c38;padding-top:16px}
+        .total-row{display:flex;justify-content:flex-end;gap:40px;margin:6px 0;font-size:14px}
+        .total-row.grand{font-weight:900;font-size:18px;color:#1a5c38;margin-top:10px;padding-top:10px;border-top:1px solid #eee}
+        .ship-to{margin-bottom:24px}
+        .ship-to h3{margin:0 0 8px;font-size:13px;color:#666;text-transform:uppercase}
+        .footer{text-align:center;margin-top:32px;padding-top:20px;border-top:1px solid #eee;color:#999;font-size:12px}
+        .delivery-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:bold;margin-top:4px;background:${order.delivery_method === "uber_express" ? "#000" : "#e8f5e9"};color:${order.delivery_method === "uber_express" ? "#fff" : "#1a5c38"}}
+        @media print{button{display:none}}
+      </style></head><body>
+      <div class="header">
+        <div class="logo">🌍 AFRIZONE</div>
+        <div class="tagline">Authentic African Products</div>
+      </div>
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:22px;font-weight:900">ORDER RECEIPT</div>
+        <div style="font-size:28px;font-weight:900;color:#1a5c38">#${order.id}</div>
+        <div class="delivery-badge">${order.delivery_method === "uber_express" ? "🛵 Uber Express Delivery" : "📦 Standard Shipping"}</div>
+      </div>
+      <div class="order-meta">
+        <div class="meta-group"><label>Order Date</label><p>${new Date(order.created_at).toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})}</p></div>
+        <div class="meta-group"><label>Status</label><p style="text-transform:capitalize">${order.status}</p></div>
+        <div class="meta-group"><label>Customer</label><p>${order.shipping_name || "—"}</p></div>
+        <div class="meta-group"><label>Items</label><p>${(order.items || []).length} item${(order.items||[]).length!==1?"s":""}</p></div>
+      </div>
+      ${order.shipping_address ? `
+      <div class="ship-to">
+        <h3>${order.delivery_method === "uber_express" ? "🛵 Deliver To" : "📦 Ship To"}</h3>
+        <p style="margin:0;font-size:14px"><strong>${order.shipping_name}</strong></p>
+        <p style="margin:4px 0;font-size:14px">${order.shipping_address}</p>
+        <p style="margin:4px 0;font-size:14px">${order.shipping_city}, ${order.shipping_state} ${order.shipping_zip || ""}</p>
+      </div>` : ""}
+      <table>
+        <thead><tr>
+          <th>Product</th><th style="text-align:center">Qty</th>
+          <th style="text-align:right">Unit Price</th><th style="text-align:right">Total</th>
+        </tr></thead>
+        <tbody>${items}</tbody>
+      </table>
+      <div class="totals">
+        <div class="total-row"><span>Subtotal</span><span>$${Number(order.subtotal||0).toFixed(2)}</span></div>
+        <div class="total-row"><span>Delivery</span><span>$${Number(order.shipping_cost||0).toFixed(2)}</span></div>
+        <div class="total-row grand"><span>TOTAL</span><span>$${Number(order.total||0).toFixed(2)}</span></div>
+      </div>
+      <div class="footer">
+        <p>Thank you for supporting African businesses! 🌍</p>
+        <p>afrizoneshop.com · support@afrizoneshop.com · (475) 307-9627</p>
+        <p style="margin-top:8px;font-size:10px">This receipt was generated by the seller. Please keep for your records.</p>
+      </div>
+      <div style="text-align:center;margin-top:20px">
+        <button onclick="window.print()" style="background:#1a5c38;color:white;border:none;padding:12px 32px;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer">🖨️ Print / Save as PDF</button>
+      </div>
+      </body></html>`);
+    w.document.close();
+  };
+
   const updateStatus = async (orderId, status) => {
     setUpdating(orderId);
     const tracking = trackingInputs[orderId] || {};
@@ -111,13 +188,7 @@ export default function SellerOrders() {
       }
 
       if (labelUrl) {
-        const a = document.createElement("a");
-        a.href = labelUrl;
-        a.target = "_blank";
-        a.rel = "noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        window.open(labelUrl, "_blank");
       } else {
         toast.error("Could not generate label. Try again.");
       }
@@ -272,7 +343,12 @@ export default function SellerOrders() {
                       )}
 
                       <div className="flex gap-2 flex-wrap">
-                        {nextStatus && order.status !== "cancelled" && (
+                        {/* UBER ORDER FLOW:
+                            processing → must Dispatch Uber first → shipped → Mark as Delivered
+                            Hide "Mark as Shipped" for Uber orders - dispatch handles that transition */}
+
+                        {/* Non-Uber: show normal next status button */}
+                        {!isUberOrder && nextStatus && order.status !== "cancelled" && (
                           <button onClick={() => updateStatus(order.id, nextStatus)}
                             disabled={updating === order.id}
                             className="flex items-center gap-2 bg-green-900 hover:bg-green-800 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50">
@@ -281,12 +357,30 @@ export default function SellerOrders() {
                           </button>
                         )}
 
-                        {/* Uber dispatch — only for uber_express orders in processing status */}
+                        {/* Uber: pending/paid → show Mark as Processing only */}
+                        {isUberOrder && ["pending", "paid"].includes(order.status) && (
+                          <button onClick={() => updateStatus(order.id, "processing")}
+                            disabled={updating === order.id}
+                            className="flex items-center gap-2 bg-green-900 hover:bg-green-800 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50">
+                            <FiClock size={14} /> Mark as Processing
+                          </button>
+                        )}
+
+                        {/* Uber: processing → MUST dispatch Uber first (this marks as shipped) */}
                         {isUberOrder && order.status === "processing" && (
                           <button onClick={() => dispatchUber(order.id)}
                             disabled={updating === order.id + "_uber"}
                             className="flex items-center gap-2 bg-black hover:bg-gray-800 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors">
                             🛵 {updating === order.id + "_uber" ? "Dispatching..." : "Dispatch Uber Driver"}
+                          </button>
+                        )}
+
+                        {/* Uber: shipped → Mark as Delivered (after driver has dispatched) */}
+                        {isUberOrder && order.status === "shipped" && (
+                          <button onClick={() => updateStatus(order.id, "delivered")}
+                            disabled={updating === order.id}
+                            className="flex items-center gap-2 bg-green-900 hover:bg-green-800 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50">
+                            <FiCheck size={14} /> Mark as Delivered
                           </button>
                         )}
 
@@ -296,6 +390,14 @@ export default function SellerOrders() {
                             disabled={updating === order.id + "_label"}
                             className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-green-900 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
                             <FiDownload size={14} /> {updating === order.id + "_label" ? "Generating..." : "Shipping Label"}
+                          </button>
+                        )}
+
+                        {/* Print Receipt — shown for processing, shipped, delivered */}
+                        {["processing", "shipped", "delivered"].includes(order.status) && (
+                          <button onClick={() => printReceipt(order)}
+                            className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
+                            <FiPrinter size={14} /> Print Receipt
                           </button>
                         )}
 
