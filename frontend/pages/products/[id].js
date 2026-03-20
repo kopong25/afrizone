@@ -14,7 +14,7 @@ import { FiShoppingCart, FiMapPin, FiPackage, FiShare2, FiHeart, FiCheck } from 
 
 export default function ProductDetail() {
   const router = useRouter();
-  const { slug } = router.query;
+  const { id: slug } = router.query; // file is [id].js so Next.js uses "id" param
   const { user } = useAuth();
   const [product, setProduct] = useState(null);
   const [reviews, setReviews] = useState([]);
