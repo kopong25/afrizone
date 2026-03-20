@@ -20,6 +20,7 @@ export default function ProductDetail() {
   const [reviews, setReviews] = useState([]);
   const [variants, setVariants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [addingToCart, setAddingToCart] = useState(false);
@@ -40,7 +41,7 @@ export default function ProductDetail() {
       if (user) {
         wishlistAPI.getIds().then((r) => setWishlisted((r.data || []).includes(p.id))).catch(() => {});
       }
-    }).catch(() => {}).finally(() => { clearTimeout(timeout); setLoading(false); });
+    }).catch(() => { setError(true); }).finally(() => { clearTimeout(timeout); setLoading(false); });
   }, [slug, user]);
 
   const toggleWishlist = async () => {
@@ -111,7 +112,19 @@ export default function ProductDetail() {
       </div>
     </>
   );
-  if (!product) return null;
+  if (!product) return (
+    <>
+      <Navbar />
+      <div className="max-w-6xl mx-auto px-4 py-24 text-center">
+        <div className="text-6xl mb-4">😕</div>
+        <h2 className="text-2xl font-black text-gray-900 mb-2">Product not found</h2>
+        <p className="text-gray-500 mb-6">This product may have been removed or the link is incorrect.</p>
+        <Link href="/" className="bg-green-900 hover:bg-green-800 text-white font-bold px-8 py-3 rounded-xl transition-colors inline-block">
+          Back to Shop
+        </Link>
+      </div>
+    </>
+  );
 
   const discount = product.compare_price
     ? Math.round(((product.compare_price - product.price) / product.compare_price) * 100) : 0;
