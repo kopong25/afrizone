@@ -59,7 +59,6 @@ def create_order(
         store_id=store.id,
         subtotal=subtotal,
         shipping_cost=shipping_cost,
-        delivery_fee=shipping_cost,
         platform_fee=platform_fee,
         seller_amount=seller_amount,
         total=total,
@@ -69,12 +68,13 @@ def create_order(
         shipping_state=order_in.shipping.state,
         shipping_country=order_in.shipping.country,
         shipping_zip=order_in.shipping.zip,
-        delivery_method=getattr(order_in, "delivery_method", None),
-        uber_quote_id=getattr(order_in, "uber_quote_id", None),
-        latitude=getattr(order_in.shipping, "latitude", None),
-        longitude=getattr(order_in.shipping, "longitude", None),
     )
-    
+    # Set delivery fields safely (in case migration hasn't run yet)
+    try:
+        order.delivery_method = order_in.delivery_method
+        order.delivery_fee = shipping_cost
+    except Exception:
+        pass
     db.add(order)
     db.flush()  # Get order.id before committing
 
@@ -268,7 +268,8 @@ def get_cart(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.get_current_user)
 ):
-    return (
+    from sqlalchemy import text
+    cart_items = (
         db.query(models.CartItem)
         .options(
             joinedload(models.CartItem.product).joinedload(models.Product.store)
@@ -276,6 +277,19 @@ def get_cart(
         .filter(models.CartItem.user_id == current_user.id)
         .all()
     )
+    # Patch vendor_type/delivery_type on each store via raw SQL (enum mapping fix)
+    store_ids = list({item.product.store_id for item in cart_items if item.product and item.product.store_id})
+    if store_ids:
+        placeholders = ",".join(str(s) for s in store_ids)
+        rows = db.execute(text(f"SELECT id, vendor_type, delivery_type FROM stores WHERE id IN ({placeholders})")).fetchall()
+        store_map = {r[0]: (r[1], r[2]) for r in rows}
+        for item in cart_items:
+            if item.product and item.product.store:
+                sid = item.product.store.id
+                if sid in store_map:
+                    item.product.store.vendor_type = store_map[sid][0]
+                    item.product.store.delivery_type = store_map[sid][1]
+    return cart_items
 
 
 @router.post("/cart/add", response_model=schemas.CartItemOut, status_code=201)
