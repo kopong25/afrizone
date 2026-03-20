@@ -199,7 +199,7 @@ export default function CartPage() {
       return true;
     } catch (err) {
       const isRest = storeVendorType === "restaurant" || primaryStore?.vendor_type === "restaurant";
-      const storeDelType = storeDeliveryType || primaryStore?.delivery_type;
+      const storeDelType = storeDeliveryType;  // already fetched fresh from /sellers/{id}/public
       const pickupOption = { id: "pickup", label: "Customer Pickup", icon: "🏪", price: 0, eta: "Pick up at store", description: "Collect your order in person. No delivery charge.", provider: "pickup" };
       const fallback = isRest
         ? storeDelType === "both"
@@ -380,13 +380,26 @@ export default function CartPage() {
             <div className="lg:col-span-2 space-y-4">
 
               {/* STEP 1 — Cart Items */}
-              {/* Multi-store warning */}
+              {/* Multi-store block */}
               {step === "cart" && Object.keys(byStore).length > 1 && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex items-start gap-3">
-                  <span className="text-xl flex-shrink-0">⚠️</span>
+                <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 flex items-start gap-3">
+                  <span className="text-2xl flex-shrink-0">🛒</span>
                   <div>
-                    <p className="font-bold text-yellow-800">Items from {Object.keys(byStore).length} different stores</p>
-                    <p className="text-sm text-yellow-700 mt-0.5">Each store will be processed as a separate order with its own delivery fee. You may receive multiple deliveries.</p>
+                    <p className="font-bold text-red-800">One store per checkout</p>
+                    <p className="text-sm text-red-700 mt-1">Afrizone currently supports one store per checkout. You have items from <strong>{Object.keys(byStore).length} different stores</strong>. Please remove items from other stores before proceeding.</p>
+                    <div className="mt-3 space-y-1">
+                      {Object.values(byStore).map(({store, items: si}) => (
+                        <div key={store?.id} className="flex items-center justify-between text-xs bg-white rounded-lg px-3 py-2 border">
+                          <span className="font-medium text-gray-700">{store?.name} ({si.length} item{si.length !== 1 ? "s" : ""})</span>
+                          <button onClick={async () => {
+                            for (const item of si) await api.delete(`/orders/cart/items/${item.id}`).catch(()=>{});
+                            const r = await api.get("/orders/cart/items");
+                            setItems(r.data?.items || r.data || []);
+                            toast.success("Items removed");
+                          }} className="text-red-500 hover:text-red-700 font-bold ml-3">Remove</button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -617,7 +630,13 @@ export default function CartPage() {
 
                 {/* Navigation buttons */}
                 {step === "cart" && (
-                  <button onClick={() => setStep("shipping")}
+                  <button onClick={() => {
+                    if (Object.keys(byStore).length > 1) {
+                      toast.error("Please remove items from other stores first");
+                      return;
+                    }
+                    setStep("shipping");
+                  }}
                     className="w-full btn-primary py-3 mt-5 flex items-center justify-center gap-2">
                     Continue to Address <FiArrowRight />
                   </button>
