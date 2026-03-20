@@ -21,10 +21,10 @@ const VENDOR_TYPES = [
 ];
 
 const DELIVERY_TYPES = [
-  { value: "shipping",       icon: "📬", label: "Ships Nationwide",   desc: "USPS / Shippo — customers anywhere in your country" },
-  { value: "local_delivery", icon: "🛵", label: "Local Delivery",     desc: "You deliver within your city/area (Uber Direct coming soon)" },
-  { value: "pickup",         icon: "🏪", label: "Pickup Only",        desc: "Customers come to your location to pick up" },
-  { value: "both",           icon: "🚀", label: "Ships + Local",      desc: "Offer both shipping and local delivery" },
+  { value: "shipping",       icon: "📬", label: "Shipping Only",          desc: "Ship orders via USPS nationwide" },
+  { value: "local_delivery", icon: "🛵", label: "Local Delivery (Uber)",  desc: "Deliver locally via Uber Direct" },
+  { value: "pickup",         icon: "🏪", label: "Pickup Only",            desc: "Customers come to your location" },
+  { value: "both",           icon: "🔀", label: "Shipping + Pickup",      desc: "Offer both shipping and in-store pickup" },
 ];
 
 export default function StoreSettings() {
@@ -282,8 +282,31 @@ export default function StoreSettings() {
           </h2>
           <p className="text-sm text-gray-500 mb-4">Choose how you fulfil orders for customers.</p>
 
+          {isRestaurant ? (
+            <div className="space-y-3">
+              <div className="bg-green-50 border-2 border-green-700 rounded-xl p-4 flex items-start gap-3">
+                <span className="text-2xl">🛵</span>
+                <div>
+                  <p className="font-bold text-green-900">Uber Express Local Delivery</p>
+                  <p className="text-sm text-green-700 mt-0.5">Hot food is delivered via Uber Direct. Pickup is optional.</p>
+                </div>
+              </div>
+              <label className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                form.delivery_type === "both" ? "border-green-700 bg-green-50" : "border-gray-200 hover:border-gray-300"
+              }`}>
+                <input type="checkbox"
+                  checked={form.delivery_type === "both"}
+                  onChange={e => setForm(f => ({ ...f, delivery_type: e.target.checked ? "both" : "local_delivery" }))}
+                  className="mt-1 accent-green-700" />
+                <div>
+                  <p className="font-semibold text-gray-800 text-sm">🏪 Also offer Customer Pickup</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Customers can choose to pick up from your location instead of delivery</p>
+                </div>
+              </label>
+            </div>
+          ) : (
           <div className="grid grid-cols-2 gap-3 mb-5">
-            {DELIVERY_TYPES.filter(d => isRestaurant ? d.value !== "shipping" : true).map((d) => (
+            {DELIVERY_TYPES.filter(d => d.value !== "local_delivery").map((d) => (
               <label key={d.value}
                 className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                   form.delivery_type === d.value
@@ -301,52 +324,46 @@ export default function StoreSettings() {
               </label>
             ))}
           </div>
-
-          {/* Local delivery extra fields */}
-          {/* Store address — always visible, used for delivery distance calculation */}
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
-            <p className="text-sm font-bold text-gray-700 flex items-center gap-2">
-              <FiMapPin size={14} /> Store Location
-            </p>
-            <p className="text-xs text-gray-500">Your address is used to calculate delivery distance and pricing for customers. It is never shown publicly.</p>
-            <div>
-              <label className="text-xs font-semibold text-gray-600 block mb-1">Store Address *</label>
-              <input
-                value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
-                placeholder="123 Main St"
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
-              />
-            </div>
-          </div>
+          )} {/* end non-restaurant delivery selector */}
 
           {/* Local delivery extra fields */}
           {isLocalDelivery && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3 mt-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
               <p className="text-sm font-bold text-blue-800 flex items-center gap-2">
                 <FiMapPin size={14} /> Local Delivery Details
               </p>
-              <div>
-                <label className="text-xs font-semibold text-gray-600 block mb-1">Delivery Radius (miles)</label>
-                <input
-                  type="number" min="1" max="50"
-                  value={form.delivery_radius_miles}
-                  onChange={(e) => setForm({ ...form, delivery_radius_miles: e.target.value })}
-                  placeholder="e.g. 10"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Delivery Radius (miles)</label>
+                  <input
+                    type="number" min="1" max="50"
+                    value={form.delivery_radius_miles}
+                    onChange={(e) => setForm({ ...form, delivery_radius_miles: e.target.value })}
+                    placeholder="e.g. 10"
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Store Address</label>
+                  <input
+                    value={form.address}
+                    onChange={(e) => setForm({ ...form, address: e.target.value })}
+                    placeholder="123 Main St, Houston TX"
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                  />
+                </div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-gray-600 block mb-1">Delivery Note for Customers</label>
                 <input
                   value={form.delivery_note}
                   onChange={(e) => setForm({ ...form, delivery_note: e.target.value })}
-                  placeholder="e.g. Min order $20 · Free delivery within 5 miles · 45-60 min"
+                  placeholder="e.g. Min order $20 · Free delivery within 5 miles · 45–60 min"
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
                 />
               </div>
               <p className="text-xs text-blue-600">
-                Uber Direct automated driver dispatch is coming soon.
+                🚀 Uber Direct automated driver dispatch is coming soon. For now, arrange your own delivery driver and update the order to <strong>Shipped</strong> when they pick up.
               </p>
             </div>
           )}

@@ -98,22 +98,17 @@ export default function CartPage() {
       // Geocode customer address
       let customerLat = null, customerLng = null;
       try {
-        const geo = await api.get("/uber-direct/geocode", {
-          params: {
-            address: shipping.address,
-            city: shipping.city,
-            state: shipping.state,
-            zip: shipping.zip,
-          }
-        });
-        if (geo.data?.found) {
-          customerLat = geo.data.lat;
-          customerLng = geo.data.lng;
+        const geo = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            `${shipping.address}, ${shipping.city}, ${shipping.state} ${shipping.zip}`
+          )}`
+        );
+        const geoData = await geo.json();
+        if (geoData?.[0]) {
+          customerLat = parseFloat(geoData[0].lat);
+          customerLng = parseFloat(geoData[0].lon);
         }
-      } catch (geoErr) {
-        console.error("[Geo] Failed:", geoErr);
-      }
-      console.log("[Geo Result] lat:", customerLat, "lng:", customerLng);
+      } catch {}
 
       let uberData = { options: [], distance_miles: null };
       try {
@@ -134,50 +129,69 @@ export default function CartPage() {
       let options = [];
 
       if (isRestaurant) {
-        // Restaurant — Uber ONLY regardless of distance
-        const uberOpt = uberData.options?.find(o => o.id === "uber_express");
-    options = [
-        {
-        id: "uber_express",
-        label: "Uber Express Delivery",
-        icon: "🛵",
-        price: uberOpt?.price ?? 9.28,
-        eta: uberOpt?.eta || "~45 minutes",
-        description: uberOpt?.description || "Hot food delivered fresh to your door.",
-        provider: "uber_direct",
-        uber_quote_id: uberOpt?.uber_quote_id || null,
-        latitude: customerLat,
-        longitude: customerLng,
-      }
-    ];
-      } else {
-        // Non-restaurant store — USPS + Uber, both dynamic
-        const uberOpt = uberData.options?.find(o => o.id === "uber_express");
-        const uspsStandard = uberData.options?.find(o => o.id === "usps_standard");
-        const uspsPriority = uberData.options?.find(o => o.id === "usps_priority");
+        // Restaurant — Uber delivery always available
         options = [
-          {
-            id: "usps_priority",
-            label: "Chippo USPS Shipping",
-            icon: "📬",
-            price: uspsPriority?.price ?? 6.99,
-            eta: uspsPriority?.eta || "1–2 business days",
-            description: "Fast tracked shipping.",
-            provider: "usps",
-          },
           {
             id: "uber_express",
             label: "Uber Express Delivery",
             icon: "🛵",
-            price: uberOpt?.price ?? 8.99,
-            eta: uberOpt?.eta || "~45 minutes",
+            price: uberData.options?.find(o => o.id === "uber_express")?.price || 9.99,
+            eta: uberData.options?.find(o => o.id === "uber_express")?.eta || "~45 minutes",
+            description: "Hot food delivered fresh to your door.",
+            provider: "uber_direct",
+            quote_id: uberData.options?.find(o => o.id === "uber_express")?.quote_id || null,
+          }
+        ];
+        // Also offer pickup if store supports it
+        if (storeDeliveryType === "both") {
+          options.push({
+            id: "pickup",
+            label: "Customer Pickup",
+            icon: "🏪",
+            price: 0,
+            eta: "Ready in ~30 mins",
+            description: "Pick up your order directly from the store. No delivery charge.",
+            provider: "pickup",
+          });
+        }
+      } else {
+        // Non-restaurant — USPS + Uber
+        options = [
+          { id: "usps_priority", label: "Chippo USPS Shipping", icon: "📬", price: 6.99, eta: "1–2 business days", description: "Fast tracked shipping.", provider: "usps" },
+          {
+            id: "uber_express",
+            label: "Uber Express Delivery",
+            icon: "🛵",
+            price: uberData.options?.find(o => o.id === "uber_express")?.price || 8.99,
+            eta: "2–4 hours",
             description: "Same-day local delivery.",
             provider: "uber_direct",
-            uber_quote_id: uberOpt?.uber_quote_id || null,
-            latitude: customerLat,
-            longitude: customerLng,
           },
         ];
+        // Add pickup if store offers it
+        if (["pickup", "both"].includes(storeDeliveryType)) {
+          options.push({
+            id: "pickup",
+            label: "Customer Pickup",
+            icon: "🏪",
+            price: 0,
+            eta: "Pick up at store",
+            description: "Collect your order in person. No delivery charge.",
+            provider: "pickup",
+          });
+        }
+        // If pickup-only store, remove delivery options
+        if (storeDeliveryType === "pickup") {
+          options = [{
+            id: "pickup",
+            label: "Customer Pickup",
+            icon: "🏪",
+            price: 0,
+            eta: "Pick up at store",
+            description: "Collect your order in person. No delivery charge.",
+            provider: "pickup",
+          }];
+        }
       }
 
       setDeliveryOptions(options);
@@ -185,12 +199,20 @@ export default function CartPage() {
       return true;
     } catch (err) {
       const isRest = storeVendorType === "restaurant" || primaryStore?.vendor_type === "restaurant";
+      const storeDelType = storeDeliveryType || primaryStore?.delivery_type;
+      const pickupOption = { id: "pickup", label: "Customer Pickup", icon: "🏪", price: 0, eta: "Pick up at store", description: "Collect your order in person. No delivery charge.", provider: "pickup" };
       const fallback = isRest
-        ? [{ id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "~45 minutes", description: "Hot food delivered fresh to your door.", provider: "uber_direct" }]
-        : [
-            { id: "usps_priority", label: "Chippo USPS Shipping", icon: "📬", price: 6.99, eta: "1–2 business days", provider: "usps" },
-            { id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "2–4 hours", provider: "uber_direct" },
-          ];
+        ? storeDelType === "both"
+          ? [{ id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "~45 minutes", description: "Hot food delivered fresh to your door.", provider: "uber_direct" }, pickupOption]
+          : [{ id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "~45 minutes", description: "Hot food delivered fresh to your door.", provider: "uber_direct" }]
+        : storeDelType === "pickup"
+          ? [pickupOption]
+          : ["both", "pickup"].includes(storeDelType)
+            ? [{ id: "usps_priority", label: "Chippo USPS Shipping", icon: "📬", price: 6.99, eta: "1–2 business days", provider: "usps" }, { id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "2–4 hours", provider: "uber_direct" }, pickupOption]
+            : [
+                { id: "usps_priority", label: "Chippo USPS Shipping", icon: "📬", price: 6.99, eta: "1–2 business days", provider: "usps" },
+                { id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "2–4 hours", provider: "uber_direct" },
+              ];
       setDeliveryOptions(fallback);
       setSelectedDelivery(fallback[0]);
       return true;
@@ -279,18 +301,16 @@ export default function CartPage() {
           store_id: resolvedStoreId,
           items: orderItems,
           shipping: {
-             name: shipping.name || "Customer",
-             address: shipping.address,
-             city: shipping.city,
-             state: shipping.state || "N/A",
-             country: shipping.country || "USA",
-             zip: shipping.zip,
-             latitude: selectedDelivery?.latitude || null,
-             longitude: selectedDelivery?.longitude || null,
-        },
+            name: shipping.name || "Customer",
+            address: shipping.address,
+            city: shipping.city,
+            state: shipping.state || "N/A",
+            country: shipping.country || "USA",
+            zip: shipping.zip,
+          },
           delivery_method: selectedDelivery?.id || "usps_priority",
           delivery_fee: shippingCost || 0,
-          uber_quote_id: selectedDelivery?.uber_quote_id || null,
+          uber_quote_id: selectedDelivery?.quote_id || null,
         };
         console.log("[Order Payload]", JSON.stringify(orderPayload));
         const r = await api.post("/orders/", orderPayload, { headers: authHeaders });
@@ -587,25 +607,10 @@ export default function CartPage() {
 
                 {/* Navigation buttons */}
                 {step === "cart" && (
-                  <>
-                    {Object.keys(byStore).length > 1 && (
-                      <div className="bg-red-50 border border-red-200 rounded-xl p-3 mt-4 text-sm text-red-700">
-                        <p className="font-bold mb-1">Multiple stores in cart</p>
-                        <p>Afrizone only supports one store per checkout. Please remove items from one store to continue.</p>
-                      </div>
-                    )}
-                    <button
-                      onClick={() => {
-                        if (Object.keys(byStore).length > 1) {
-                          toast.error("Please keep items from one store only to checkout.");
-                          return;
-                        }
-                        setStep("shipping");
-                      }}
-                      className="w-full btn-primary py-3 mt-5 flex items-center justify-center gap-2">
-                      Continue to Address <FiArrowRight />
-                    </button>
-                  </>
+                  <button onClick={() => setStep("shipping")}
+                    className="w-full btn-primary py-3 mt-5 flex items-center justify-center gap-2">
+                    Continue to Address <FiArrowRight />
+                  </button>
                 )}
                 {step === "shipping" && (
                   <div className="space-y-2 mt-5">
