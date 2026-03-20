@@ -255,8 +255,6 @@ class ShippingAddress(BaseModel):
     state: str
     country: str
     zip: str
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
 
 
 class OrderCreate(BaseModel):
@@ -294,12 +292,10 @@ class OrderOut(BaseModel):
     tracking_number: Optional[str]
     tracking_url: Optional[str]
     stripe_payment_intent_id: Optional[str]
+    delivery_method: Optional[str] = None
+    delivery_fee: Optional[float] = None
     items: List[OrderItemOut]
-    store: Optional[StoreOut]
-    vendor_type: Optional[str] = None
-    delivery_type: Optional[str] = None
-    delivery_radius_miles: Optional[int] = None
-    delivery_note: Optional[str] = None
+    store: Optional[StoreOut] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -338,10 +334,6 @@ class ReviewOut(BaseModel):
     photos: Optional[List[str]] = []
     helpful_count: Optional[int] = 0
     user: UserOut
-    vendor_type: Optional[str] = None
-    delivery_type: Optional[str] = None
-    delivery_radius_miles: Optional[int] = None
-    delivery_note: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
