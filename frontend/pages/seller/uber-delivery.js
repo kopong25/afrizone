@@ -6,7 +6,7 @@ import { useAuth } from "../_app";
 import { useRouter } from "next/router";
 import api from "../../lib/api";
 import toast from "react-hot-toast";
-import { FiArrowLeft, FiNavigation, FiDollarSign, FiMapPin, FiClock, FiAlertCircle } from "react-icons/fi";
+import { FiArrowLeft, FiNavigation, FiDollarSign, FiMapPin, FiClock, FiAlertCircle, FiPackage, FiUser, FiShoppingBag, FiTruck } from "react-icons/fi";
 
 const ZONES = [
   { zone: 1, label: "Nearby",   miles: "0–3",  charge: "$5.99",  color: "green" },
@@ -27,10 +27,16 @@ export default function UberDeliveryPage() {
   const router = useRouter();
   const [testResult, setTestResult] = useState(null);
   const [testing, setTesting] = useState(false);
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
 
   useEffect(() => {
     if (!user) { router.push("/login"); return; }
     if (user.role !== "seller" && user.role !== "admin") router.push("/");
+    api.get("/orders/store-orders?size=10")
+      .then(r => setRecentOrders((r.data?.items || r.data || []).filter(o => o.delivery_method === "uber_express")))
+      .catch(() => {})
+      .finally(() => setLoadingOrders(false));
   }, [user]);
 
   const runSandboxTest = async () => {
@@ -81,32 +87,102 @@ export default function UberDeliveryPage() {
           <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full font-bold">SANDBOX</span>
         </div>
 
-        {/* Status Banner */}
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 mb-6">
-          <div className="flex gap-3">
-            <FiAlertCircle size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold text-blue-800">Integration Status: Sandbox Testing</p>
-              <p className="text-sm text-blue-700 mt-1">
-                Uber Direct is configured in sandbox mode. All dispatch calls are simulated — no real drivers are sent.
-                To go live, add your Uber Direct credentials to Render environment variables.
-              </p>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                {[
-                  ["UBER_CLIENT_ID", "From Uber Developer Dashboard"],
-                  ["UBER_CLIENT_SECRET", "From Uber Developer Dashboard"],
-                  ["UBER_CUSTOMER_ID", "Your Uber Direct customer ID"],
-                  ["UBER_SANDBOX", "Set to 'false' for production"],
-                ].map(([key, desc]) => (
-                  <div key={key} className="bg-white rounded-lg p-2 border border-blue-100">
-                    <code className="font-bold text-blue-900">{key}</code>
-                    <p className="text-blue-600 mt-0.5">{desc}</p>
-                  </div>
-                ))}
+        {/* Seller: Recent Uber Delivery Orders */}
+        {user?.role !== "admin" && (
+          <div className="bg-white rounded-2xl border shadow-sm p-6 mb-6">
+            <h2 className="font-black text-gray-900 mb-4 flex items-center gap-2">
+              <FiTruck size={18} className="text-green-700" /> Recent Uber Delivery Orders
+            </h2>
+            {loadingOrders ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />)}
+              </div>
+            ) : recentOrders.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <FiTruck size={32} className="mx-auto mb-2" />
+                <p className="text-sm">No Uber delivery orders yet</p>
+                <p className="text-xs mt-1">Orders using Uber Express will appear here</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-gray-50">
+                      <th className="text-left py-2 px-3 text-xs font-bold text-gray-500 uppercase">Order #</th>
+                      <th className="text-left py-2 px-3 text-xs font-bold text-gray-500 uppercase">Date & Time</th>
+                      <th className="text-left py-2 px-3 text-xs font-bold text-gray-500 uppercase">Customer</th>
+                      <th className="text-right py-2 px-3 text-xs font-bold text-gray-500 uppercase">Products</th>
+                      <th className="text-right py-2 px-3 text-xs font-bold text-gray-500 uppercase">Delivery Fee</th>
+                      <th className="text-right py-2 px-3 text-xs font-bold text-gray-500 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentOrders.map(order => {
+                      const statusColors = {
+                        pending: "bg-yellow-100 text-yellow-800",
+                        paid: "bg-blue-100 text-blue-800",
+                        processing: "bg-purple-100 text-purple-800",
+                        shipped: "bg-orange-100 text-orange-800",
+                        delivered: "bg-green-100 text-green-800",
+                        cancelled: "bg-red-100 text-red-800",
+                      };
+                      return (
+                        <tr key={order.id} className="border-b hover:bg-gray-50">
+                          <td className="py-3 px-3 font-bold text-gray-900">#{order.id}</td>
+                          <td className="py-3 px-3 text-gray-600 text-xs">
+                            {new Date(order.created_at).toLocaleDateString("en-US", {month:"short", day:"numeric", year:"numeric"})}
+                            <br />
+                            <span className="text-gray-400">{new Date(order.created_at).toLocaleTimeString("en-US", {hour:"2-digit", minute:"2-digit"})}</span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <p className="font-medium text-gray-800">{order.shipping_name || "—"}</p>
+                            <p className="text-xs text-gray-400">{order.shipping_city}, {order.shipping_state}</p>
+                          </td>
+                          <td className="py-3 px-3 text-right font-bold text-gray-900">${Number(order.subtotal || 0).toFixed(2)}</td>
+                          <td className="py-3 px-3 text-right text-gray-600">${Number(order.shipping_cost || 0).toFixed(2)}</td>
+                          <td className="py-3 px-3 text-right">
+                            <span className={`text-xs font-bold px-2 py-1 rounded-full capitalize ${statusColors[order.status] || "bg-gray-100 text-gray-600"}`}>
+                              {order.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Admin Only: Integration Status */}
+        {user?.role === "admin" && (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 mb-6">
+            <div className="flex gap-3">
+              <FiAlertCircle size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-blue-800">Integration Status: Sandbox Testing</p>
+                <p className="text-sm text-blue-700 mt-1">
+                  Uber Direct is in sandbox mode. All dispatch calls are simulated.
+                  Add credentials to Render env vars to go live.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  {[
+                    ["UBER_CLIENT_ID", "From Uber Developer Dashboard"],
+                    ["UBER_CLIENT_SECRET", "From Uber Developer Dashboard"],
+                    ["UBER_CUSTOMER_ID", "Your Uber Direct customer ID"],
+                    ["UBER_SANDBOX", "Set to false for production"],
+                  ].map(([key, desc]) => (
+                    <div key={key} className="bg-white rounded-lg p-2 border border-blue-100">
+                      <code className="font-bold text-blue-900">{key}</code>
+                      <p className="text-blue-600 mt-0.5">{desc}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Zone Pricing Table */}
         <div className="bg-white rounded-2xl border shadow-sm p-6 mb-6">
@@ -178,8 +254,8 @@ export default function UberDeliveryPage() {
           </div>
         </div>
 
-        {/* Sandbox Test */}
-        <div className="bg-white rounded-2xl border shadow-sm p-6 mb-6">
+        {/* Sandbox Test — Admin Only */}
+        {user?.role === "admin" && <div className="bg-white rounded-2xl border shadow-sm p-6 mb-6">
           <h2 className="font-black text-gray-900 mb-2 flex items-center gap-2">
             <FiNavigation size={18} className="text-green-700" /> Sandbox Test
           </h2>
@@ -215,9 +291,10 @@ export default function UberDeliveryPage() {
               )}
             </div>
           )}
-        </div>
+        </div>}
 
-        {/* Setup steps */}
+        {/* Setup steps — Admin Only */}
+        {user?.role === "admin" && (
         <div className="bg-gray-50 rounded-2xl border p-5 text-sm text-gray-600">
           <p className="font-bold text-gray-800 mb-2">📋 To activate production Uber Direct:</p>
           <ol className="space-y-1 list-decimal list-inside">
@@ -227,7 +304,7 @@ export default function UberDeliveryPage() {
             <li>Once approved, add credentials to Render environment variables</li>
             <li>Set <code className="bg-gray-200 px-1 rounded">UBER_SANDBOX=false</code> in Render</li>
           </ol>
-        </div>
+        </div>)}
       </div>
       <Footer />
     </>
