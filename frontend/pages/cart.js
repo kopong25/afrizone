@@ -380,6 +380,16 @@ export default function CartPage() {
             <div className="lg:col-span-2 space-y-4">
 
               {/* STEP 1 — Cart Items */}
+              {/* Multi-store warning */}
+              {step === "cart" && Object.keys(byStore).length > 1 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex items-start gap-3">
+                  <span className="text-xl flex-shrink-0">⚠️</span>
+                  <div>
+                    <p className="font-bold text-yellow-800">Items from {Object.keys(byStore).length} different stores</p>
+                    <p className="text-sm text-yellow-700 mt-0.5">Each store will be processed as a separate order with its own delivery fee. You may receive multiple deliveries.</p>
+                  </div>
+                </div>
+              )}
               {step === "cart" && Object.values(byStore).map(({ store, items: storeItems }) => (
                 <div key={store?.id} className="bg-white rounded-2xl shadow-sm border overflow-hidden">
                   <div className="bg-green-900 text-white px-4 py-2.5 flex items-center gap-2">
