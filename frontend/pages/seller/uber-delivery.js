@@ -9,10 +9,10 @@ import toast from "react-hot-toast";
 import { FiArrowLeft, FiNavigation, FiDollarSign, FiMapPin, FiClock, FiAlertCircle, FiPackage, FiUser, FiShoppingBag, FiTruck } from "react-icons/fi";
 
 const ZONES = [
-  { zone: 1, label: "Nearby",   miles: "0–3",  charge: "$5.99",  color: "green" },
-  { zone: 2, label: "Local",    miles: "3–7",  charge: "$8.99",  color: "blue" },
-  { zone: 3, label: "Extended", miles: "7–12", charge: "$12.99", color: "yellow" },
-  { zone: 4, label: "Far",      miles: "12–20",charge: "$16.99", color: "orange" },
+  { zone: 1, label: "Nearby",   miles: "0–3",  charge: "$5.99",  uber: "~$3.50", margin: "~$2.49", color: "green" },
+  { zone: 2, label: "Local",    miles: "3–7",  charge: "$8.99",  uber: "~$5.50", margin: "~$3.49", color: "blue" },
+  { zone: 3, label: "Extended", miles: "7–12", charge: "$12.99", uber: "~$8.50", margin: "~$4.49", color: "yellow" },
+  { zone: 4, label: "Far",      miles: "12–20",charge: "$16.99", uber: "~$12.00",margin: "~$4.99", color: "orange" },
 ];
 
 const colorMap = {
@@ -184,8 +184,8 @@ export default function UberDeliveryPage() {
           </div>
         )}
 
-        {/* Zone Pricing Table */}
-        <div className="bg-white rounded-2xl border shadow-sm p-6 mb-6">
+        {/* Zone Pricing Table — Admin Only */}
+        {user?.role === "admin" && <div className="bg-white rounded-2xl border shadow-sm p-6 mb-6">
           <h2 className="font-black text-gray-900 mb-1 flex items-center gap-2">
             <FiDollarSign size={18} className="text-green-700" /> Zone Pricing Model
           </h2>
@@ -201,7 +201,7 @@ export default function UberDeliveryPage() {
                   <th className="text-left py-2 px-3 text-xs font-bold text-gray-500 uppercase">Zone</th>
                   <th className="text-left py-2 px-3 text-xs font-bold text-gray-500 uppercase">Distance</th>
                   <th className="text-left py-2 px-3 text-xs font-bold text-green-700 uppercase">Customer Pays</th>
-                  <th className="text-left py-2 px-3 text-xs font-bold text-red-500 uppercase">Uber Cost</th>
+                  <th className="text-left py-2 px-3 text-xs font-bold text-red-500 uppercase">Uber Cost (est)</th>
                   <th className="text-left py-2 px-3 text-xs font-bold text-blue-600 uppercase">Afrizone Margin</th>
                 </tr>
               </thead>
@@ -215,18 +215,51 @@ export default function UberDeliveryPage() {
                     </td>
                     <td className="py-3 px-3 text-gray-600">{z.miles} miles</td>
                     <td className="py-3 px-3 font-black text-gray-900">{z.charge}</td>
-                    
-                    
+                    <td className="py-3 px-3 text-red-600">{z.uber}</td>
+                    <td className="py-3 px-3 font-bold text-blue-700">{z.margin}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {user?.role === "admin" && (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-sm mt-2">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 px-3 text-xs font-bold text-gray-500 uppercase">Zone</th>
+                    <th className="text-left py-2 px-3 text-xs font-bold text-gray-500 uppercase">Distance</th>
+                    <th className="text-left py-2 px-3 text-xs font-bold text-green-700 uppercase">Customer Pays</th>
+                    <th className="text-left py-2 px-3 text-xs font-bold text-red-500 uppercase">Uber Cost</th>
+                    <th className="text-left py-2 px-3 text-xs font-bold text-blue-600 uppercase">Afrizone Margin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { zone:1, label:"Nearby",   miles:"0–3",   charge:"$5.99",  uber:"~$3.50", margin:"~$2.49", color:"green" },
+                    { zone:2, label:"Local",    miles:"3–7",   charge:"$8.99",  uber:"~$5.50", margin:"~$3.49", color:"blue" },
+                    { zone:3, label:"Extended", miles:"7–12",  charge:"$12.99", uber:"~$8.50", margin:"~$4.49", color:"yellow" },
+                    { zone:4, label:"Far",      miles:"12–20", charge:"$16.99", uber:"~$12.00",margin:"~$4.99", color:"orange" },
+                  ].map(z => (
+                    <tr key={z.zone} className="border-b hover:bg-gray-50">
+                      <td className="py-3 px-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold border ${colorMap[z.color]}`}>Zone {z.zone} · {z.label}</span>
+                      </td>
+                      <td className="py-3 px-3 text-gray-600">{z.miles} miles</td>
+                      <td className="py-3 px-3 font-black text-gray-900">{z.charge}</td>
+                      <td className="py-3 px-3 text-red-600 font-medium">{z.uber}</td>
+                      <td className="py-3 px-3 text-blue-700 font-bold">{z.margin}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <p className="text-xs text-gray-400 mt-3">
-            * Uber costs are estimates. Actual costs vary by city, time of day, and demand. 
+            * Uber costs are estimates. Actual costs vary by city, time of day, and demand.
             Delivery fees are handled automatically — no action needed from you.
           </p>
-        </div>
+        </div>}
 
         {/* How It Works */}
         <div className="bg-white rounded-2xl border shadow-sm p-6 mb-6">
