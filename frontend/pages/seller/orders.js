@@ -43,6 +43,7 @@ export default function SellerOrders() {
   const { user } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState([]);
+  const [myStore, setMyStore] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [expanded, setExpanded] = useState(null);
@@ -56,6 +57,7 @@ export default function SellerOrders() {
   }, [user]);
 
   const fetchOrders = () => {
+    api.get("/sellers/my-store").then(r => setMyStore(r.data)).catch(() => {});
     api.get("/orders/store-orders")
       .then(r => setOrders(r.data?.items || r.data || []))
       .catch(() => toast.error("Failed to load orders"))
@@ -78,7 +80,9 @@ export default function SellerOrders() {
     } finally { setUpdating(null); }
   };
 
-  const printReceipt = (order) => {
+  const printReceipt = (order, storeData) => {
+    const store = storeData || myStore || {};
+    const store = myStore || order.store || {};
     const w = window.open("", "_blank", "width=800,height=600");
     const items = (order.items || []).map(item => `
       <tr>
@@ -119,8 +123,12 @@ export default function SellerOrders() {
       </style></head><body>
       <!-- Store banner at top -->
       <div class="store-banner">
-        <p class="store-name">${order.store?.name || "Store"}</p>
-        <p class="store-tagline">Order Receipt</p>
+        ${store.logo_url ? `<img src="${store.logo_url}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,0.4);margin-bottom:10px" />` : ""}
+        <p class="store-name">${store.name || "Store"}</p>
+        ${store.address ? `<p class="store-tagline" style="margin-top:4px">📍 ${store.address}${store.city ? ", " + store.city : ""}${store.state ? ", " + store.state : ""}</p>` : ""}
+        ${store.phone ? `<p class="store-tagline">📞 ${store.phone}</p>` : ""}
+        ${store.email || store.owner_email ? `<p class="store-tagline">✉️ ${store.email || store.owner_email}</p>` : ""}
+        <p class="store-tagline" style="margin-top:6px;opacity:0.7">Order Receipt</p>
       </div>
 
       <!-- Afrizone branding bar -->
@@ -439,7 +447,7 @@ export default function SellerOrders() {
 
                         {/* Print Receipt — shown for processing, shipped, delivered */}
                         {["processing", "shipped", "delivered"].includes(order.status) && (
-                          <button onClick={() => printReceipt(order)}
+                          <button onClick={() => printReceipt(order, myStore)}
                             className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
                             <FiPrinter size={14} /> Print Receipt
                           </button>
