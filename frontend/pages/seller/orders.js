@@ -82,7 +82,6 @@ export default function SellerOrders() {
 
   const printReceipt = (order, storeData) => {
     const store = storeData || myStore || {};
-    const store = myStore || order.store || {};
     const w = window.open("", "_blank", "width=800,height=600");
     const items = (order.items || []).map(item => `
       <tr>
