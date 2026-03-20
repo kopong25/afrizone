@@ -287,7 +287,7 @@ async def dispatch_uber_driver(
     if order.status not in ["paid", "processing"]:
         raise HTTPException(status_code=400, detail=f"Cannot dispatch — order is {order.status}")
 
-    if not UBER_CLIENT_ID or not UBER_CLIENT_SECRET or not UBER_CUSTOMER_ID:
+    if UBER_SANDBOX or not UBER_CLIENT_ID or not UBER_CLIENT_SECRET or not UBER_CUSTOMER_ID:
         # Sandbox simulation mode
         order.status = models.OrderStatus.shipped
         order.tracking_number = f"UBER-SANDBOX-{order_id}"
