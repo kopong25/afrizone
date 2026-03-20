@@ -106,7 +106,7 @@ export default function SellerOrders() {
         .ship-to{margin-bottom:24px}
         .ship-to h3{margin:0 0 8px;font-size:13px;color:#666;text-transform:uppercase}
         .footer{text-align:center;margin-top:32px;padding-top:20px;border-top:1px solid #eee;color:#999;font-size:12px}
-        .delivery-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:bold;margin-top:4px;background:${order.delivery_method === "uber_express" ? "#000" : "#e8f5e9"};color:${order.delivery_method === "uber_express" ? "#fff" : "#1a5c38"}}
+        .delivery-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:bold;margin-top:4px;background:${order.delivery_method === "uber_express" ? "#000" : order.delivery_method === "pickup" ? "#ede9fe" : "#e8f5e9"};color:${order.delivery_method === "uber_express" ? "#fff" : order.delivery_method === "pickup" ? "#6d28d9" : "#1a5c38"}}
         @media print{button{display:none}}
       </style></head><body>
       <div class="header">
@@ -116,7 +116,7 @@ export default function SellerOrders() {
       <div style="text-align:center;margin-bottom:20px">
         <div style="font-size:22px;font-weight:900">ORDER RECEIPT</div>
         <div style="font-size:28px;font-weight:900;color:#1a5c38">#${order.id}</div>
-        <div class="delivery-badge">${order.delivery_method === "uber_express" ? "🛵 Uber Express Delivery" : "📦 Standard Shipping"}</div>
+        <div class="delivery-badge">${order.delivery_method === "uber_express" ? "🛵 Uber Express Delivery" : order.delivery_method === "pickup" ? "🏪 Customer Pickup" : "📦 Standard Shipping"}</div>
       </div>
       <div class="order-meta">
         <div class="meta-group"><label>Order Date</label><p>${new Date(order.created_at).toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})}</p></div>
@@ -126,7 +126,7 @@ export default function SellerOrders() {
       </div>
       ${order.shipping_address ? `
       <div class="ship-to">
-        <h3>${order.delivery_method === "uber_express" ? "🛵 Deliver To" : "📦 Ship To"}</h3>
+        <h3>${order.delivery_method === "uber_express" ? "🛵 Deliver To" : order.delivery_method === "pickup" ? "🏪 Customer Pickup" : "📦 Ship To"}</h3>
         <p style="margin:0;font-size:14px"><strong>${order.shipping_name}</strong></p>
         <p style="margin:4px 0;font-size:14px">${order.shipping_address}</p>
         <p style="margin:4px 0;font-size:14px">${order.shipping_city}, ${order.shipping_state} ${order.shipping_zip || ""}</p>
@@ -263,6 +263,7 @@ export default function SellerOrders() {
               const isExpanded = expanded === order.id;
               const nextStatus = STATUS_FLOW[STATUS_FLOW.indexOf(order.status) + 1];
               const isUberOrder = order.delivery_method === "uber_express";
+              const isPickupOrder = order.delivery_method === "pickup";
 
               return (
                 <div key={order.id} className="bg-white border rounded-2xl shadow-sm overflow-hidden">
@@ -279,6 +280,7 @@ export default function SellerOrders() {
                         <span className="font-black text-gray-900">Order #{order.id}</span>
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${s.bg}`}>{s.label}</span>
                         {isUberOrder && <span className="text-xs bg-black text-white px-2 py-0.5 rounded-full">🛵 Uber</span>}
+                        {isPickupOrder && <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full">🏪 Pickup</span>}
                         {order.tracking_number && (
                           <span className="text-xs text-gray-400 font-mono">{order.tracking_number}</span>
                         )}
@@ -318,14 +320,14 @@ export default function SellerOrders() {
                       {order.shipping_address && (
                         <div className="mb-4 bg-white rounded-xl p-3 border">
                           <p className="text-xs font-bold text-gray-500 uppercase mb-1">
-                            {isUberOrder ? "🛵 Deliver To" : "📦 Ship To"}
+                            {isUberOrder ? "🛵 Deliver To" : isPickupOrder ? "🏪 Customer Pickup" : "📦 Ship To"}
                           </p>
                           <p className="text-sm text-gray-700">{order.shipping_name}</p>
                           <p className="text-sm text-gray-500">{order.shipping_address}, {order.shipping_city}, {order.shipping_state} {order.shipping_zip}</p>
                         </div>
                       )}
 
-                      {!isUberOrder && order.status !== "delivered" && order.status !== "cancelled" && (
+                      {!isUberOrder && !isPickupOrder && order.status !== "delivered" && order.status !== "cancelled" && (
                         <div className="mb-4 grid grid-cols-2 gap-2">
                           <input
                             placeholder="Tracking number (optional)"
@@ -348,7 +350,7 @@ export default function SellerOrders() {
                             Hide "Mark as Shipped" for Uber orders - dispatch handles that transition */}
 
                         {/* Non-Uber: show normal next status button */}
-                        {!isUberOrder && nextStatus && order.status !== "cancelled" && (
+                        {!isUberOrder && !isPickupOrder && nextStatus && order.status !== "cancelled" && (
                           <button onClick={() => updateStatus(order.id, nextStatus)}
                             disabled={updating === order.id}
                             className="flex items-center gap-2 bg-green-900 hover:bg-green-800 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50">
@@ -358,6 +360,28 @@ export default function SellerOrders() {
                         )}
 
                         {/* Uber: pending/paid → show Mark as Processing only */}
+                                                {/* Pickup order flow */}
+                        {isPickupOrder && ["pending", "paid"].includes(order.status) && (
+                          <button onClick={() => updateStatus(order.id, "processing")}
+                            disabled={updating === order.id}
+                            className="flex items-center gap-2 bg-green-900 hover:bg-green-800 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50">
+                            <FiClock size={14} /> Mark as Processing
+                          </button>
+                        )}
+                        {isPickupOrder && order.status === "processing" && (
+                          <button onClick={() => updateStatus(order.id, "shipped")}
+                            disabled={updating === order.id}
+                            className="flex items-center gap-2 bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50">
+                            🏪 Mark as Ready for Pickup
+                          </button>
+                        )}
+                        {isPickupOrder && order.status === "shipped" && (
+                          <button onClick={() => updateStatus(order.id, "delivered")}
+                            disabled={updating === order.id}
+                            className="flex items-center gap-2 bg-green-900 hover:bg-green-800 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50">
+                            <FiCheck size={14} /> Mark as Collected
+                          </button>
+                        )}
                         {isUberOrder && ["pending", "paid"].includes(order.status) && (
                           <button onClick={() => updateStatus(order.id, "processing")}
                             disabled={updating === order.id}
@@ -385,7 +409,7 @@ export default function SellerOrders() {
                         )}
 
                         {/* Shipping label — only for non-Uber orders */}
-                        {!isUberOrder && (
+                        {!isUberOrder && !isPickupOrder && (
                           <button onClick={() => downloadLabel(order.id)}
                             disabled={updating === order.id + "_label"}
                             className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-green-900 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
