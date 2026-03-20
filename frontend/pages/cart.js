@@ -74,21 +74,21 @@ export default function CartPage() {
       // storeId: always use product.store_id (reliably present even without store join)
       const storeId = items[0]?.product?.store_id || primaryStore?.id;
 
-      // Fetch store details fresh to get vendor_type reliably
-      let storeVendorType = primaryStore?.vendor_type;
-      let storeDeliveryType = primaryStore?.delivery_type;
-      if (!storeVendorType && storeId) {
+      // Always fetch fresh store data - enum fields can return null from SQLAlchemy
+      let storeVendorType = null;
+      let storeDeliveryType = null;
+      if (storeId) {
         try {
           const storeRes = await api.get(`/sellers/${storeId}/public`);
-          storeVendorType = storeRes.data?.vendor_type;
-          storeDeliveryType = storeRes.data?.delivery_type;
+          storeVendorType = storeRes.data?.vendor_type ?? primaryStore?.vendor_type;
+          storeDeliveryType = storeRes.data?.delivery_type ?? primaryStore?.delivery_type;
         } catch {
-          // fallback — try products endpoint which has store embedded
-          try {
-            const prodRes = await api.get(`/products/?store_id=${storeId}&size=1`);
-            storeVendorType = prodRes.data?.items?.[0]?.store?.vendor_type;
-          } catch {}
+          storeVendorType = primaryStore?.vendor_type;
+          storeDeliveryType = primaryStore?.delivery_type;
         }
+      } else {
+        storeVendorType = primaryStore?.vendor_type;
+        storeDeliveryType = primaryStore?.delivery_type;
       }
 
       const isRestaurant = storeVendorType === "restaurant";
