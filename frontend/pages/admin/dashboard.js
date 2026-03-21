@@ -5,7 +5,7 @@ import Footer from "../../components/layout/Footer";
 import { useAuth } from "../_app";
 import toast from "react-hot-toast";
 import { FiUsers, FiShoppingBag, FiPackage, FiDollarSign, FiCheck, FiX, FiSearch, FiUserCheck, FiUserX, FiEye, FiStar } from "react-icons/fi";
-import { adminAPI, productsAPI } from "../../lib/api";
+import api, { adminAPI, productsAPI } from "../../lib/api";
 
 const STATUS_BADGE = {
   approved: "bg-green-100 text-green-700",
