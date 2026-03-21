@@ -127,7 +127,7 @@ export default function SellerOrders() {
       </style></head><body>
       <!-- Store banner at top -->
       <div class="store-banner">
-        ${store.logo_url ? `<img src="${store.logo_url}" />` : ""}
+        ${store.logo_url ? `<img src="${store.logo_url}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.4);vertical-align:middle;margin-right:8px" />` : ""}
         <p class="store-name">${store.name || "Store"}</p>
         ${store.address ? `<p class="store-tagline" style="margin-top:4px">📍 ${store.address}${store.city ? ", " + store.city : ""}${store.state ? ", " + store.state : ""}</p>` : ""}
         ${store.phone ? `<p class="store-tagline">📞 ${store.phone}</p>` : ""}
