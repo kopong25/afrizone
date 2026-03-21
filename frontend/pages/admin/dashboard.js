@@ -25,6 +25,9 @@ export default function AdminDashboard() {
   const [roleFilter, setRoleFilter] = useState("");
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [suspendModal, setSuspendModal] = useState(null);
+  const [suspendReason, setSuspendReason] = useState("");
+  const [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== "admin")) router.push("/");
