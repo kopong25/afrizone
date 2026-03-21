@@ -10,7 +10,7 @@ import Link from "next/link";
 import { FiSave, FiArrowLeft, FiShoppingBag, FiTruck, FiPackage, FiMapPin } from "react-icons/fi";
 
 const COUNTRIES = ["USA", "Canada", "UK", "Germany", "France", "Netherlands", "Belgium", "Sweden", "Other"];
-const BUSINESS_TYPES = ["Food & Groceries", "Fashion & Clothing", "Beauty & Hair", "Arts & Crafts", "Electronics", "Books & Media", "Health & Wellness", "Home & Living", "Other"];
+const BUSINESS_TYPES = ["Restaurant", "Food & Groceries", "Fashion & Clothing", "Beauty & Hair", "Arts & Crafts", "Electronics", "Books & Media", "Health & Wellness", "Home & Living", "Other"];
 
 const VENDOR_TYPES = [
   { value: "grocery",    label: "🛒 Grocery / Shelf-stable Food", desc: "Fufu, garri, spices, canned goods — ships nationwide via USPS" },

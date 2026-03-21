@@ -6,7 +6,7 @@ import { storesAPI } from "../lib/api";
 import { FiSearch, FiMapPin, FiStar, FiPackage } from "react-icons/fi";
 
 const COUNTRIES = ["All", "USA", "Canada", "UK", "Germany", "France"];
-const CATEGORIES = ["All", "Food & Groceries", "Fashion", "Beauty & Hair", "Arts & Crafts", "Electronics"];
+const CATEGORIES = ["All", "Restaurants", "Food & Groceries", "Fashion", "Beauty & Hair", "Arts & Crafts", "Electronics", "Books & Media", "Health & Wellness", "Home & Living"];
 
 function StoreCard({ store }) {
   return (
