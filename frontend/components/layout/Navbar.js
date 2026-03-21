@@ -51,13 +51,8 @@ export default function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 flex-shrink-0">
           <img src="/logo.png" alt="Afrizone" width={36} height={36} style={{borderRadius:8,display:"block"}} />
-         <span className="flex flex-col leading-none w-fit">
-          <span className="font-black text-xl text-yellow-400 tracking-tight"> AFRIZONE</span>
-         <span className="text-[10px] text-yellow-200 font-medium tracking-tight">
-        Authentic African Products
-     </span>
-    </span>
-         </Link>
+          <span className="font-black text-xl text-yellow-400 tracking-tight">AFRIZONE</span>
+        </Link>
 
         {/* Search bar */}
         <div className="flex-1 max-w-xl relative hidden md:block">
@@ -101,6 +96,10 @@ export default function Navbar() {
         <div className="flex items-center gap-3 ml-auto">
           <Link href="/" className="hidden md:block text-sm text-green-200 hover:text-white transition-colors">Shop</Link>
           <Link href="/stores" className="hidden md:block text-sm text-green-200 hover:text-white transition-colors">Stores</Link>
+          <Link href="/jerseys" className="hidden md:block text-sm font-bold px-3 py-1.5 rounded-lg transition-all"
+            style={{background:'linear-gradient(135deg,#FCD116,#f5a623)',color:'#000'}}>
+            ⚽ WC 2026
+          </Link>
 
           {user ? (
             <>
@@ -202,6 +201,7 @@ export default function Navbar() {
           </form>
           <Link href="/" className="block text-sm py-2 hover:text-yellow-400" onClick={() => setMobileOpen(false)}>🏪 Shop</Link>
           <Link href="/stores" className="block text-sm py-2 hover:text-yellow-400" onClick={() => setMobileOpen(false)}>🏬 Stores</Link>
+          <Link href="/jerseys" className="block text-sm py-2 font-black text-yellow-400" onClick={() => setMobileOpen(false)}>⚽ World Cup 2026 Jerseys</Link>
           {user ? (
             <>
               <Link href="/cart" className="block text-sm py-2 hover:text-yellow-400" onClick={() => setMobileOpen(false)}>🛒 Cart ({cartCount})</Link>

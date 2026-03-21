@@ -181,6 +181,52 @@ export default function Home() {
         </div>
       </div>
 
+      {/* World Cup 2026 Promo Banner */}
+      {!hasActiveFilters && (
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <a href="/jerseys" className="block group relative overflow-hidden rounded-3xl shadow-2xl"
+            style={{background:'linear-gradient(135deg,#050505 0%,#0d1117 40%,#0f1f0f 70%,#1a0a00 100%)'}}>
+
+            {/* Animated background glow */}
+            <div className="absolute inset-0 opacity-60" style={{
+              background:'radial-gradient(ellipse at 20% 50%,rgba(252,209,22,0.2) 0%,transparent 55%),radial-gradient(ellipse at 80% 50%,rgba(0,107,63,0.2) 0%,transparent 55%)'
+            }}/>
+            <div className="absolute inset-0" style={{
+              background:'repeating-linear-gradient(-55deg,transparent,transparent 20px,rgba(255,255,255,0.02) 20px,rgba(255,255,255,0.02) 40px)'
+            }}/>
+
+            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-8 py-7 gap-4">
+              {/* Left — text */}
+              <div className="text-center md:text-left">
+                <div className="inline-flex items-center gap-2 bg-yellow-400 text-black text-xs font-black px-3 py-1 rounded-full mb-3 uppercase tracking-widest">
+                  ⚽ FIFA World Cup 2026 · USA · Canada · Mexico
+                </div>
+                <h3 className="text-white font-black text-3xl md:text-4xl leading-tight mb-1"
+                  style={{fontFamily:'Bebas Neue,sans-serif',letterSpacing:'2px'}}>
+                  AFRICA <span style={{color:'#FCD116'}}>RISES</span> — SHOP THE KITS
+                </h3>
+                <p className="text-gray-400 text-sm">
+                  Ghana · Morocco · Senegal · Egypt · Côte d&apos;Ivoire + All 48 Nations
+                </p>
+              </div>
+
+              {/* Right — flags + CTA */}
+              <div className="flex flex-col items-center gap-3 flex-shrink-0">
+                <div className="flex gap-2 text-3xl">
+                  {["🇬🇭","🇲🇦","🇸🇳","🇪🇬","🇨🇮","🇿🇦","🇩🇿","🇹🇳","🇨🇻"].map(f=>(
+                    <span key={f} className="hover:scale-125 transition-transform">{f}</span>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 font-black text-black text-sm px-6 py-3 rounded-2xl group-hover:scale-105 transition-transform"
+                  style={{background:'linear-gradient(135deg,#FCD116,#f5a623)'}}>
+                  Shop All Jerseys →
+                </div>
+              </div>
+            </div>
+          </a>
+        </div>
+      )}
+
       {/* Featured Products */}
       {!hasActiveFilters && featuredProducts.length > 0 && (
         <div className="bg-yellow-50 py-10 border-b">
