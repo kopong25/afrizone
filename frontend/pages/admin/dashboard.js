@@ -28,6 +28,8 @@ export default function AdminDashboard() {
   const [suspendModal, setSuspendModal] = useState(null);
   const [suspendReason, setSuspendReason] = useState("");
   const [deleting, setDeleting] = useState(null);
+  const [allStores, setAllStores] = useState([]);
+  const [storeSearch, setStoreSearch] = useState("");
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== "admin")) router.push("/");
@@ -35,11 +37,12 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (user?.role === "admin") {
-      Promise.all([adminAPI.stats(), adminAPI.pendingSellers(), adminAPI.users()])
-        .then(([s, p, u]) => {
+      Promise.all([adminAPI.stats(), adminAPI.pendingSellers(), adminAPI.users(), api.get("/sellers/")])
+        .then(([s, p, u, st]) => {
           setStats(s.data);
           setPendingSellers(p.data);
           setUsers(u.data);
+          setAllStores(st.data || []);
         })
         .catch(console.error)
         .finally(() => setLoading(false));
@@ -69,8 +72,9 @@ export default function AdminDashboard() {
     try {
       await adminAPI.deleteStore(store.id);
       toast.success(`${store.name} deleted`);
-      const r = await adminAPI.pendingSellers();
-      setStores(r.data || []);
+      const [p, st] = await Promise.all([adminAPI.pendingSellers(), api.get("/sellers/")]);
+      setPendingSellers(p.data || []);
+      setAllStores(st.data || []);
     } catch(e) {
       toast.error(e.response?.data?.detail || "Cannot delete store");
     } finally { setDeleting(null); }
@@ -83,8 +87,9 @@ export default function AdminDashboard() {
       toast.success(suspendModal.action === "suspend" ? "Store suspended" : "Store reactivated");
       setSuspendModal(null);
       setSuspendReason("");
-      const r = await adminAPI.pendingSellers();
-      setStores(r.data || []);
+      const [p, st] = await Promise.all([adminAPI.pendingSellers(), api.get("/sellers/")]);
+      setPendingSellers(p.data || []);
+      setAllStores(st.data || []);
     } catch(e) { toast.error(e.response?.data?.detail || "Failed"); }
   };
 
@@ -206,6 +211,68 @@ export default function AdminDashboard() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* All Stores Management */}
+        {tab === "sellers" && (
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
+            <div className="px-6 py-4 border-b bg-gray-50 flex items-center justify-between flex-wrap gap-3">
+              <h2 className="font-bold text-gray-800 flex items-center gap-2">
+                All Stores
+                <span className="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">{allStores.length}</span>
+              </h2>
+              <input value={storeSearch} onChange={e => setStoreSearch(e.target.value)}
+                placeholder="Search stores..." 
+                className="border rounded-lg px-3 py-1.5 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-green-700" />
+            </div>
+            <div className="divide-y">
+              {allStores.filter(s => !storeSearch || s.name?.toLowerCase().includes(storeSearch.toLowerCase()) || s.owner?.email?.toLowerCase().includes(storeSearch.toLowerCase())).map(store => {
+                const statusColors = { approved: "bg-green-100 text-green-700", pending: "bg-yellow-100 text-yellow-700", suspended: "bg-red-100 text-red-600" };
+                return (
+                  <div key={store.id} className="px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-3">
+                      {store.logo_url
+                        ? <img src={store.logo_url} className="w-10 h-10 rounded-full object-cover border" />
+                        : <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center font-black text-green-900">{store.name?.[0]}</div>
+                      }
+                      <div>
+                        <p className="font-bold text-gray-800">{store.name}</p>
+                        <p className="text-xs text-gray-500">{store.city || store.country} · {store.business_type || store.vendor_type || "General"}</p>
+                        <p className="text-xs text-gray-400">{store.owner?.email || ""}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full capitalize ${statusColors[store.status] || "bg-gray-100 text-gray-500"}`}>
+                        {store.status}
+                      </span>
+                      {store.status !== "approved" && (
+                        <button onClick={() => approveSeller(store.id, "approved")}
+                          className="text-xs bg-green-100 hover:bg-green-200 text-green-700 font-bold px-3 py-1.5 rounded-lg">
+                          ✓ Approve
+                        </button>
+                      )}
+                      {store.status !== "suspended" ? (
+                        <button onClick={() => { setSuspendModal({store, action:"suspend"}); setSuspendReason(""); }}
+                          className="text-xs bg-orange-100 hover:bg-orange-200 text-orange-700 font-bold px-3 py-1.5 rounded-lg">
+                          ⏸ Suspend
+                        </button>
+                      ) : (
+                        <button onClick={() => { setSuspendModal({store, action:"reactivate"}); setSuspendReason(""); }}
+                          className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold px-3 py-1.5 rounded-lg">
+                          ▶ Reactivate
+                        </button>
+                      )}
+                      <button onClick={() => deleteStore(store)}
+                        disabled={deleting === store.id}
+                        className="text-xs bg-red-100 hover:bg-red-200 text-red-700 font-bold px-3 py-1.5 rounded-lg disabled:opacity-50">
+                        🗑 Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
