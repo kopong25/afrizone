@@ -181,6 +181,8 @@ export const adminAPI = {
   stats: () => api.get("/admin/stats"),
   pendingSellers: () => api.get("/admin/sellers/pending"),
   approveSeller: (id, data) => api.put(`/admin/sellers/${id}/approve`, data),
+  suspendStore: (id, data) => api.put(`/admin/stores/${id}/suspend`, data),
+  deleteStore: (id) => api.delete(`/admin/stores/${id}`),
   users: (params) => api.get("/admin/users", { params }),
   featureProduct: (id) => api.put(`/admin/products/${id}/feature`),
 };

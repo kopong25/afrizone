@@ -203,3 +203,88 @@ def admin_analytics(
         "top_sellers": top_sellers,
         "top_products": top_products,
     }
+
+
+@router.delete("/stores/{store_id}")
+def delete_store(
+    store_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.require_admin)
+):
+    """Delete a store — only allowed if store has zero real orders (demo/test stores)."""
+    store = db.query(models.Store).filter(models.Store.id == store_id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="Store not found")
+    
+    # Count real orders (paid or beyond)
+    real_orders = db.query(models.Order).filter(
+        models.Order.store_id == store_id,
+        models.Order.status.notin_(["pending", "cancelled"])
+    ).count()
+    
+    if real_orders > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete: store has {real_orders} real order(s). Suspend the store instead to preserve order history."
+        )
+    
+    # Safe to delete — remove products and store
+    db.query(models.CartItem).filter(
+        models.CartItem.product_id.in_(
+            db.query(models.Product.id).filter(models.Product.store_id == store_id)
+        )
+    ).delete(synchronize_session=False)
+    db.query(models.Product).filter(models.Product.store_id == store_id).delete()
+    db.delete(store)
+    db.commit()
+    return {"deleted": True, "store_id": store_id}
+
+
+@router.put("/stores/{store_id}/suspend")
+def suspend_store(
+    store_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.require_admin)
+):
+    """Suspend or reactivate a store with an optional reason."""
+    store = db.query(models.Store).filter(models.Store.id == store_id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="Store not found")
+    
+    action = payload.get("action", "suspend")  # suspend | reactivate
+    reason = payload.get("reason", "")
+    
+    if action == "suspend":
+        from sqlalchemy import text
+        db.execute(text("UPDATE stores SET status = 'suspended' WHERE id = :id"), {"id": store_id})
+        db.commit()
+        # Notify seller
+        try:
+            from utils.email import send_generic_email
+            owner = db.query(models.User).filter(models.User.id == store.owner_id).first()
+            if owner:
+                send_generic_email(
+                    owner.email, owner.full_name,
+                    subject=f"Your Afrizone store '{store.name}' has been suspended",
+                    body=f"Your store has been suspended by Afrizone admin.{(' Reason: ' + reason) if reason else ''} Please contact support@afrizoneshop.com to resolve this."
+                )
+        except Exception:
+            pass
+        return {"status": "suspended", "store_id": store_id, "reason": reason}
+    else:
+        from sqlalchemy import text
+        db.execute(text("UPDATE stores SET status = 'approved' WHERE id = :id"), {"id": store_id})
+        db.commit()
+        try:
+            from utils.email import send_generic_email
+            owner = db.query(models.User).filter(models.User.id == store.owner_id).first()
+            if owner:
+                send_generic_email(
+                    owner.email, owner.full_name,
+                    subject=f"Your Afrizone store '{store.name}' has been reactivated",
+                    body="Great news! Your store has been reactivated and is now visible to customers on Afrizone."
+                )
+        except Exception:
+            pass
+        return {"status": "approved", "store_id": store_id}

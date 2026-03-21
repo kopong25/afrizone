@@ -135,7 +135,7 @@ def send_delivery_confirmation(buyer_email: str, buyer_name: str, order_id: int,
     body = f"""<h2 class="hero">Order Delivered!</h2>
     <p>Hi {buyer_name}, your order #{order_id} from <strong>{store_name}</strong> has been delivered.</p>
     <p>We hope you love your purchase! Share your experience by leaving a review.</p>
-    <a href="{FRONTEND_URL}/orders?review={order_id}" class="btn">Leave a Review</a>"""
+    <a href="{FRONTEND_URL}/orders" class="btn">Leave a Review</a>"""
     send_email(buyer_email, f"Order #{order_id} has been delivered! 📦", _wrap(body))
 
 
@@ -172,3 +172,19 @@ def send_password_reset(user_email: str, user_name: str, reset_url: str):
         </div>
     """)
     send_email(user_email, "Reset your Afrizone password", html)
+
+def send_generic_email(user_email: str, user_name: str, subject: str, body: str):
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+      <div style="background:#1a5c38;padding:20px;border-radius:8px 8px 0 0;text-align:center">
+        <h1 style="color:#f5a623;margin:0;font-size:24px">🌍 AFRIZONE</h1>
+      </div>
+      <div style="background:#fff;padding:24px;border:1px solid #eee;border-radius:0 0 8px 8px">
+        <p>Hi {user_name},</p>
+        <p>{body}</p>
+        <p style="margin-top:24px;color:#666;font-size:12px">
+          Afrizone · afrizoneshop.com · support@afrizoneshop.com
+        </p>
+      </div>
+    </div>"""
+    send_email(user_email, subject, html)

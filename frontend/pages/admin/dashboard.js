@@ -60,6 +60,31 @@ export default function AdminDashboard() {
     } catch { toast.error("Failed to update"); }
   };
 
+  const deleteStore = async (store) => {
+    if (!window.confirm(`DELETE "${store.name}"?\n\nThis is permanent and only works if the store has no real orders.`)) return;
+    setDeleting(store.id);
+    try {
+      await adminAPI.deleteStore(store.id);
+      toast.success(`${store.name} deleted`);
+      const r = await adminAPI.pendingSellers();
+      setStores(r.data || []);
+    } catch(e) {
+      toast.error(e.response?.data?.detail || "Cannot delete store");
+    } finally { setDeleting(null); }
+  };
+
+  const submitSuspend = async () => {
+    if (!suspendModal) return;
+    try {
+      await adminAPI.suspendStore(suspendModal.store.id, { action: suspendModal.action, reason: suspendReason });
+      toast.success(suspendModal.action === "suspend" ? "Store suspended" : "Store reactivated");
+      setSuspendModal(null);
+      setSuspendReason("");
+      const r = await adminAPI.pendingSellers();
+      setStores(r.data || []);
+    } catch(e) { toast.error(e.response?.data?.detail || "Failed"); }
+  };
+
   const approveSeller = async (storeId, status) => {
     try {
       await adminAPI.approveSeller(storeId, { status });
@@ -335,6 +360,42 @@ export default function AdminDashboard() {
         )}
       </div>
       <Footer />
+      {/* Suspend Modal */}
+      {suspendModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+            <h3 className="font-black text-gray-900 text-lg mb-1">
+              {suspendModal.action === "suspend" ? "⏸ Suspend Store" : "▶ Reactivate Store"}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {suspendModal.action === "suspend"
+                ? `Suspending "${suspendModal.store.name}" will hide it from all customers. The seller will be notified.`
+                : `Reactivating "${suspendModal.store.name}" will make it visible to customers again.`}
+            </p>
+            {suspendModal.action === "suspend" && (
+              <div className="mb-4">
+                <label className="text-xs font-bold text-gray-600 block mb-1">Reason (sent to seller)</label>
+                <textarea value={suspendReason} onChange={e => setSuspendReason(e.target.value)}
+                  placeholder="e.g. Policy violation, pending review, fraudulent activity..."
+                  rows={3}
+                  className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button onClick={() => setSuspendModal(null)}
+                className="flex-1 border-2 border-gray-200 text-gray-600 font-bold py-2.5 rounded-xl hover:bg-gray-50">
+                Cancel
+              </button>
+              <button onClick={submitSuspend}
+                className={`flex-1 text-white font-black py-2.5 rounded-xl transition-colors ${
+                  suspendModal.action === "suspend" ? "bg-orange-500 hover:bg-orange-600" : "bg-green-700 hover:bg-green-800"
+                }`}>
+                {suspendModal.action === "suspend" ? "Suspend Store" : "Reactivate Store"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
