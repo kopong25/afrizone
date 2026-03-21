@@ -14,7 +14,8 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold mb-3 text-gold-400">Shop</h4>
             <ul className="space-y-2 text-sm text-green-200">
-              <li><Link href="/jerseys" className="hover:text-white font-bold" style={{color:"#FCD116"}}>? World Cup 2026 Jerseys</Link></li>`n              <li><Link href="/?category=food className="hover:text-white">Food & Groceries</Link></li>
+              <li><Link href="/jerseys" className="font-bold" style={{color:"#FCD116"}}>⚽ World Cup 2026 Jerseys</Link></li>
+              <li><Link href="/?category=food" className="hover:text-white">Food & Groceries</Link></li>
               <li><Link href="/?category=fashion" className="hover:text-white">Fashion & Clothing</Link></li>
               <li><Link href="/?category=beauty" className="hover:text-white">Beauty & Hair</Link></li>
               <li><Link href="/?category=arts" className="hover:text-white">Arts & Crafts</Link></li>
