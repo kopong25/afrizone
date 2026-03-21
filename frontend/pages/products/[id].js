@@ -7,7 +7,7 @@ import { StarDisplay } from "../../components/ui/StarRating";
 import ProductRecommendations from "../../components/ui/ProductRecommendations";
 import RecentlyViewed, { trackProductView } from "../../components/ui/RecentlyViewed";
 import { productsAPI, ordersAPI, reviewsAPI, wishlistAPI, variantsAPI } from "../../lib/api";
-import { useAuth } from "../_app";
+import { useAuth, fbq } from "../_app";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { FiShoppingCart, FiMapPin, FiPackage, FiShare2, FiHeart, FiCheck } from "react-icons/fi";
@@ -36,6 +36,14 @@ export default function ProductDetail() {
       const p = prodRes.data;
       setProduct(p);
       trackProductView(p);
+      // Facebook Pixel: ViewContent
+      fbq("track", "ViewContent", {
+        content_ids: [String(p.id)],
+        content_name: p.name,
+        content_type: "product",
+        value: p.price,
+        currency: "USD",
+      });
       reviewsAPI.getForProduct(p.id).then((r) => setReviews(Array.isArray(r.data) ? r.data : [])).catch(() => {});
       variantsAPI.getForProduct(p.id).then((r) => setVariants(Array.isArray(r.data) ? r.data : [])).catch(() => {});
       if (user) {
@@ -78,6 +86,12 @@ export default function ProductDetail() {
         variant_label: variantLabel || null,
       });
       setAddedToCart(true);
+      fbq("track", "AddToCart", {
+        content_ids: [String(product.id)],
+        content_name: product.name,
+        value: finalPrice,
+        currency: "USD",
+      });
       toast.success(`Added to cart!${variantLabel ? ` (${variantLabel})` : ""}`);
       setTimeout(() => setAddedToCart(false), 3000);
     } catch (err) {

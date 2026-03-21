@@ -1,8 +1,43 @@
 import React from 'react';
 import { createContext, useContext, useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import Script from "next/script";
 import { Toaster } from "react-hot-toast";
 import { authAPI, setAuthToken, loadStoredToken } from "../lib/api";
 import "../styles/globals.css";
+
+// ── Facebook Pixel ─────────────────────────────────────────────
+const FB_PIXEL_ID = process.env.NEXT_PUBLIC_FB_PIXEL_ID || "PLACEHOLDER";
+
+export const fbq = (...args) => {
+  if (typeof window !== "undefined" && window.fbq) window.fbq(...args);
+};
+
+// ── UTM Tracking ───────────────────────────────────────────────
+export const getUTM = () => {
+  if (typeof window === "undefined") return {};
+  const p = new URLSearchParams(window.location.search);
+  return {
+    source:   p.get("utm_source")   || "",
+    medium:   p.get("utm_medium")   || "",
+    campaign: p.get("utm_campaign") || "",
+    content:  p.get("utm_content")  || "",
+    term:     p.get("utm_term")     || "",
+  };
+};
+
+export const saveUTM = () => {
+  const utm = getUTM();
+  if (utm.source && typeof window !== "undefined") {
+    sessionStorage.setItem("utm", JSON.stringify(utm));
+  }
+};
+
+export const getSavedUTM = () => {
+  try {
+    return JSON.parse(sessionStorage.getItem("utm") || "{}");
+  } catch { return {}; }
+};
 
 const AuthContext = createContext(null);
 
@@ -123,8 +158,46 @@ function PWAInstallBanner() {
 }
 
 export default function App({ Component, pageProps }) {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Save UTM params when user first lands
+    saveUTM();
+
+    // Track page views on route change
+    const handleRouteChange = (url) => {
+      fbq("track", "PageView");
+    };
+    router.events.on("routeChangeComplete", handleRouteChange);
+    return () => router.events.off("routeChangeComplete", handleRouteChange);
+  }, [router.events]);
+
   return (
     <AuthProvider>
+      {/* Facebook Pixel */}
+      {FB_PIXEL_ID && FB_PIXEL_ID !== "PLACEHOLDER" && (
+        <>
+          <Script id="fb-pixel" strategy="afterInteractive">
+            {`
+              !function(f,b,e,v,n,t,s)
+              {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+              n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+              if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+              n.queue=[];t=b.createElement(e);t.async=!0;
+              t.src=v;s=b.getElementsByTagName(e)[0];
+              s.parentNode.insertBefore(t,s)}(window, document,'script',
+              'https://connect.facebook.net/en_US/fbevents.js');
+              fbq('init', '${FB_PIXEL_ID}');
+              fbq('track', 'PageView');
+            `}
+          </Script>
+          <noscript>
+            <img height="1" width="1" style={{display:"none"}}
+              src={`https://www.facebook.com/tr?id=${FB_PIXEL_ID}&ev=PageView&noscript=1`}
+              alt="" />
+          </noscript>
+        </>
+      )}
       <Component {...pageProps} />
       <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
     </AuthProvider>
