@@ -377,6 +377,117 @@ export default function JerseysPage() {
         </div>
       </div>
 
+      {/* ══════════════════ WORLD CUP TICKET SECTION ══════════════════ */}
+      <div className="bg-gray-950 py-16 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-10">
+            <p className="text-gray-500 text-xs uppercase tracking-widest mb-2">The Biggest Event on Earth</p>
+            <h2 className="bebas text-5xl md:text-7xl text-white">YOUR <span style={{color:'#FCD116'}}>TICKET</span> TO THE GAME</h2>
+            <p className="text-gray-400 mt-2 text-sm">Final Match · 19 July 2026 · New York / New Jersey</p>
+          </div>
+
+          {/* Ticket Card */}
+          <div className="relative max-w-2xl mx-auto group">
+            {/* Glow effect */}
+            <div className="absolute -inset-1 rounded-3xl opacity-50 blur-xl group-hover:opacity-80 transition-opacity"
+              style={{background:'linear-gradient(135deg,#FCD116,#006B3F,#C1272D)'}}/>
+
+            {/* Ticket body */}
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl"
+              style={{background:'linear-gradient(135deg,#1a1a1a 0%,#2a2a2a 100%)'}}>
+
+              {/* Top stripe */}
+              <div className="h-2 w-full" style={{background:'linear-gradient(90deg,#FCD116,#006B3F,#C1272D,#FCD116)'}}/>
+
+              <div className="flex">
+                {/* Main ticket body */}
+                <div className="flex-1 p-8">
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-6">
+                    <div>
+                      <p className="text-yellow-400 font-black text-xs uppercase tracking-widest mb-1">FIFA</p>
+                      <h3 className="bebas text-4xl text-white leading-none">WORLD CUP</h3>
+                      <h3 className="bebas text-5xl leading-none" style={{color:'#FCD116'}}>2026™</h3>
+                    </div>
+                    <div className="text-right">
+                      <div className="bg-yellow-400 text-black text-xs font-black px-3 py-1 rounded-full mb-2">FINAL MATCH</div>
+                      <p className="text-gray-400 text-xs">New York / New Jersey</p>
+                    </div>
+                  </div>
+
+                  {/* Details grid */}
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    {[
+                      ["DATE","19 JULY 2026"],
+                      ["VENUE","MetLife Stadium"],
+                      ["EVENT","FIFA World Cup Final"],
+                      ["NATIONS","48 Teams · 9 African"],
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <p className="text-gray-600 text-xs uppercase tracking-widest font-bold">{label}</p>
+                        <p className="text-white font-bold text-sm mt-0.5">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* African flags row */}
+                  <div className="flex items-center gap-2 mb-6">
+                    <p className="text-gray-600 text-xs uppercase tracking-wider">Africa Represented:</p>
+                    <div className="flex gap-1 text-lg">
+                      {["🇬🇭","🇲🇦","🇸🇳","🇪🇬","🇨🇮","🇿🇦","🇩🇿","🇹🇳","🇨🇻"].map(f=>(
+                        <span key={f}>{f}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* CTA */}
+                  <a href="#kits" onClick={e=>{e.preventDefault(); document.getElementById("kits")?.scrollIntoView({behavior:"smooth"})}}
+                    className="buy-btn inline-flex items-center gap-2 text-black font-black px-8 py-3 rounded-2xl text-sm">
+                    ⚽ Get Your Nation's Kit
+                  </a>
+                </div>
+
+                {/* Tear strip */}
+                <div className="w-px bg-gray-600 my-4 border-dashed border-l-2 border-gray-700 mx-0" style={{
+                  backgroundImage:'repeating-linear-gradient(to bottom,#444 0px,#444 8px,transparent 8px,transparent 14px)',
+                  width:'2px'
+                }}/>
+
+                {/* Stub */}
+                <div className="w-28 p-4 flex flex-col items-center justify-between"
+                  style={{background:'rgba(252,209,22,0.05)'}}>
+                  <div className="text-center">
+                    <p className="bebas text-yellow-400 text-2xl leading-none">26</p>
+                    <p className="text-gray-500 text-xs">FIFA WC</p>
+                  </div>
+                  {/* Barcode simulation */}
+                  <div className="flex gap-px items-end my-2">
+                    {[3,5,2,7,4,6,3,5,4,6,3,7,5,3,6,4,5].map((h,i)=>(
+                      <div key={i} className="bg-white w-0.5" style={{height:`${h*4}px`}}/>
+                    ))}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-gray-500 text-xs">AFRIZONE</p>
+                    <p className="text-gray-600 text-xs">SHOP</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom stripe */}
+              <div className="h-1 w-full" style={{background:'linear-gradient(90deg,#C1272D,#006B3F,#FCD116,#C1272D)'}}/>
+            </div>
+          </div>
+
+          {/* Countdown urgency */}
+          <div className="text-center mt-8">
+            <p className="text-gray-500 text-sm">
+              🗓 <span className="text-white font-bold">485 days</span> until the World Cup Final · July 19, 2026
+            </p>
+            <p className="text-gray-600 text-xs mt-1">Jerseys are selling fast. Don't miss out on your nation's kit.</p>
+          </div>
+        </div>
+      </div>
+
       {/* ══════════════════ WHY AFRIZONE ══════════════════ */}
       <div className="py-16 px-4" style={{background:'linear-gradient(135deg,#006B3F,#004d2d)'}}>
         <div className="max-w-4xl mx-auto text-center text-white">
