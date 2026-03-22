@@ -224,6 +224,30 @@ export default function Home() {
               </div>
             </div>
           </a>
+
+          {/* Fitness Banner */}
+          <a href="/fitness" className="block group relative overflow-hidden rounded-3xl shadow-2xl mt-4"
+            style={{background:'linear-gradient(135deg,#050505 0%,#1a0a00 50%,#0d0d0d 100%)'}}>
+            <div className="absolute inset-0 opacity-50" style={{
+              background:'radial-gradient(ellipse at 30% 50%,rgba(255,107,53,0.25) 0%,transparent 60%),radial-gradient(ellipse at 80% 50%,rgba(252,209,22,0.15) 0%,transparent 50%)'
+            }}/>
+            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-8 py-6 gap-4">
+              <div className="text-center md:text-left">
+                <div className="inline-flex items-center gap-2 bg-orange-500 text-white text-xs font-black px-3 py-1 rounded-full mb-2 uppercase tracking-widest">
+                  💪 New — African Fitness & Streetwear
+                </div>
+                <h3 className="text-white font-black text-2xl md:text-3xl leading-tight"
+                  style={{fontFamily:'Bebas Neue,sans-serif',letterSpacing:'2px'}}>
+                  TRAIN LIKE AN <span style={{color:'#FF6B35'}}>AFRICAN</span>
+                </h3>
+                <p className="text-gray-400 text-xs">Nike · Adidas · Puma + African Brands · Ships Worldwide</p>
+              </div>
+              <div className="flex items-center gap-2 font-black text-white text-sm px-6 py-3 rounded-2xl group-hover:scale-105 transition-transform flex-shrink-0"
+                style={{background:'linear-gradient(135deg,#FF6B35,#e84d00)'}}>
+                💪 Shop Fitness →
+              </div>
+            </div>
+          </a>
         </div>
       )}
 

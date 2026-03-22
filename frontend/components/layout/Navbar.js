@@ -100,6 +100,10 @@ export default function Navbar() {
             style={{background:'linear-gradient(135deg,#FCD116,#f5a623)',color:'#000'}}>
             ⚽ WC 2026
           </Link>
+          <Link href="/fitness" className="hidden md:block text-sm font-bold px-3 py-1.5 rounded-lg transition-all"
+            style={{background:'linear-gradient(135deg,#FF6B35,#e84d00)',color:'#fff'}}>
+            💪 Fitness
+          </Link>
 
           {user ? (
             <>
@@ -202,6 +206,7 @@ export default function Navbar() {
           <Link href="/" className="block text-sm py-2 hover:text-yellow-400" onClick={() => setMobileOpen(false)}>🏪 Shop</Link>
           <Link href="/stores" className="block text-sm py-2 hover:text-yellow-400" onClick={() => setMobileOpen(false)}>🏬 Stores</Link>
           <Link href="/jerseys" className="block text-sm py-2 font-black text-yellow-400" onClick={() => setMobileOpen(false)}>⚽ World Cup 2026 Jerseys</Link>
+          <Link href="/fitness" className="block text-sm py-2 font-black" style={{color:"#FF6B35"}} onClick={() => setMobileOpen(false)}>💪 African Fitness & Streetwear</Link>
           {user ? (
             <>
               <Link href="/cart" className="block text-sm py-2 hover:text-yellow-400" onClick={() => setMobileOpen(false)}>🛒 Cart ({cartCount})</Link>
