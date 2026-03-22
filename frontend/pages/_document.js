@@ -32,6 +32,9 @@ export default function Document() {
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://afrizone-frontend.onrender.com" />
         <meta name="twitter:card" content="summary_large_image" />
+
+        {/* Impact.com affiliate verification */}
+        <meta name="impact-site-verification" content="4706caff-b8aa-4b08-a725-1a0dec19b04c" />
       </Head>
       <body>
         <Main />
