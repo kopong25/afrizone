@@ -4,8 +4,6 @@ import { useState } from "react";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 
-const AMAZON_URL = "https://www.amazon.com";
-
 const AFRICAN_BRANDS = [
   {
     brand: "Tshepo Jeans",
@@ -14,7 +12,8 @@ const AFRICAN_BRANDS = [
     type: "Streetwear",
     accent: "#E8B84B",
     bg: "from-[#1a1a1a] to-[#2d2d2d]",
-    image: "https://images.unsplash.com/photo-1556906781-9a412961a28c?w=600&h=700&fit=crop",
+    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774244463/jeans_tuuxe4.jpg",
+    affiliateUrl: "https://www.amazon.com",
     price: "$45–$120",
     description: "Premium African denim and streetwear. Crafted in Johannesburg. Worn worldwide.",
     hot: true,
@@ -27,7 +26,8 @@ const AFRICAN_BRANDS = [
     type: "Afro Sportswear",
     accent: "#FCD116",
     bg: "from-[#006B3F] to-[#003d1f]",
-    image: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=600&h=700&fit=crop",
+    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774244464/vibrate_gkkqqg.jpg",
+    affiliateUrl: "https://www.amazon.com",
     price: "$35–$95",
     description: "Kente-inspired athletic wear. Train in your culture. Represent Ghana.",
     hot: true,
@@ -40,7 +40,8 @@ const AFRICAN_BRANDS = [
     type: "Luxury Streetwear",
     accent: "#008751",
     bg: "from-[#1a0a00] to-[#3d1f00]",
-    image: "https://images.unsplash.com/photo-1523398002811-999ca8dec234?w=600&h=700&fit=crop",
+    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774244463/nija_oyiqiq.jpg",
+    affiliateUrl: "https://www.amazon.com",
     price: "$65–$180",
     description: "Lagos luxury. New York edge. The diaspora's favourite street label.",
     hot: true,
@@ -53,7 +54,8 @@ const AFRICAN_BRANDS = [
     type: "Performance Wear",
     accent: "#BE0027",
     bg: "from-[#006600] to-[#003300]",
-    image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600&h=700&fit=crop",
+    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774244464/ubuntu_aivjpb.jpg",
+    affiliateUrl: "https://www.amazon.com",
     price: "$40–$110",
     description: "Built for African champions. Performance gear inspired by Kenya's running legacy.",
     hot: false,
@@ -66,7 +68,8 @@ const AFRICAN_BRANDS = [
     type: "Gym & Training",
     accent: "#F77F00",
     bg: "from-[#F77F00] to-[#7a3d00]",
-    image: "https://images.unsplash.com/photo-1483721310020-03333e577078?w=600&h=700&fit=crop",
+    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774244463/Ankara_Athlics_bclem2.jpg",
+    affiliateUrl: "https://www.amazon.com",
     price: "$38–$85",
     description: "Bold African prints meet gym-ready performance fabric. Train different.",
     hot: false,
@@ -79,7 +82,8 @@ const AFRICAN_BRANDS = [
     type: "Urban Streetwear",
     accent: "#C1272D",
     bg: "from-[#C1272D] to-[#6a0000]",
-    image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&h=700&fit=crop",
+    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774244464/sahara_zp0c0t.jpg",
+    affiliateUrl: "https://www.amazon.com",
     price: "$50–$140",
     description: "North African streetwear with Mediterranean soul. From Casablanca to the world.",
     hot: true,
@@ -96,7 +100,8 @@ const GYM_GEAR = [
     price: "$150",
     rating: 4.8,
     reviews: "12.4k",
-    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop",
+    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774244464/Nike_ShoeMen_1_vvzowm.jpg",
+    affiliateUrl: "https://www.amazon.com",
     description: "Max cushioning for max performance. The diaspora's favourite trainer.",
     hot: true,
   },
@@ -108,7 +113,8 @@ const GYM_GEAR = [
     price: "$120",
     rating: 4.7,
     reviews: "8.9k",
-    image: "https://images.unsplash.com/photo-1556906781-9a412961a28c?w=400&h=400&fit=crop",
+    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774244463/Adidas_Originals_Tracksuit_iavpra.jpg",
+    affiliateUrl: "https://www.amazon.com",
     description: "Iconic three stripes. Street to gym. Never goes out of style.",
     hot: true,
   },
@@ -120,7 +126,8 @@ const GYM_GEAR = [
     price: "$75",
     rating: 4.6,
     reviews: "5.2k",
-    image: "https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=400&h=400&fit=crop",
+    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774244464/Puma_Training_Hoodie_pxjcxt.jpg",
+    affiliateUrl: "https://www.amazon.com",
     description: "Premium cotton blend. Perfect for gym, street, or travel.",
     hot: false,
   },
@@ -132,7 +139,8 @@ const GYM_GEAR = [
     price: "$45",
     rating: 4.9,
     reviews: "22.1k",
-    image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&h=400&fit=crop",
+    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774244464/Nike_Dri-FIT_Shorts_l2wqhh.jpg",
+    affiliateUrl: "https://www.amazon.com",
     description: "Sweat-wicking tech. Built for the hardest workouts.",
     hot: true,
   },
@@ -144,7 +152,8 @@ const GYM_GEAR = [
     price: "$190",
     rating: 4.8,
     reviews: "18.7k",
-    image: "https://images.unsplash.com/photo-1608231387042-66d1773070a5?w=400&h=400&fit=crop",
+    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774244463/Adidas_Ultraboost_23_uemsep.jpg",
+    affiliateUrl: "https://www.amazon.com",
     description: "Boost energy return. Run like a Kenyan champion.",
     hot: true,
   },
@@ -156,7 +165,8 @@ const GYM_GEAR = [
     price: "$55",
     rating: 4.7,
     reviews: "9.3k",
-    image: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=400&h=400&fit=crop",
+    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774244464/Under_Armour_Sports_Bra_bccvx8.jpg",
+    affiliateUrl: "https://amzn.to/4bXwRRc",
     description: "High support. All-day comfort. Made for every body.",
     hot: false,
   },
@@ -168,7 +178,8 @@ const GYM_GEAR = [
     price: "$80",
     rating: 4.6,
     reviews: "15.8k",
-    image: "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?w=400&h=400&fit=crop",
+    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774244464/Puma_Suede_Classic_n72ump.jpg",
+    affiliateUrl: "https://www.amazon.com",
     description: "A street legend since 1968. Fresh colourways for the diaspora.",
     hot: false,
   },
@@ -180,17 +191,11 @@ const GYM_GEAR = [
     price: "$110",
     rating: 4.9,
     reviews: "31.2k",
-    image: "https://images.unsplash.com/photo-1591195853828-11db59a44f43?w=400&h=400&fit=crop",
+    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774244463/Nike_Tech_Fleece_Jogger_bbkrpw.jpg",
+    affiliateUrl: "https://www.amazon.com",
     description: "The jogger that took over the streets. Slim fit. Premium feel.",
     hot: true,
   },
-];
-
-const CATEGORIES = [
-  { id: "all", label: "Everything", icon: "🔥" },
-  { id: "african", label: "African Brands", icon: "🌍" },
-  { id: "gym", label: "Gym & Training", icon: "💪" },
-  { id: "street", label: "Streetwear", icon: "🧢" },
 ];
 
 const STATS = [
@@ -311,7 +316,6 @@ export default function FitnessPage() {
       <div className="hero-bg min-h-screen flex flex-col items-center justify-center text-white px-4 py-28 relative">
         <div className="hero-grid" />
 
-        {/* Animated sweat lines */}
         {[15, 30, 50, 70, 85].map((left, i) => (
           <div key={i} className="sweat-line" style={{
             left: `${left}%`,
@@ -323,12 +327,10 @@ export default function FitnessPage() {
         ))}
 
         <div className="relative z-10 max-w-6xl mx-auto text-center">
-          {/* Badge */}
           <div className="inline-flex items-center gap-2 glass-gold text-yellow-400 text-xs font-black px-5 py-2 rounded-full mb-8 uppercase tracking-widest">
             🌍 African Fitness & Streetwear · Shop the Culture
           </div>
 
-          {/* Hero headline */}
           <div className="mb-6">
             <h1 className="bebas leading-none">
               <span className="block text-7xl md:text-[9rem]" style={{color:'#FCD116'}}>TRAIN</span>
@@ -346,7 +348,6 @@ export default function FitnessPage() {
             Train in your culture. Represent your roots.
           </p>
 
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto mb-12">
             {STATS.map(s => (
               <div key={s.label} className="glass rounded-2xl py-5 px-3">
@@ -356,7 +357,6 @@ export default function FitnessPage() {
             ))}
           </div>
 
-          {/* CTA Buttons */}
           <div className="flex flex-wrap gap-4 justify-center">
             <button onClick={() => { setActiveSection("african"); document.getElementById("shop")?.scrollIntoView({behavior:"smooth"}); }}
               className="buy-btn text-black font-black text-base px-10 py-4 rounded-2xl shadow-xl">
@@ -369,7 +369,6 @@ export default function FitnessPage() {
           </div>
         </div>
 
-        {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
           <div className="w-6 h-10 border-2 border-white/20 rounded-full flex items-start justify-center pt-2">
             <div className="w-1 h-3 bg-yellow-400 rounded-full" />
@@ -400,7 +399,6 @@ export default function FitnessPage() {
       <div id="shop" className="bg-gray-950 py-20 px-4">
         <div className="max-w-7xl mx-auto">
 
-          {/* Section header */}
           <div className="text-center mb-10">
             <h2 className="bebas text-6xl md:text-8xl text-white mb-2">
               SHOP THE <span style={{color:'#FCD116'}}>CULTURE</span>
@@ -408,7 +406,6 @@ export default function FitnessPage() {
             <p className="text-gray-500 text-sm">African brands + world's best sportswear</p>
           </div>
 
-          {/* Tab Navigation */}
           <div className="flex flex-wrap justify-center gap-3 mb-12">
             {[
               ["african", "🌍 African Brands"],
@@ -468,7 +465,7 @@ export default function FitnessPage() {
                           <p className="text-xs text-gray-500 uppercase tracking-wider">Starting From</p>
                           <p className="text-2xl font-black text-white">{brand.price}</p>
                         </div>
-                        <a href={AMAZON_URL} target="_blank" rel="noopener noreferrer"
+                        <a href={brand.affiliateUrl} target="_blank" rel="noopener noreferrer"
                           className="amazon-btn text-black font-black px-5 py-2.5 rounded-xl text-sm">
                           Shop Now →
                         </a>
@@ -486,8 +483,8 @@ export default function FitnessPage() {
               <div className="glass rounded-2xl p-4 mb-8 flex items-center gap-3 justify-center">
                 <span className="text-2xl">🛒</span>
                 <p className="text-gray-300 text-sm font-bold">
-                  All gear ships via <span className="text-orange-400">Amazon Prime</span> — 
-                  Free 2-day delivery for Prime members. 
+                  All gear ships via <span className="text-orange-400">Amazon Prime</span> —
+                  Free 2-day delivery for Prime members.
                   <span className="text-gray-500 ml-1 text-xs">(Affiliate links — Afrizone earns 8–10% commission)</span>
                 </p>
               </div>
@@ -499,7 +496,7 @@ export default function FitnessPage() {
                         background: `linear-gradient(135deg, ${item.accent}33, ${item.accent}11)`
                       }} />
                       <img src={item.image} alt={item.name}
-                        className="w-full h-full object-cover mix-blend-overlay opacity-90" />
+                        className="w-full h-full object-cover" />
                       <div className="img-overlay absolute inset-0" />
                       {item.hot && (
                         <div className="hot-badge absolute top-3 right-3 bg-orange-500 text-white text-xs font-black px-2 py-0.5 rounded-full">
@@ -512,7 +509,6 @@ export default function FitnessPage() {
                     </div>
                     <div className="p-4">
                       <h3 className="font-black text-white text-sm mb-1 leading-tight">{item.name}</h3>
-                      {/* Stars */}
                       <div className="flex items-center gap-1 mb-2">
                         <div className="flex">
                           {[...Array(5)].map((_, i) => (
@@ -524,7 +520,7 @@ export default function FitnessPage() {
                       <p className="text-gray-500 text-xs mb-3 leading-relaxed">{item.description}</p>
                       <div className="flex items-center justify-between">
                         <p className="text-xl font-black text-white">{item.price}</p>
-                        <a href={AMAZON_URL} target="_blank" rel="noopener noreferrer"
+                        <a href={item.affiliateUrl} target="_blank" rel="noopener noreferrer"
                           className="amazon-btn text-black font-black px-4 py-2 rounded-xl text-xs">
                           Amazon →
                         </a>
@@ -536,7 +532,6 @@ export default function FitnessPage() {
             </>
           )}
 
-          {/* Affiliate disclosure */}
           <div className="glass rounded-2xl p-4 mt-14 text-center text-gray-500 text-xs max-w-2xl mx-auto">
             📋 <strong className="text-gray-400">Affiliate Disclosure:</strong> Afrizone is a participant in the Amazon Associates Program and other affiliate programs. We earn commissions on qualifying purchases at no extra cost to you.
           </div>
@@ -579,7 +574,7 @@ export default function FitnessPage() {
               <div className="absolute -inset-4 rounded-3xl opacity-30 blur-2xl"
                 style={{background:'linear-gradient(135deg,#FCD116,#006B3F)'}} />
               <img
-                src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600&h=700&fit=crop"
+                src="https://res.cloudinary.com/dta7pubd5/image/upload/v1774244464/ubuntu_aivjpb.jpg"
                 alt="African fitness"
                 className="relative rounded-3xl w-full object-cover shadow-2xl"
                 style={{height:'420px'}}
