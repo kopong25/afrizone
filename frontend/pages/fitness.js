@@ -429,7 +429,7 @@ export default function FitnessPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {AFRICAN_BRANDS.map(brand => (
-                  <div key={brand.brand} className="kit-card rounded-3xl overflow-hidden bg-gray-900 border border-white/10">
+                  <a key={brand.brand} href={brand.affiliateUrl} target="_blank" rel="noopener noreferrer" className="kit-card rounded-3xl overflow-hidden bg-gray-900 border border-white/10 block">
                     <div className="relative h-72 overflow-hidden">
                       <div className={`absolute inset-0 bg-gradient-to-br ${brand.bg}`} />
                       <img src={brand.image} alt={brand.brand}
@@ -471,7 +471,7 @@ export default function FitnessPage() {
                         </a>
                       </div>
                     </div>
-                  </div>
+                  </a>
                 ))}
               </div>
             </>
@@ -491,7 +491,7 @@ export default function FitnessPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                 {GYM_GEAR.map(item => (
                   <div key={item.name} className="gear-card rounded-2xl overflow-hidden bg-gray-900 border border-white/10">
-                    <div className="relative h-52 overflow-hidden">
+                    <a href={item.affiliateUrl} target="_blank" rel="noopener noreferrer" className="relative h-52 overflow-hidden block">
                       <div className="absolute inset-0" style={{
                         background: `linear-gradient(135deg, ${item.accent}33, ${item.accent}11)`
                       }} />
@@ -506,7 +506,7 @@ export default function FitnessPage() {
                       <div className="absolute bottom-3 left-3">
                         <span className="tag text-xs text-gray-300 px-2 py-0.5 rounded-full">{item.category}</span>
                       </div>
-                    </div>
+                    </a>
                     <div className="p-4">
                       <h3 className="font-black text-white text-sm mb-1 leading-tight">{item.name}</h3>
                       <div className="flex items-center gap-1 mb-2">
@@ -579,9 +579,10 @@ export default function FitnessPage() {
                 className="relative rounded-3xl w-full object-cover shadow-2xl"
                 style={{height:'420px'}}
               />
-              <div className="absolute bottom-6 left-6 right-6 glass rounded-2xl p-4">
-                <p className="text-white font-black text-sm">🏃 African Athletes Dominate</p>
-                <p className="text-gray-400 text-xs mt-1">From Kenyan marathons to Nigerian boxing — Africa sets the standard.</p>
+              <div className="absolute inset-0 rounded-3xl" style={{background:'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 50%, transparent 100%)'}} />
+              <div className="absolute bottom-6 left-6 right-6 rounded-2xl p-4" style={{background:'rgba(0,0,0,0.75)', backdropFilter:'blur(12px)', border:'1px solid rgba(255,255,255,0.15)'}}>
+                <p className="text-white font-black text-sm" style={{textShadow:'0 1px 4px rgba(0,0,0,0.8)'}}>🏃 African Athletes Dominate</p>
+                <p className="text-gray-200 text-xs mt-1" style={{textShadow:'0 1px 3px rgba(0,0,0,0.8)'}}>From Kenyan marathons to Nigerian boxing — Africa sets the standard.</p>
               </div>
             </div>
           </div>
