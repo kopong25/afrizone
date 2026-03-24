@@ -301,6 +301,8 @@ export default function JerseysPage() {
                 ))}
               </div>
               <div className="mt-10 glass rounded-2xl p-5 text-center">
+                <p className="text-yellow-400 font-bold mb-1">💡 Pro Tip</p>
+                <p className="text-gray-400 text-sm">Club jerseys sell year-round — not just every 4 years. These are your biggest revenue opportunity.</p>
               </div>
             </>
           )}
