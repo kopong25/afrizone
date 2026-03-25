@@ -221,3 +221,73 @@ def get_seller_payouts(
         models.Payout.store_id == store.id
     ).order_by(models.Payout.created_at.desc()).all()
     return payouts
+# ─── PAYMENT STATUS POLL ──────────────────────────────────────
+
+@router.get("/status/{order_id}")
+def get_payment_status(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.get_current_user),
+):
+    """Frontend polls this on /order-success page to confirm payment."""
+    order = db.query(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.buyer_id == current_user.id,
+    ).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    stripe_status = None
+    if order.stripe_payment_intent_id:
+        try:
+            intent = stripe.PaymentIntent.retrieve(order.stripe_payment_intent_id)
+            stripe_status = intent.status
+        except Exception:
+            pass
+
+    return {
+        "order_id": order.id,
+        "order_status": order.status,
+        "stripe_status": stripe_status,
+        "total": order.total,
+        "paid": order.status == models.OrderStatus.paid,
+    }
+
+
+# ─── REFUND ───────────────────────────────────────────────────
+
+@router.post("/refund")
+def refund_order(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.get_current_user),
+):
+    """Admin or buyer can refund a paid order."""
+    order_id = payload.get("order_id")
+    reason = payload.get("reason", "requested_by_customer")
+
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    is_admin = current_user.role == models.UserRole.admin
+    is_buyer = order.buyer_id == current_user.id
+    if not (is_admin or is_buyer):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    if order.status not in [models.OrderStatus.paid, models.OrderStatus.processing]:
+        raise HTTPException(status_code=400, detail=f"Cannot refund order with status '{order.status}'")
+
+    if not order.stripe_payment_intent_id:
+        raise HTTPException(status_code=400, detail="No payment on record for this order")
+
+    try:
+        refund = stripe.Refund.create(
+            payment_intent=order.stripe_payment_intent_id,
+            reason=reason,
+        )
+        order.status = models.OrderStatus.refunded
+        db.commit()
+        return {"refunded": True, "refund_id": refund.id, "amount": refund.amount / 100}
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=502, detail=f"Stripe refund failed: {str(e)}")
