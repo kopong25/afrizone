@@ -39,6 +39,63 @@ MAX_DELIVERY_MILES = 20
 SANDBOX_BASE_FEE   = 3.50   # dollars
 SANDBOX_PER_MILE   = 0.90   # dollars per mile
 
+# ── Delivery Zones ─────────────────────────────────────────────────────────────
+# Afrizone flat-fee zone pricing table.
+# charge = what the customer pays
+# uber_est = estimated Uber Direct cost
+# profit = Afrizone margin
+DELIVERY_ZONES = [
+    {
+        "zone":      1,
+        "label":     "Nearby",
+        "min_miles": 0,
+        "max_miles": 3,
+        "charge":    5.99,
+        "uber_est":  3.50,
+        "profit":    2.49,
+        "eta":       "~25–35 minutes",
+    },
+    {
+        "zone":      2,
+        "label":     "Local",
+        "min_miles": 3,
+        "max_miles": 7,
+        "charge":    8.99,
+        "uber_est":  5.50,
+        "profit":    3.49,
+        "eta":       "~35–50 minutes",
+    },
+    {
+        "zone":      3,
+        "label":     "Extended",
+        "min_miles": 7,
+        "max_miles": 12,
+        "charge":    12.99,
+        "uber_est":  8.50,
+        "profit":    4.49,
+        "eta":       "~50–65 minutes",
+    },
+    {
+        "zone":      4,
+        "label":     "Far",
+        "min_miles": 12,
+        "max_miles": 20,
+        "charge":    16.99,
+        "uber_est":  12.00,
+        "profit":    4.99,
+        "eta":       "~65–90 minutes",
+    },
+]
+
+
+def get_zone_for_distance(miles: float) -> dict | None:
+    """Return the matching zone dict for a given distance, or None if out of range."""
+    for zone in DELIVERY_ZONES:
+        if zone["min_miles"] <= miles < zone["max_miles"]:
+            return zone
+    return None  # Outside MAX_DELIVERY_MILES
+
+
 def estimate_uber_cost(distance_miles: float) -> float:
     """Estimate Uber Direct cost for sandbox mode."""
     return round(SANDBOX_BASE_FEE + (SANDBOX_PER_MILE * distance_miles), 2)
