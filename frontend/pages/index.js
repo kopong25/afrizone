@@ -99,7 +99,7 @@ export default function Home() {
   }, [router.query]);
 
   useEffect(() => {
-    productsAPI.list({ featured: true, size: 4 }).then((r) => setFeaturedProducts(r.data.items)).catch(() => {});
+    productsAPI.list({ featured: true, size: 4 }).then((r) => setFeaturedProducts(r.data.items ?? r.data ?? [])).catch(() => {});
     storesAPI.list({ limit: 4 }).then((r) => setFeaturedStores(r.data)).catch(() => {});
   }, []);
 
@@ -288,13 +288,18 @@ export default function Home() {
                 </h2>
                 <p className="text-green-700 text-sm mt-0.5">Hand-picked by our team</p>
               </div>
-              <button onClick={() => setFilter("sort", "popular")}
-                className="text-green-900 font-semibold text-sm flex items-center gap-1 hover:underline">
+              <button
+                onClick={() => {
+                  setFilter("sort", "popular");
+                  document.getElementById("main-content")?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="text-green-900 font-semibold text-sm flex items-center gap-1 hover:underline"
+              >
                 View all <FiArrowRight size={14} />
               </button>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {featuredProducts.map((p) => (
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {featuredProducts.slice(0, 4).map((p) => (
                 <ProductCard key={p.id} product={p} wishlisted={wishlist.includes(p.id)} onWishlist={() => toggleWishlist(p.id)} />
               ))}
             </div>
