@@ -9,7 +9,6 @@ Used when:
 """
 
 import httpx
-from typing import tuple as Tuple
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 NOMINATIM_HEADERS = {
@@ -18,7 +17,7 @@ NOMINATIM_HEADERS = {
 }
 
 
-async def geocode_address(address: str, city: str = "", state: str = "", country: str = "US") -> tuple[float, float] | None:
+async def geocode_address(address: str, city: str = "", state: str = "", country: str = "US") -> tuple | None:
     """
     Convert a street address to (latitude, longitude).
 
