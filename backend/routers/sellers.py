@@ -5,6 +5,7 @@ from database import get_db
 import models, schemas, auth as auth_utils
 from utils.cloudinary import upload_image
 from slugify import slugify
+from geocoding import geocode_address   # ← NEW IMPORT
 
 router = APIRouter()
 
@@ -60,7 +61,7 @@ def get_my_store(
 
 
 @router.put("/my-store", response_model=schemas.StoreOut)
-def update_my_store(
+async def update_my_store(                          # ← changed to async def
     updates: schemas.StoreUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.require_seller)
@@ -81,6 +82,23 @@ def update_my_store(
         # Non-restaurant: if they were on local_delivery, switch back to shipping
         if store.delivery_type == "local_delivery" and "delivery_type" not in data:
             data["delivery_type"] = "shipping"
+
+    # ── AUTO-GEOCODE when address or city is being updated ────────────────────
+    address_changed = (
+        ("address" in data and data["address"] != store.address) or
+        ("city"    in data and data["city"]    != getattr(store, "city", None))
+    )
+    if address_changed:
+        new_address = data.get("address") or getattr(store, "address", "")
+        new_city    = data.get("city")    or getattr(store, "city",    "")
+        new_state   = data.get("state")   or getattr(store, "state",   "")
+        coords = await geocode_address(new_address, new_city, new_state)
+        if coords:
+            store.latitude, store.longitude = coords
+            print(f"[Store] ✅ Geocoded '{store.name}': {coords}")
+        else:
+            print(f"[Store] ⚠️  Could not geocode address for '{store.name}' — coordinates not updated")
+    # ─────────────────────────────────────────────────────────────────────────
 
     for key, value in data.items():
         # Use raw SQL update for enum columns to avoid SQLAlchemy coercion issues
@@ -273,6 +291,7 @@ def get_store_analytics(
         "top_products": top_products,
         "status_breakdown": status_counts,
     }
+
 
 @router.get("/{store_id}/public", response_model=schemas.StoreOut)
 def get_store_by_id(store_id: int, db: Session = Depends(get_db)):
