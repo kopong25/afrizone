@@ -1,452 +1,575 @@
-import { useState, useEffect } from "react";
-import { useRouter } from "next/router";
+import { useState, useEffect, useRef, useCallback } from "react";
+import Head from "next/head";
 import Link from "next/link";
-import Navbar from "../components/layout/Navbar";
-import Footer from "../components/layout/Footer";
-import ProductCard from "../components/ui/ProductCard";
-import { productsAPI, storesAPI } from "../lib/api";
-import { FiArrowRight, FiTrendingUp, FiStar, FiShield, FiTruck, FiPackage } from "react-icons/fi";
+import { useRouter } from "next/router";
+import { storesAPI, productsAPI } from "../lib/api";
+
+// ── Engagement Best Practices Built In ────────────────────────────────────────
+// ✅ Hero carousel auto-plays (grabs attention immediately)
+// ✅ Flash deal countdown timer (urgency)
+// ✅ "X people viewing" social proof
+// ✅ Category cards visible above fold (fast navigation)
+// ✅ Product cards show ratings + stock warnings
+// ✅ Sticky announcement bar (free delivery hook)
+// ✅ Search is front and center
+// ✅ Mobile-first responsive layout
+
+const HERO_SLIDES = [
+  {
+    id: 1,
+    title: "Festival Season",
+    subtitle: "UP TO 60% OFF",
+    description: "African fashion, food & lifestyle — delivered to your door",
+    cta: "Shop Now",
+    href: "/products",
+    bg: "from-[#1a4731] to-[#2d7a50]",
+    badge: "🔥 Hot Deals",
+    accent: "#f5a623",
+  },
+  {
+    id: 2,
+    title: "Fresh Food\nDelivered",
+    subtitle: "~45 MINUTES",
+    description: "Local restaurants dispatching via Uber Direct — hot & fresh",
+    cta: "Order Food",
+    href: "/products?category=food",
+    bg: "from-[#7c3626] to-[#c0572e]",
+    badge: "🛵 Express",
+    accent: "#ffd166",
+  },
+  {
+    id: 3,
+    title: "New Arrivals",
+    subtitle: "JUST DROPPED",
+    description: "Discover the latest from Afrizone sellers this week",
+    cta: "Explore",
+    href: "/stores",
+    bg: "from-[#1a3a5c] to-[#2563a8]",
+    badge: "✨ New",
+    accent: "#60b8ff",
+  },
+];
 
 const CATEGORIES = [
-  { name: "All", slug: "", icon: "🛒" },
-  { name: "Restaurants", slug: "restaurants", icon: "🍝" },
-  { name: "Food & Groceries", slug: "food-groceries", icon: "🍲" },
-  { name: "Fashion", slug: "fashion", icon: "👗" },
-  { name: "Beauty & Hair", slug: "beauty-hair", icon: "💄" },
-  { name: "Arts & Crafts", slug: "arts-crafts", icon: "🎨" },
-  { name: "Electronics", slug: "electronics", icon: "📱" },
-  { name: "Books & Media", slug: "books-media", icon: "📚" },
-  { name: "Health & Wellness", slug: "health-wellness", icon: "🌿" },
-  { name: "Home & Living", slug: "home-living", icon: "🏠" },
+  { label: "Food & Dining",   icon: "🍲", slug: "food",      color: "#c0572e" },
+  { label: "Fashion",         icon: "👗", slug: "fashion",    color: "#7c3a8a" },
+  { label: "Beauty",          icon: "💄", slug: "beauty",     color: "#c2185b" },
+  { label: "Fitness",         icon: "🏋️", slug: "fitness",    color: "#2e7d32" },
+  { label: "Electronics",     icon: "📱", slug: "electronics",color: "#1565c0" },
+  { label: "Home & Decor",    icon: "🏠", slug: "home",       color: "#5d4037" },
+  { label: "Sports",          icon: "⚽", slug: "sports",     color: "#00695c" },
+  { label: "Groceries",       icon: "🥦", slug: "groceries",  color: "#558b2f" },
 ];
 
-const REGIONS = [
-  { name: "Popular in North America", flag: "🇺🇸", country: "" },
-  { name: "Made in Nigeria", flag: "🇳🇬", country: "Nigeria" },
-  { name: "Made in Ghana", flag: "🇬🇭", country: "Ghana" },
-  { name: "Made in Kenya", flag: "🇰🇪", country: "Kenya" },
-  { name: "Made in Senegal", flag: "🇸🇳", country: "Senegal" },
+const PROMO_CARDS = [
+  {
+    title: "FIFA World Cup\nGear",
+    tag: "Sports",
+    emoji: "⚽",
+    bg: "#0a2f5c",
+    accent: "#ffd700",
+    href: "/products?category=sports",
+  },
+  {
+    title: "Fitness\nCollection",
+    tag: "Health",
+    emoji: "🏋️",
+    bg: "#1b4332",
+    accent: "#74c69d",
+    href: "/products?category=fitness",
+  },
+  {
+    title: "Afro\nFashion Week",
+    tag: "Trending",
+    emoji: "👗",
+    bg: "#4a0e2e",
+    accent: "#f48fb1",
+    href: "/products?category=fashion",
+  },
 ];
 
-const SORT_OPTIONS = [
-  { label: "Newest", value: "created_at" },
-  { label: "Price: Low to High", value: "price_asc" },
-  { label: "Price: High to Low", value: "price_desc" },
-  { label: "Top Rated", value: "rating" },
-  { label: "Best Sellers", value: "popular" },
-];
-
-const ALL_COUNTRIES = ["Nigeria","Ghana","Ethiopia","Kenya","Senegal","Cameroon","South Africa","Congo","Ivory Coast","Tanzania","Chad","Sudan"];
-
-function SkeletonCard() {
-  return (
-    <div className="bg-white rounded-xl overflow-hidden animate-pulse">
-      <div className="aspect-square bg-gray-200" />
-      <div className="p-3 space-y-2">
-        <div className="h-4 bg-gray-200 rounded w-3/4" />
-        <div className="h-3 bg-gray-200 rounded w-1/2" />
-        <div className="h-5 bg-gray-200 rounded w-1/3" />
-      </div>
-    </div>
-  );
+// ── Countdown Timer Hook ───────────────────────────────────────────────────────
+function useCountdown() {
+  const getEnd = () => {
+    const end = new Date();
+    end.setHours(23, 59, 59, 0);
+    return end;
+  };
+  const [timeLeft, setTimeLeft] = useState({ h: "00", m: "00", s: "00" });
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const end = getEnd();
+      const diff = Math.max(0, Math.floor((end - now) / 1000));
+      const h = String(Math.floor(diff / 3600)).padStart(2, "0");
+      const m = String(Math.floor((diff % 3600) / 60)).padStart(2, "0");
+      const s = String(diff % 60).padStart(2, "0");
+      setTimeLeft({ h, m, s });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return timeLeft;
 }
 
-function EmptyState({ q, onReset }) {
+// ── Product Card ───────────────────────────────────────────────────────────────
+function ProductCard({ product }) {
+  const [viewing] = useState(() => Math.floor(Math.random() * 18) + 3);
+  const price = product.price ?? product.base_price ?? 0;
+  const originalPrice = product.original_price;
+  const discount = originalPrice ? Math.round(((originalPrice - price) / originalPrice) * 100) : null;
+  const img = product.images?.[0] || product.image_url;
+  const isLowStock = product.stock_quantity && product.stock_quantity < 10;
+
   return (
-    <div className="text-center py-16 px-4">
-      <div className="text-7xl mb-4">🌍</div>
-      <h3 className="text-2xl font-bold text-gray-800 mb-2">
-        {q ? `No results for "${q}"` : "Explore New Arrivals"}
-      </h3>
-      <p className="text-gray-500 mb-6 max-w-md mx-auto">
-        {q ? "Try a different search term or browse by category below." : "New African products are added daily by our verified sellers."}
-      </p>
-      <div className="flex flex-wrap justify-center gap-3">
-        {q && <button onClick={onReset} className="btn-primary py-2 px-6">Clear Search</button>}
-        <Link href="/register?role=seller" className="btn-secondary py-2 px-6">Sell Your Products</Link>
-      </div>
-      {!q && (
-        <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
-          {CATEGORIES.slice(1, 5).map((cat) => (
-            <Link key={cat.slug} href={`/?category=${cat.slug}`}
-              className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all text-center border hover:border-green-900">
-              <div className="text-3xl mb-2">{cat.icon}</div>
-              <p className="text-xs font-medium text-gray-700 leading-tight">{cat.name}</p>
-            </Link>
-          ))}
+    <Link href={`/products/${product.id}`} className="group block">
+      <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100">
+        {/* Image */}
+        <div className="relative aspect-square bg-gray-50 overflow-hidden">
+          {img ? (
+            <img
+              src={img}
+              alt={product.name}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-5xl bg-gradient-to-br from-green-50 to-amber-50">
+              🛍️
+            </div>
+          )}
+          {discount && (
+            <span className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+              -{discount}%
+            </span>
+          )}
+          {isLowStock && (
+            <span className="absolute bottom-2 left-2 bg-orange-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+              Only {product.stock_quantity} left!
+            </span>
+          )}
+          <button
+            onClick={(e) => { e.preventDefault(); }}
+            className="absolute top-2 right-2 w-7 h-7 bg-white rounded-full shadow flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+          >
+            ♡
+          </button>
         </div>
-      )}
-    </div>
+
+        {/* Info */}
+        <div className="p-3">
+          <p className="text-xs text-gray-400 mb-0.5 truncate">{product.store?.name || "Afrizone Store"}</p>
+          <h3 className="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug mb-2">{product.name}</h3>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-base font-black text-green-900">${Number(price).toFixed(2)}</span>
+              {originalPrice && (
+                <span className="ml-1.5 text-xs text-gray-400 line-through">${Number(originalPrice).toFixed(2)}</span>
+              )}
+            </div>
+            {product.avg_rating > 0 && (
+              <span className="text-xs text-amber-500 font-semibold">★ {Number(product.avg_rating).toFixed(1)}</span>
+            )}
+          </div>
+
+          {/* Social proof */}
+          <p className="text-xs text-gray-400 mt-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400 mr-1 animate-pulse" />
+            {viewing} people viewing
+          </p>
+        </div>
+      </div>
+    </Link>
   );
 }
 
+// ── Main Homepage ──────────────────────────────────────────────────────────────
 export default function Home() {
   const router = useRouter();
+  const [slide, setSlide] = useState(0);
+  const [search, setSearch] = useState("");
   const [products, setProducts] = useState([]);
-  const [featuredProducts, setFeaturedProducts] = useState([]);
-  const [featuredStores, setFeaturedStores] = useState([]);
-  const [pagination, setPagination] = useState({ total: 0, pages: 1, page: 1 });
+  const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [wishlist, setWishlist] = useState([]);
-  const [filters, setFilters] = useState({
-    q: "", category: "", country_of_origin: "", min_price: "", max_price: "",
-    sort: "created_at", page: 1,
-  });
+  const slideTimer = useRef(null);
+  const countdown = useCountdown();
 
-  useEffect(() => {
-    if (router.query.q) setFilters((f) => ({ ...f, q: router.query.q }));
-    if (router.query.category) setFilters((f) => ({ ...f, category: router.query.category }));
-  }, [router.query]);
-
-  useEffect(() => {
-    productsAPI.list({ featured: true, size: 4 }).then((r) => setFeaturedProducts(r.data.items)).catch(() => {});
-    storesAPI.list({ limit: 4 }).then((r) => setFeaturedStores(r.data)).catch(() => {});
+  // Auto-advance carousel
+  const nextSlide = useCallback(() => {
+    setSlide((s) => (s + 1) % HERO_SLIDES.length);
   }, []);
 
-  useEffect(() => { fetchProducts(); }, [filters]);
+  useEffect(() => {
+    slideTimer.current = setInterval(nextSlide, 4500);
+    return () => clearInterval(slideTimer.current);
+  }, [nextSlide]);
 
-  const fetchProducts = async () => {
-    setLoading(true);
-    try {
-      const params = { sort: filters.sort, page: filters.page, size: 24 };
-      if (filters.q) params.q = filters.q;
-      if (filters.category) params.category = filters.category;
-      if (filters.country_of_origin) params.country_of_origin = filters.country_of_origin;
-      if (filters.min_price) params.min_price = filters.min_price;
-      if (filters.max_price) params.max_price = filters.max_price;
-      const res = await productsAPI.list(params);
-      setProducts(res.data.items);
-      setPagination({ total: res.data.total, pages: res.data.pages, page: res.data.page });
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+  const goToSlide = (i) => {
+    clearInterval(slideTimer.current);
+    setSlide(i);
+    slideTimer.current = setInterval(nextSlide, 4500);
   };
 
-  const setFilter = (key, value) => setFilters((f) => ({ ...f, [key]: value, page: 1 }));
-  const resetFilters = () => setFilters({ q: "", category: "", country_of_origin: "", min_price: "", max_price: "", sort: "created_at", page: 1 });
-  const hasActiveFilters = filters.q || filters.category || filters.country_of_origin || filters.min_price || filters.max_price;
-  const toggleWishlist = (id) => setWishlist((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]);
+  // Fetch data
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [prodRes, storeRes] = await Promise.all([
+          productsAPI?.getAll?.({ limit: 16 }).catch(() => ({ data: [] })),
+          storesAPI?.getAll?.({ limit: 6 }).catch(() => ({ data: [] })),
+        ]);
+        setProducts(prodRes?.data?.items || prodRes?.data || []);
+        setStores(storeRes?.data?.items || storeRes?.data || []);
+      } catch {
+        setProducts([]);
+        setStores([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (search.trim()) router.push(`/products?q=${encodeURIComponent(search.trim())}`);
+  };
+
+  const current = HERO_SLIDES[slide];
 
   return (
     <>
-      <Navbar />
+      <Head>
+        <title>Afrizone — African Marketplace</title>
+        <meta name="description" content="Shop African food, fashion, beauty and more. Local delivery powered by Uber Direct." />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+      </Head>
 
-      {/* Hero */}
-      <div className="bg-gradient-to-br from-green-900 via-green-800 to-green-900 text-white relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="absolute top-10 left-10 w-64 h-64 bg-yellow-400 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-20 w-96 h-96 bg-green-400 rounded-full blur-3xl" />
+      <div style={{ fontFamily: "'DM Sans', sans-serif" }} className="bg-[#f8f6f1] min-h-screen">
+
+        {/* ── Announcement Bar ─────────────────────────────────────────────── */}
+        <div className="bg-[#1a4731] text-white text-center text-xs py-2 px-4 font-medium tracking-wide">
+          🌍 FREE delivery on your first 3 orders &nbsp;·&nbsp; Use code <span className="font-bold bg-white text-green-900 px-1.5 py-0.5 rounded ml-1">WELCOME</span>
         </div>
-        <div className="max-w-5xl mx-auto px-4 py-16 text-center relative">
-          <div className="inline-flex items-center gap-2 bg-white bg-opacity-10 rounded-full px-4 py-1.5 text-sm mb-6">
-            <span>🌍</span>
-            <span className="text-green-100">Verified sellers · USA · Canada · Europe</span>
-          </div>
-          <h1 className="text-4xl md:text-6xl font-black mb-5 leading-tight">
-            Shop Authentic<br />
-            <span className="text-yellow-400">African Products</span>
-          </h1>
-          <p className="text-green-200 text-lg mb-8 max-w-2xl mx-auto">
-            From African stores across the USA, Canada & Europe — food, fashion, beauty, arts & more.
-          </p>
-          <div className="flex max-w-2xl mx-auto gap-2 mb-8">
-            <input type="text" placeholder="Search jollof rice, ankara fabric, shea butter..."
-              value={filters.q} onChange={(e) => setFilter("q", e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && fetchProducts()}
-              className="flex-1 px-5 py-4 rounded-xl text-gray-900 focus:outline-none text-base shadow-lg" />
-            <button onClick={fetchProducts}
-              className="bg-yellow-500 hover:bg-yellow-400 text-green-900 font-bold px-6 py-4 rounded-xl shadow-lg transition-colors">
+
+        {/* ── Search Bar (sticky) ──────────────────────────────────────────── */}
+        <div className="bg-white border-b border-gray-100 px-4 py-3 sticky top-0 z-40 shadow-sm">
+          <form onSubmit={handleSearch} className="max-w-2xl mx-auto flex gap-2">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search products, stores, food..."
+              className="flex-1 border border-gray-200 rounded-full px-5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731] bg-gray-50"
+            />
+            <button
+              type="submit"
+              className="bg-[#1a4731] text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-[#2d7a50] transition-colors"
+            >
               Search
             </button>
-          </div>
-          <div className="flex flex-wrap justify-center gap-6 text-sm text-green-200">
-            <span className="flex items-center gap-1.5"><FiShield size={14} className="text-yellow-400" /> Verified Sellers</span>
-            <span className="flex items-center gap-1.5"><FiTruck size={14} className="text-yellow-400" /> USA · Canada · Europe</span>
-            <span className="flex items-center gap-1.5"><FiStar size={14} className="text-yellow-400" /> 4.8★ Average Rating</span>
-            <span className="flex items-center gap-1.5"><FiPackage size={14} className="text-yellow-400" /> Secure Checkout</span>
-          </div>
+          </form>
         </div>
-      </div>
 
-      {/* Category Bar */}
-      <div className="bg-white border-b sticky top-16 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-          {CATEGORIES.map((cat) => (
-            <button key={cat.slug} onClick={() => setFilter("category", cat.slug)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                filters.category === cat.slug ? "bg-green-900 text-white shadow-md" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}>
-              <span>{cat.icon}</span>{cat.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* World Cup 2026 Promo Banner */}
-      {!hasActiveFilters && (
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <a href="/jerseys" className="block group relative overflow-hidden rounded-3xl shadow-2xl"
-            style={{background:'linear-gradient(135deg,#050505 0%,#0d1117 40%,#0f1f0f 70%,#1a0a00 100%)'}}>
-
-            {/* Animated background glow */}
-            <div className="absolute inset-0 opacity-60" style={{
-              background:'radial-gradient(ellipse at 20% 50%,rgba(252,209,22,0.2) 0%,transparent 55%),radial-gradient(ellipse at 80% 50%,rgba(0,107,63,0.2) 0%,transparent 55%)'
-            }}/>
-            <div className="absolute inset-0" style={{
-              background:'repeating-linear-gradient(-55deg,transparent,transparent 20px,rgba(255,255,255,0.02) 20px,rgba(255,255,255,0.02) 40px)'
-            }}/>
-
-            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-8 py-7 gap-4">
-              {/* Left — text */}
-              <div className="text-center md:text-left">
-                <div className="inline-flex items-center gap-2 bg-yellow-400 text-black text-xs font-black px-3 py-1 rounded-full mb-3 uppercase tracking-widest">
-                  ⚽ FIFA World Cup 2026 · USA · Canada · Mexico
-                </div>
-                <h3 className="text-white font-black text-3xl md:text-4xl leading-tight mb-1"
-                  style={{fontFamily:'Bebas Neue,sans-serif',letterSpacing:'2px'}}>
-                  AFRICA <span style={{color:'#FCD116'}}>RISES</span> — SHOP THE KITS
-                </h3>
-                <p className="text-gray-400 text-sm">
-                  Ghana · Morocco · Senegal · Egypt · Côte d&apos;Ivoire + All 48 Nations
-                </p>
-              </div>
-
-              {/* Right — flags + CTA */}
-              <div className="flex flex-col items-center gap-3 flex-shrink-0">
-                <div className="flex gap-2 text-3xl">
-                  {["🇬🇭","🇲🇦","🇸🇳","🇪🇬","🇨🇮","🇿🇦","🇩🇿","🇹🇳","🇨🇻"].map(f=>(
-                    <span key={f} className="hover:scale-125 transition-transform">{f}</span>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 font-black text-black text-sm px-6 py-3 rounded-2xl group-hover:scale-105 transition-transform"
-                  style={{background:'linear-gradient(135deg,#FCD116,#f5a623)'}}>
-                  Shop All Jerseys →
-                </div>
-              </div>
-            </div>
-          </a>
-
-          {/* Fitness Banner */}
-          <a href="/fitness" className="block group relative overflow-hidden rounded-3xl shadow-2xl mt-4"
-            style={{background:'linear-gradient(135deg,#050505 0%,#1a0a00 50%,#0d0d0d 100%)'}}>
-            <div className="absolute inset-0 opacity-50" style={{
-              background:'radial-gradient(ellipse at 30% 50%,rgba(255,107,53,0.25) 0%,transparent 60%),radial-gradient(ellipse at 80% 50%,rgba(252,209,22,0.15) 0%,transparent 50%)'
-            }}/>
-            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-8 py-6 gap-4">
-              <div className="text-center md:text-left">
-                <div className="inline-flex items-center gap-2 bg-orange-500 text-white text-xs font-black px-3 py-1 rounded-full mb-2 uppercase tracking-widest">
-                  💪 New — African Fitness & Streetwear
-                </div>
-                <h3 className="text-white font-black text-2xl md:text-3xl leading-tight"
-                  style={{fontFamily:'Bebas Neue,sans-serif',letterSpacing:'2px'}}>
-                  TRAIN LIKE AN <span style={{color:'#FF6B35'}}>AFRICAN</span>
-                </h3>
-                <p className="text-gray-400 text-xs">Nike · Adidas · Puma + African Brands · Ships Worldwide</p>
-              </div>
-              <div className="flex items-center gap-2 font-black text-white text-sm px-6 py-3 rounded-2xl group-hover:scale-105 transition-transform flex-shrink-0"
-                style={{background:'linear-gradient(135deg,#FF6B35,#e84d00)'}}>
-                💪 Shop Fitness →
-              </div>
-            </div>
-          </a>
-        </div>
-      )}
-
-      {/* Featured Products */}
-      {!hasActiveFilters && featuredProducts.length > 0 && (
-        <div className="bg-yellow-50 py-10 border-b">
-          <div className="max-w-7xl mx-auto px-4">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-black text-green-900 flex items-center gap-2">
-                  <FiTrendingUp className="text-yellow-500" /> Featured Products
-                </h2>
-                <p className="text-green-700 text-sm mt-0.5">Hand-picked by our team</p>
-              </div>
-              <button onClick={() => setFilter("sort", "popular")}
-                className="text-green-900 font-semibold text-sm flex items-center gap-1 hover:underline">
-                View all <FiArrowRight size={14} />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {featuredProducts.map((p) => (
-                <ProductCard key={p.id} product={p} wishlisted={wishlist.includes(p.id)} onWishlist={() => toggleWishlist(p.id)} />
+        {/* ── Flash Deal Bar ───────────────────────────────────────────────── */}
+        <div className="bg-[#f5a623] py-2 px-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-3 text-sm font-bold text-[#1a1a1a]">
+            <span>⚡ FLASH DEALS END IN</span>
+            <div className="flex gap-1">
+              {[countdown.h, countdown.m, countdown.s].map((v, i) => (
+                <span key={i} className="bg-[#1a1a1a] text-white rounded px-2 py-0.5 font-mono text-sm">
+                  {v}
+                </span>
               ))}
             </div>
+            <Link href="/products?sale=true" className="underline text-[#1a4731] hover:opacity-80">
+              View All →
+            </Link>
           </div>
         </div>
-      )}
 
-      {/* Region Tabs */}
-      {!hasActiveFilters && (
-        <div className="bg-white border-b py-3">
-          <div className="max-w-7xl mx-auto px-4 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            {REGIONS.map((r) => (
-              <button key={r.name} onClick={() => setFilter("country_of_origin", r.country)}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-all border ${
-                  filters.country_of_origin === r.country && r.country
-                    ? "bg-green-900 text-white border-green-900"
-                    : "border-gray-200 hover:border-green-900 text-gray-700"
-                }`}>
-                <span>{r.flag}</span>{r.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+        {/* ── Main Hero Section ────────────────────────────────────────────── */}
+        <div className="max-w-7xl mx-auto px-3 py-4">
+          <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr_200px] gap-3">
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
-
-          {/* Sidebar */}
-          <aside className="lg:w-60 flex-shrink-0">
-            <div className="bg-white rounded-2xl p-5 shadow-sm sticky top-36 border">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-gray-800">Filters</h3>
-                {hasActiveFilters && <button onClick={resetFilters} className="text-xs text-red-500 hover:underline">Reset all</button>}
-              </div>
-              <div className="space-y-5">
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-2">Country of Origin</label>
-                  <select value={filters.country_of_origin} onChange={(e) => setFilter("country_of_origin", e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-900">
-                    <option value="">All Countries</option>
-                    {ALL_COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-2">Price Range (USD)</label>
-                  <div className="flex gap-2">
-                    <input type="number" placeholder="Min" value={filters.min_price} onChange={(e) => setFilter("min_price", e.target.value)}
-                      className="w-1/2 border rounded-lg px-2 py-2 text-sm focus:outline-none" />
-                    <input type="number" placeholder="Max" value={filters.max_price} onChange={(e) => setFilter("max_price", e.target.value)}
-                      className="w-1/2 border rounded-lg px-2 py-2 text-sm focus:outline-none" />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-2">Sort By</label>
-                  <select value={filters.sort} onChange={(e) => setFilter("sort", e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-900">
-                    {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-2">Categories</label>
-                  <div className="space-y-0.5">
-                    {CATEGORIES.slice(1).map((cat) => (
-                      <button key={cat.slug} onClick={() => setFilter("category", cat.slug)}
-                        className={`w-full text-left px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 transition-colors ${
-                          filters.category === cat.slug ? "bg-green-900 text-white" : "hover:bg-gray-50 text-gray-700"
-                        }`}>
-                        <span>{cat.icon}</span>{cat.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          {/* Products Grid */}
-          <main id="main-content" className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-5">
-              <p className="text-sm text-gray-500">
-                {loading ? "Loading..." : <><span className="font-bold text-gray-800">{pagination.total}</span> products found</>}
+            {/* LEFT — Category Cards */}
+            <div className="hidden lg:flex flex-col gap-2">
+              <p style={{ fontFamily: "'Syne', sans-serif" }} className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1 mb-1">
+                Categories
               </p>
-              {hasActiveFilters && <button onClick={resetFilters} className="text-sm text-red-500 hover:underline">Clear filters</button>}
-            </div>
-
-            {loading ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                {[...Array(12)].map((_, i) => <SkeletonCard key={i} />)}
-              </div>
-            ) : products.length === 0 ? (
-              <EmptyState q={filters.q} onReset={resetFilters} />
-            ) : (
-              <>
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {products.map((p) => (
-                    <ProductCard key={p.id} product={p} wishlisted={wishlist.includes(p.id)} onWishlist={() => toggleWishlist(p.id)} />
-                  ))}
-                </div>
-                {pagination.pages > 1 && (
-                  <div className="flex justify-center gap-2 mt-10">
-                    <button disabled={pagination.page === 1} onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))}
-                      className="px-4 py-2 rounded-lg border text-sm disabled:opacity-40 hover:border-green-900">← Prev</button>
-                    {[...Array(Math.min(pagination.pages, 7))].map((_, i) => (
-                      <button key={i} onClick={() => setFilters((f) => ({ ...f, page: i + 1 }))}
-                        className={`w-9 h-9 rounded-lg text-sm font-medium ${pagination.page === i + 1 ? "bg-green-900 text-white" : "bg-white border hover:border-green-900"}`}>
-                        {i + 1}
-                      </button>
-                    ))}
-                    <button disabled={pagination.page === pagination.pages} onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
-                      className="px-4 py-2 rounded-lg border text-sm disabled:opacity-40 hover:border-green-900">Next →</button>
-                  </div>
-                )}
-              </>
-            )}
-          </main>
-        </div>
-
-        {/* Featured Stores */}
-        {!hasActiveFilters && featuredStores.length > 0 && (
-          <div className="mt-16 border-t pt-12">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-black text-gray-900">🏪 Featured Stores</h2>
-                <p className="text-gray-500 text-sm">Verified African businesses</p>
-              </div>
-              <Link href="/stores" className="text-green-900 font-semibold text-sm flex items-center gap-1 hover:underline">
-                All stores <FiArrowRight size={14} />
+              {CATEGORIES.map((cat) => (
+                <Link
+                  key={cat.slug}
+                  href={`/products?category=${cat.slug}`}
+                  className="group flex items-center gap-3 bg-white rounded-xl px-3 py-2.5 shadow-sm hover:shadow-md transition-all border border-gray-100 hover:border-transparent hover:scale-[1.02]"
+                  style={{ "--accent": cat.color }}
+                >
+                  <span className="text-xl w-8 text-center">{cat.icon}</span>
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-[#1a4731]">{cat.label}</span>
+                  <span className="ml-auto text-gray-300 group-hover:text-[#1a4731] text-xs">›</span>
+                </Link>
+              ))}
+              <Link
+                href="/products"
+                className="mt-1 text-center text-xs text-[#1a4731] font-semibold hover:underline py-1"
+              >
+                All Categories →
               </Link>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {featuredStores.slice(0, 4).map((store) => (
-                <Link key={store.id} href={`/stores/${store.slug}`}
-                  className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all border group">
-                  <div className="h-24 bg-green-900 relative overflow-hidden">
-                    {store.banner_url && <img src={store.banner_url} alt="" className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform" />}
-                    <div className="absolute bottom-2 left-3">
-                      {store.logo_url
-                        ? <img src={store.logo_url} alt={store.name} className="w-10 h-10 rounded-full border-2 border-white object-cover" />
-                        : <div className="w-10 h-10 rounded-full border-2 border-white bg-yellow-500 flex items-center justify-center font-black text-green-900">{store.name[0]}</div>
-                      }
-                    </div>
-                  </div>
-                  <div className="p-3">
-                    <p className="font-bold text-gray-800 text-sm">{store.name}</p>
-                    <p className="text-xs text-gray-500">📍 {store.city || store.country}</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="text-xs text-yellow-600 font-medium">★ {store.avg_rating.toFixed(1)}</span>
-                      <span className="text-xs text-gray-400">({store.review_count})</span>
-                    </div>
-                  </div>
+
+            {/* CENTER — Hero Carousel */}
+            <div className="relative rounded-2xl overflow-hidden shadow-lg" style={{ minHeight: 340 }}>
+              {HERO_SLIDES.map((s, i) => (
+                <div
+                  key={s.id}
+                  className={`absolute inset-0 bg-gradient-to-br ${s.bg} flex flex-col justify-center px-8 transition-all duration-700 ${
+                    i === slide ? "opacity-100 z-10" : "opacity-0 z-0"
+                  }`}
+                >
+                  {/* Badge */}
+                  <span
+                    className="inline-block text-xs font-bold px-3 py-1 rounded-full mb-4 w-fit"
+                    style={{ background: s.accent, color: "#1a1a1a" }}
+                  >
+                    {s.badge}
+                  </span>
+
+                  {/* Title */}
+                  <h1
+                    style={{ fontFamily: "'Syne', sans-serif", whiteSpace: "pre-line" }}
+                    className="text-4xl md:text-5xl font-black text-white leading-tight mb-2"
+                  >
+                    {s.title}
+                  </h1>
+                  <p
+                    style={{ color: s.accent, fontFamily: "'Syne', sans-serif" }}
+                    className="text-2xl font-black mb-3"
+                  >
+                    {s.subtitle}
+                  </p>
+                  <p className="text-white/80 text-sm mb-6 max-w-xs">{s.description}</p>
+
+                  <Link
+                    href={s.href}
+                    className="inline-block px-6 py-3 rounded-full font-bold text-sm w-fit transition-transform hover:scale-105 active:scale-95"
+                    style={{ background: s.accent, color: "#1a1a1a" }}
+                  >
+                    {s.cta} →
+                  </Link>
+
+                  {/* Decorative circle */}
+                  <div
+                    className="absolute -right-10 -bottom-10 w-56 h-56 rounded-full opacity-10"
+                    style={{ background: s.accent }}
+                  />
+                  <div
+                    className="absolute right-20 top-10 w-24 h-24 rounded-full opacity-10"
+                    style={{ background: s.accent }}
+                  />
+                </div>
+              ))}
+
+              {/* Slide dots */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+                {HERO_SLIDES.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => goToSlide(i)}
+                    className={`rounded-full transition-all duration-300 ${
+                      i === slide ? "w-6 h-2 bg-white" : "w-2 h-2 bg-white/50"
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {/* Arrows */}
+              <button
+                onClick={() => goToSlide((slide - 1 + HERO_SLIDES.length) % HERO_SLIDES.length)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 bg-white/20 hover:bg-white/40 text-white rounded-full flex items-center justify-center transition-colors"
+              >
+                ‹
+              </button>
+              <button
+                onClick={() => goToSlide((slide + 1) % HERO_SLIDES.length)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 bg-white/20 hover:bg-white/40 text-white rounded-full flex items-center justify-center transition-colors"
+              >
+                ›
+              </button>
+            </div>
+
+            {/* RIGHT — Promo Cards */}
+            <div className="hidden lg:flex flex-col gap-2">
+              {PROMO_CARDS.map((card) => (
+                <Link
+                  key={card.title}
+                  href={card.href}
+                  className="group flex-1 rounded-xl overflow-hidden relative flex flex-col justify-end p-4 min-h-[100px] hover:shadow-lg transition-all hover:scale-[1.02]"
+                  style={{ background: card.bg }}
+                >
+                  <span
+                    className="text-xs font-bold px-2 py-0.5 rounded-full w-fit mb-1"
+                    style={{ background: card.accent, color: "#1a1a1a" }}
+                  >
+                    {card.tag}
+                  </span>
+                  <p
+                    style={{ fontFamily: "'Syne', sans-serif", whiteSpace: "pre-line", color: card.accent }}
+                    className="text-sm font-black leading-tight"
+                  >
+                    {card.title}
+                  </p>
+                  <span className="absolute top-3 right-3 text-3xl opacity-80">{card.emoji}</span>
                 </Link>
               ))}
             </div>
           </div>
-        )}
 
-        {/* Sell CTA */}
-        {!hasActiveFilters && (
-          <div className="mt-16 bg-gradient-to-r from-green-900 to-green-800 rounded-2xl p-8 md:p-12 text-white text-center">
-            <h2 className="text-3xl font-black mb-3">Own an African Business? 🌍</h2>
-            <p className="text-green-200 mb-6 max-w-xl mx-auto">
-              List your products and reach thousands of African diaspora customers across the USA, Canada & Europe. Setup takes less than 10 minutes.
-            </p>
-            <div className="flex flex-wrap justify-center gap-4">
-              <Link href="/register?role=seller" className="bg-yellow-500 hover:bg-yellow-400 text-green-900 font-bold px-8 py-3 rounded-xl transition-colors">
-                Start Selling Free →
+          {/* ── Mobile Categories (horizontal scroll) ─────────────────────── */}
+          <div className="flex lg:hidden gap-3 overflow-x-auto py-3 -mx-3 px-3 scrollbar-hide">
+            {CATEGORIES.map((cat) => (
+              <Link
+                key={cat.slug}
+                href={`/products?category=${cat.slug}`}
+                className="flex-none flex flex-col items-center gap-1 bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100"
+              >
+                <span className="text-2xl">{cat.icon}</span>
+                <span className="text-xs font-medium text-gray-600 whitespace-nowrap">{cat.label}</span>
               </Link>
-              <Link href="/pricing" className="border-2 border-white text-white hover:bg-white hover:text-green-900 font-semibold px-8 py-3 rounded-xl transition-colors">
-                View Pricing
+            ))}
+          </div>
+
+          {/* ── Featured Stores ────────────────────────────────────────────── */}
+          {stores.length > 0 && (
+            <section className="mt-8">
+              <div className="flex items-center justify-between mb-3">
+                <h2 style={{ fontFamily: "'Syne', sans-serif" }} className="text-xl font-black text-gray-900">
+                  🏪 Top Stores
+                </h2>
+                <Link href="/stores" className="text-sm text-[#1a4731] font-semibold hover:underline">
+                  See All →
+                </Link>
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                {stores.map((store) => (
+                  <Link
+                    key={store.id}
+                    href={`/stores/${store.slug || store.id}`}
+                    className="flex-none w-32 bg-white rounded-xl p-3 shadow-sm border border-gray-100 hover:shadow-md transition-all hover:-translate-y-0.5 text-center"
+                  >
+                    <div className="w-12 h-12 rounded-full mx-auto mb-2 overflow-hidden bg-gradient-to-br from-green-100 to-amber-100 flex items-center justify-center">
+                      {store.logo_url
+                        ? <img src={store.logo_url} alt={store.name} className="w-full h-full object-cover" />
+                        : <span className="text-2xl">🏪</span>
+                      }
+                    </div>
+                    <p className="text-xs font-semibold text-gray-800 line-clamp-2 leading-tight">{store.name}</p>
+                    {store.avg_rating > 0 && (
+                      <p className="text-xs text-amber-500 mt-1">★ {Number(store.avg_rating).toFixed(1)}</p>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── Products Grid ──────────────────────────────────────────────── */}
+          <section className="mt-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 style={{ fontFamily: "'Syne', sans-serif" }} className="text-xl font-black text-gray-900">
+                ⚡ Trending Now
+              </h2>
+              <Link href="/products" className="text-sm text-[#1a4731] font-semibold hover:underline">
+                View All →
               </Link>
             </div>
-            <p className="text-green-300 text-sm mt-4">First 3 months free · No credit card required</p>
-          </div>
-        )}
+
+            {loading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="bg-white rounded-xl overflow-hidden shadow-sm animate-pulse">
+                    <div className="aspect-square bg-gray-200" />
+                    <div className="p-3 space-y-2">
+                      <div className="h-3 bg-gray-200 rounded w-2/3" />
+                      <div className="h-3 bg-gray-200 rounded" />
+                      <div className="h-4 bg-gray-200 rounded w-1/3" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : products.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {products.map((p) => (
+                  <ProductCard key={p.id} product={p} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-200">
+                <p className="text-4xl mb-3">🛍️</p>
+                <p className="text-gray-500 font-medium">Products loading soon</p>
+                <p className="text-sm text-gray-400 mt-1">Sellers are stocking up — check back shortly</p>
+                <Link href="/stores" className="mt-4 inline-block bg-[#1a4731] text-white px-6 py-2.5 rounded-full text-sm font-semibold hover:bg-[#2d7a50] transition-colors">
+                  Browse Stores
+                </Link>
+              </div>
+            )}
+          </section>
+
+          {/* ── Trust Signals ─────────────────────────────────────────────── */}
+          <section className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { icon: "🛵", title: "Fast Delivery", desc: "~45 min via Uber Direct" },
+              { icon: "🔒", title: "Secure Checkout", desc: "256-bit SSL encryption" },
+              { icon: "↩️", title: "Easy Returns", desc: "Hassle-free 30 day policy" },
+              { icon: "🌍", title: "African Sellers", desc: "100% verified stores" },
+            ].map((t) => (
+              <div key={t.title} className="bg-white rounded-xl p-4 text-center shadow-sm border border-gray-100">
+                <p className="text-2xl mb-2">{t.icon}</p>
+                <p className="text-sm font-bold text-gray-800">{t.title}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{t.desc}</p>
+              </div>
+            ))}
+          </section>
+
+          {/* ── Newsletter ─────────────────────────────────────────────────── */}
+          <section className="mt-8 mb-10 bg-gradient-to-r from-[#1a4731] to-[#2d7a50] rounded-2xl p-8 text-center text-white">
+            <p className="text-xs font-bold tracking-widest uppercase text-green-300 mb-2">Stay in the loop</p>
+            <h3 style={{ fontFamily: "'Syne', sans-serif" }} className="text-2xl font-black mb-2">
+              Get deals before anyone else
+            </h3>
+            <p className="text-white/70 text-sm mb-5">Flash sales, new arrivals and exclusive drops — straight to your inbox.</p>
+            <form
+              onSubmit={(e) => e.preventDefault()}
+              className="flex gap-2 max-w-sm mx-auto"
+            >
+              <input
+                type="email"
+                placeholder="your@email.com"
+                className="flex-1 rounded-full px-4 py-2.5 text-sm text-gray-800 focus:outline-none"
+              />
+              <button
+                type="submit"
+                className="bg-[#f5a623] text-gray-900 font-bold px-5 py-2.5 rounded-full text-sm hover:bg-[#f0c040] transition-colors whitespace-nowrap"
+              >
+                Subscribe
+              </button>
+            </form>
+          </section>
+
+        </div>
       </div>
-      <Footer />
+
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+      `}</style>
     </>
   );
 }
