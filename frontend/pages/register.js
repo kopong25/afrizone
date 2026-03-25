@@ -12,7 +12,7 @@ export default function Register() {
   const { login } = useAuth();
   const defaultRole = router.query.role || "buyer";
   const [form, setForm] = useState({
-    email: "", password: "", full_name: "", country: "USA", role: defaultRole,
+    email: "", password: "", full_name: "", country: "USA", role: defaultRole, phone: "",
   });
   const [loading, setLoading] = useState(false);
 
@@ -94,6 +94,17 @@ export default function Register() {
                 className="w-full border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-900 text-sm"
                 placeholder="you@example.com"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+              <input
+                type="tel" required
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                className="w-full border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-900 text-sm"
+                placeholder="+1 (555) 000-0000"
+              />
+              <p className="text-xs text-gray-400 mt-1">Used by the delivery driver to contact you.</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
