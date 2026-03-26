@@ -528,4 +528,4 @@ class Ad(Base):
     accent_color = Column(String(20), default="#FCD116")
     is_featured = Column(Boolean, default=False)
     sort_order = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=func.now())
