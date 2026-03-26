@@ -78,7 +78,7 @@ app.include_router(referrals.router,     prefix="/referrals",     tags=["Referra
 app.include_router(uber_direct.router,   prefix="/uber-direct",   tags=["Uber Direct"])
 
 # Ads — homepage carousel
-app.include_router(ads.router,           prefix="/ads",           tags=["Ads"])
+app.include_router(ads.router,                                    tags=["Ads"])
 
 @app.get("/", tags=["Health"])
 def root():
