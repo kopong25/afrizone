@@ -50,7 +50,7 @@ async def upload_ad_image(
     if current_user.role not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admins only")
     try:
-        url = await upload_image(file, folder="afrizone/ads")
+        url = await upload_image(file, folder="afrizone/products/ads")
     except HTTPException:
         raise
     except Exception as e:
