@@ -511,3 +511,21 @@ class PasswordResetToken(Base):
     used       = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     user       = relationship("User", backref="reset_tokens")
+
+# Ads
+# ─────────────────────────────────────────────
+class Ad(Base):
+    __tablename__ = "ads"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(100), nullable=False)
+    subtitle = Column(String(200), nullable=True)
+    cta_text = Column(String(50), default="Shop Now")
+    cta_url = Column(String(300), default="/")
+    image_url = Column(String(500), nullable=True)
+    emoji = Column(String(10), default="⚡")
+    bg_color = Column(String(20), default="#006B3F")
+    accent_color = Column(String(20), default="#FCD116")
+    is_featured = Column(Boolean, default=False)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
