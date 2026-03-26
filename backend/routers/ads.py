@@ -49,15 +49,12 @@ async def upload_ad_image(
 ):
     if current_user.role not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admins only")
-
-    # Let cloudinary.py handle validation — remove duplicate checks here
     try:
-        url = await upload_image(file, folder="afrizone/ads")  # ✅ pass UploadFile
+        url = await upload_image(file, folder="afrizone/ads")
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
-
     return {"image_url": url}
 
 
