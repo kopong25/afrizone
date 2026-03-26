@@ -47,28 +47,14 @@ async def upload_ad_image(
     file: UploadFile = File(...),
     current_user=Depends(auth_utils.get_current_user),
 ):
-    """
-    Admin uploads an image for a carousel ad.
-    Returns { image_url } — paste this into the ad form image_url field,
-    or the frontend can auto-fill it after upload.
-    Supported: jpg, png, webp, gif. Max 10MB.
-    """
     if current_user.role not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admins only")
 
-    allowed = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"}
-    if file.content_type not in allowed:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid file type. Use jpg, png, webp, or gif."
-        )
-
-    contents = await file.read()
-    if len(contents) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="File too large. Max 10MB.")
-
+    # Let cloudinary.py handle validation — remove duplicate checks here
     try:
-        url = await upload_image(contents, folder="afrizone/ads")
+        url = await upload_image(file, folder="afrizone/ads")  # ✅ pass UploadFile
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
