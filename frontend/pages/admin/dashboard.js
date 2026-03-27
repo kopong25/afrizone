@@ -145,8 +145,9 @@ export default function AdminDashboard() {
           ))}
         </div>
 
+        
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b" onClick={(e) => {
+        <div className="flex gap-2 mb-6 border-b items-center" onClick={(e) => {
           const btn = e.target.closest("button");
           if (btn && btn.textContent.trim().startsWith("products") && products.length === 0) fetchProducts();
         }}>
@@ -161,6 +162,10 @@ export default function AdminDashboard() {
               )}
             </button>
           ))}
+          <a href="/admin/ads"
+            className="ml-auto mb-1 px-4 py-2 text-sm font-bold bg-green-900 text-white rounded-xl hover:bg-green-800 transition-colors whitespace-nowrap">
+            📢 Manage Ads
+          </a>
         </div>
 
         {/* Pending Sellers */}
