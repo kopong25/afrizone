@@ -30,12 +30,8 @@ const COLOR_PRESETS = [
 const API = process.env.NEXT_PUBLIC_API_URL || "https://afrizone-loqr.onrender.com";
 
 function getToken() {
-  if (typeof window === "undefined") return "";
-  return (
-    sessionStorage.getItem("az_tok") ||
-    localStorage.getItem("afrizone_token") ||
-    ""
-  );
+  if (typeof window !== "undefined") return localStorage.getItem("afrizone_token") || "";
+  return "";
 }
 
 export default function AdminAdsPage() {
