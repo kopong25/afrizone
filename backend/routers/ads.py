@@ -141,6 +141,22 @@ def delete_ad(
     db.delete(ad)
     db.commit()
     return {"message": "Ad deleted"}
+@router.get("/test-upload")
+async def test_upload():
+    import cloudinary.uploader
+    import os
+    
+    # Upload a simple 1x1 pixel PNG (no file needed)
+    import base64
+    tiny_png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    )
+    result = cloudinary.uploader.upload(
+        tiny_png,
+        folder="afrizone/test",
+        resource_type="image",
+    )
+    return {"url": result["secure_url"]}
 
 
 @router.patch("/{ad_id}/feature", response_model=AdOut)
