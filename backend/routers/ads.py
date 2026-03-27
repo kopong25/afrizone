@@ -13,6 +13,7 @@ from database import get_db
 import models
 import auth as auth_utils
 from utils.cloudinary import upload_image
+import time
 
 router = APIRouter(prefix="/ads", tags=["ads"])
 
@@ -50,8 +51,9 @@ async def upload_ad_image(
     if current_user.role not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admins only")
     try:
-        url = await upload_image(file, folder="afrizone/products/ads")
-    except HTTPException:
+        
+      url = await upload_image(file, folder=f"afrizone/products/{int(time.time())}")
+      except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
