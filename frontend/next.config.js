@@ -3,7 +3,7 @@ const withPWA = require("next-pwa")({
   register: true,
   skipWaiting: true,
   reloadOnOnline: true,
-  disable: true, // Disabled: SW was intercepting API calls and breaking product pages
+  disable: process.env.NODE_ENV === 'development',
   runtimeCaching: [
     {
       urlPattern: /^https:\/\/afrizone-loqr\.onrender\.com\/.*$/i,
