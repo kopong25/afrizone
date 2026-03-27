@@ -2,9 +2,8 @@
 Ads management router for Afrizone.
 Admin can create/edit/delete ads and mark up to 4 as featured.
 Featured ads appear in the homepage carousel.
-Admin can upload images directly via POST /ads/upload-image.
 """
-import time
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -13,7 +12,6 @@ from database import get_db
 import models
 import auth as auth_utils
 from utils.cloudinary import upload_image
-
 
 router = APIRouter(prefix="/ads", tags=["ads"])
 
@@ -41,21 +39,19 @@ class AdOut(AdCreate):
         from_attributes = True
 
 
-# ── Image upload ──────────────────────────────────────────────────────────────
+# ── Image upload — passes UploadFile directly to your existing util ───────────
 
 @router.post("/upload-image")
 async def upload_ad_image(
     file: UploadFile = File(...),
     current_user=Depends(auth_utils.get_current_user),
 ):
+    """Admin uploads an image for a carousel ad. Returns { image_url }."""
     if current_user.role not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admins only")
-    try:
-        url = await upload_image(file, folder=f"afrizone/products/{int(time.time())}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+    # Pass the UploadFile directly — matches your existing upload_image signature
+    url = await upload_image(file, folder="afrizone/ads")
     return {"image_url": url}
 
 
@@ -141,22 +137,6 @@ def delete_ad(
     db.delete(ad)
     db.commit()
     return {"message": "Ad deleted"}
-@router.get("/test-upload")
-async def test_upload():
-    import cloudinary.uploader
-    import os
-    
-    # Upload a simple 1x1 pixel PNG (no file needed)
-    import base64
-    tiny_png = base64.b64decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-    )
-    result = cloudinary.uploader.upload(
-        tiny_png,
-        folder="afrizone/test",
-        resource_type="image",
-    )
-    return {"url": result["secure_url"]}
 
 
 @router.patch("/{ad_id}/feature", response_model=AdOut)
