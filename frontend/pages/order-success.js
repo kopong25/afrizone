@@ -1,14 +1,47 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import Navbar from "../components/layout/Navbar";
 import { useAuth, fbq, getSavedUTM } from "./_app";
 import api from "../lib/api";
 
-function getDeliveryDate() {
-  const d = new Date();
-  d.setDate(d.getDate() + Math.floor(Math.random() * 3) + 5); // 5-7 days
-  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+// Returns a human-readable delivery estimate based on the delivery method
+function getDeliveryEstimate(deliveryMethod) {
+  const method = (deliveryMethod || "").toLowerCase();
+
+  if (method === "uber" || method === "uber_eats" || method === "local") {
+    // Same-day: estimate 45–75 min from now
+    const now = new Date();
+    const low = new Date(now.getTime() + 45 * 60 * 1000);
+    const high = new Date(now.getTime() + 75 * 60 * 1000);
+    const fmt = (d) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    return {
+      label: "Today",
+      detail: `Estimated between ${fmt(low)} – ${fmt(high)}`,
+    };
+  }
+
+  // Default: USPS / standard shipping — 3–5 business days
+  function addBusinessDays(date, days) {
+    let d = new Date(date);
+    let added = 0;
+    while (added < days) {
+      d.setDate(d.getDate() + 1);
+      const day = d.getDay();
+      if (day !== 0 && day !== 6) added++; // skip weekends
+    }
+    return d;
+  }
+
+  const earliest = addBusinessDays(new Date(), 3);
+  const latest = addBusinessDays(new Date(), 5);
+  const fmtDate = (d) =>
+    d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
+  return {
+    label: fmtDate(earliest),
+    detail: `Estimated by ${fmtDate(latest)} · Tracking emailed once shipped`,
+  };
 }
 
 const AFRICAN_PROVERBS = [
@@ -22,19 +55,68 @@ export default function OrderSuccessPage() {
   const router = useRouter();
   const { order_id } = router.query;
   const [order, setOrder] = useState(null);
+  const [orderLoading, setOrderLoading] = useState(true);
+  const [orderError, setOrderError] = useState(false);
   const [confetti, setConfetti] = useState(true);
-  const deliveryDate = getDeliveryDate();
-  const proverb = AFRICAN_PROVERBS[Math.floor(Math.random() * AFRICAN_PROVERBS.length)];
+  const fbqFired = useRef(false); // prevent double-firing purchase pixel
+
+  // Stable random values — won't re-randomize on every render
+  const proverb = useMemo(
+    () => AFRICAN_PROVERBS[Math.floor(Math.random() * AFRICAN_PROVERBS.length)],
+    []
+  );
+
   const firstName = user?.full_name?.split(" ")[0] || "Friend";
+
+  // Derive delivery estimate once order is loaded (so we respect delivery_method)
+  const delivery = getDeliveryEstimate(order?.delivery_method);
+
+  // Derive delivery fee: use order.delivery_fee if present, else derive from total - items sum
+  const itemsSubtotal = order?.items?.reduce(
+    (sum, item) => sum + Number(item.total_price),
+    0
+  ) ?? 0;
+  const deliveryFee =
+    order?.delivery_fee != null
+      ? Number(order.delivery_fee)
+      : order?.total != null
+      ? Number(order.total) - itemsSubtotal
+      : null;
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) { router.push("/login"); return; }
+
     if (order_id) {
-      api.get(`/orders/${order_id}`).then(r => setOrder(r.data)).catch(() => {});
+      setOrderLoading(true);
+      api.get(`/orders/${order_id}`)
+        .then(r => {
+          const fetchedOrder = r.data;
+          setOrder(fetchedOrder);
+          setOrderLoading(false);
+
+          // ✅ Fire Meta/Facebook Purchase pixel exactly once
+          if (!fbqFired.current && fetchedOrder?.total) {
+            fbqFired.current = true;
+            const utm = getSavedUTM?.() || {};
+            fbq("track", "Purchase", {
+              value: Number(fetchedOrder.total),
+              currency: "USD",
+              content_ids: fetchedOrder.items?.map(i => String(i.product?.id)) || [],
+              content_type: "product",
+              ...utm,
+            });
+          }
+        })
+        .catch(() => {
+          setOrderLoading(false);
+          setOrderError(true);
+        });
+
       // Send confirmation email (fires after Stripe redirects here)
       api.post(`/orders/${order_id}/send-confirmation`).catch(() => {});
     }
+
     const t = setTimeout(() => setConfetti(false), 4000);
     return () => clearTimeout(t);
   }, [user, authLoading, order_id]);
@@ -69,11 +151,15 @@ export default function OrderSuccessPage() {
         }
         @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
         @keyframes slide-up { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes pulse-bg { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         .pop { animation: pop 0.6s ease forwards; }
         .slide-up { animation: slide-up 0.5s ease forwards; }
         .slide-up-2 { animation: slide-up 0.5s ease 0.15s forwards; opacity: 0; }
         .slide-up-3 { animation: slide-up 0.5s ease 0.3s forwards; opacity: 0; }
         .slide-up-4 { animation: slide-up 0.5s ease 0.45s forwards; opacity: 0; }
+        .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+          background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 6px; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
       `}</style>
 
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
@@ -94,43 +180,91 @@ export default function OrderSuccessPage() {
             <p className="text-green-700 font-bold text-lg">Your order is confirmed!</p>
           </div>
 
-          {/* Order card */}
-          <div className="slide-up-2 bg-white rounded-2xl border border-green-100 shadow-lg p-6 mt-8 text-left">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-xs text-gray-400 uppercase font-bold tracking-wide">Order</p>
-                <p className="font-black text-gray-900 text-lg">#{order_id || order?.id}</p>
+          {/* ── Error state ── */}
+          {orderError && (
+            <div className="slide-up-2 bg-red-50 border border-red-200 rounded-2xl p-6 mt-8 text-left">
+              <p className="font-bold text-red-700 mb-1">⚠️ Couldn't load order details</p>
+              <p className="text-sm text-red-500 mb-3">
+                Your order was placed successfully, but we had trouble fetching the details.
+                Check your email for confirmation or visit your orders page.
+              </p>
+              <Link href="/orders"
+                className="text-sm font-bold text-red-700 underline">
+                View my orders →
+              </Link>
+            </div>
+          )}
+
+          {/* ── Loading skeleton ── */}
+          {!orderError && orderLoading && (
+            <div className="slide-up-2 bg-white rounded-2xl border border-green-100 shadow-lg p-6 mt-8 text-left space-y-4">
+              <div className="flex justify-between items-center">
+                <div className="skeleton h-5 w-20" />
+                <div className="skeleton h-6 w-24" />
               </div>
-              <span className="bg-green-100 text-green-800 text-xs font-black px-3 py-1.5 rounded-full">✓ Confirmed</span>
+              <div className="skeleton h-20 w-full" />
+              <div className="skeleton h-4 w-3/4" />
+              <div className="skeleton h-4 w-1/2" />
+              <div className="border-t pt-3 skeleton h-5 w-full" />
             </div>
+          )}
 
-            {/* Delivery timeline */}
-            <div className="bg-green-50 rounded-xl p-4 mb-4">
-              <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">📦 Estimated Delivery</p>
-              <p className="text-xl font-black text-green-900">{deliveryDate}</p>
-              <p className="text-xs text-green-700 mt-1">We'll email you tracking info once shipped</p>
-            </div>
-
-            {/* Order items if available */}
-            {order?.items?.length > 0 && (
-              <div className="space-y-2 mb-4">
-                {order.items.map(item => (
-                  <div key={item.id} className="flex justify-between text-sm">
-                    <span className="text-gray-600">{item.product?.name} × {item.quantity}</span>
-                    <span className="font-bold">${Number(item.total_price).toFixed(2)}</span>
-                  </div>
-                ))}
-                <div className="border-t pt-2 flex justify-between font-black text-gray-900">
-                  <span>Total</span>
-                  <span>${Number(order?.total).toFixed(2)}</span>
+          {/* ── Order card (loaded) ── */}
+          {!orderError && !orderLoading && (
+            <div className="slide-up-2 bg-white rounded-2xl border border-green-100 shadow-lg p-6 mt-8 text-left">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-xs text-gray-400 uppercase font-bold tracking-wide">Order</p>
+                  <p className="font-black text-gray-900 text-lg">#{order_id || order?.id}</p>
                 </div>
+                <span className="bg-green-100 text-green-800 text-xs font-black px-3 py-1.5 rounded-full">✓ Confirmed</span>
               </div>
-            )}
 
-            <div className="border-t pt-3 text-sm text-gray-500">
-              <p>📧 Confirmation sent to <strong>{user?.email}</strong></p>
+              {/* Delivery timeline — dynamic based on delivery_method */}
+              <div className="bg-green-50 rounded-xl p-4 mb-4">
+                <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">📦 Estimated Delivery</p>
+                <p className="text-xl font-black text-green-900">{delivery.label}</p>
+                <p className="text-xs text-green-700 mt-1">{delivery.detail}</p>
+              </div>
+
+              {/* Order items + delivery fee + total */}
+              {order?.items?.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  {/* Line items */}
+                  {order.items.map(item => (
+                    <div key={item.id} className="flex justify-between text-sm">
+                      <span className="text-gray-600">{item.product?.name} × {item.quantity}</span>
+                      <span className="font-bold">${Number(item.total_price).toFixed(2)}</span>
+                    </div>
+                  ))}
+
+                  {/* ✅ FIX 1: Delivery fee row */}
+                  {deliveryFee != null && deliveryFee > 0 && (
+                    <div className="flex justify-between text-sm text-gray-500">
+                      <span>Delivery fee</span>
+                      <span>${deliveryFee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {deliveryFee === 0 && (
+                    <div className="flex justify-between text-sm text-green-700">
+                      <span>Delivery fee</span>
+                      <span className="font-bold">Free 🎉</span>
+                    </div>
+                  )}
+
+                  {/* Total */}
+                  <div className="border-t pt-2 flex justify-between font-black text-gray-900">
+                    <span>Total</span>
+                    <span>${Number(order?.total).toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="border-t pt-3 text-sm text-gray-500">
+                <p>📧 Confirmation sent to <strong>{user?.email}</strong></p>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Exciting message */}
           <div className="slide-up-3 mt-8">
