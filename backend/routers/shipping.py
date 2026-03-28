@@ -94,16 +94,22 @@ def _build_parcel(order: models.Order) -> dict:
     }
 
 
-def _create_mock_label(order_id: int, db: Session, order, store, background_tasks: BackgroundTasks):
-    """Persist and return a mock label (only used when SHIPPO_API_KEY is absent)."""
+def _create_mock_label(order_id: int, db: Session, order, store, background_tasks: BackgroundTasks, sample: bool = False):
+    """Persist and return a mock/sample label.
+
+    sample=False  → no API key at all (dev mode)
+    sample=True   → API key exists but address was incomplete; label is watermarked SAMPLE - DO NOT SHIP
+    """
+    status = "sample" if sample else "created"
+    label_url = f"https://afrizone-loqr.onrender.com/shipping/mock-label/{order_id}{'?sample=1' if sample else ''}"
     label = models.ShippingLabel(
         order_id=order_id,
         carrier="USPS",
         service="Priority Mail",
         tracking_number=f"9400111899223{order_id:06d}",
-        label_url=f"https://afrizone-loqr.onrender.com/shipping/mock-label/{order_id}",
+        label_url=label_url,
         rate=8.95,
-        status="created",
+        status=status,
     )
     db.add(label)
     order.tracking_number = label.tracking_number
@@ -111,10 +117,15 @@ def _create_mock_label(order_id: int, db: Session, order, store, background_task
     db.commit()
     background_tasks.add_task(_email_label_to_seller, order, store, label)
     return {
-        "label_url": label.label_url,
+        "label_url":       label.label_url,
         "tracking_number": label.tracking_number,
-        "carrier": label.carrier,
-        "mock": True,
+        "carrier":         label.carrier,
+        "mock":            True,
+        "sample":          sample,
+        "warning":         (
+            "Address was incomplete — this is a SAMPLE label. DO NOT SHIP. "
+            "Ask the customer to update their address."
+        ) if sample else None,
     }
 
 
@@ -279,10 +290,11 @@ async def create_shipping_label(
         })
     except httpx.HTTPStatusError as e:
         logger.error(f"[SHIPPO] Transaction HTTP error: {e.response.status_code} — {e.response.text}")
-        raise HTTPException(
-            status_code=502,
-            detail=f"Shippo transaction failed: {e.response.text}",
-        )
+        # Incomplete address → fall back to sample label so seller can still see the flow
+        if "complete address" in e.response.text.lower() or "address" in e.response.text.lower():
+            logger.warning("[SHIPPO] Incomplete address detected — issuing SAMPLE label")
+            return _create_mock_label(order_id, db, order, store, background_tasks, sample=True)
+        raise HTTPException(status_code=502, detail=f"Shippo transaction failed: {e.response.text}")
     except Exception as e:
         logger.error(f"[SHIPPO] Transaction error: {e}")
         raise HTTPException(status_code=502, detail=f"Could not purchase label: {str(e)}")
@@ -290,10 +302,12 @@ async def create_shipping_label(
     if txn.get("status") != "SUCCESS":
         messages = txn.get("messages", "Unknown Shippo error")
         logger.error(f"[SHIPPO] Transaction not SUCCESS: {messages}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Shippo could not create label: {messages}",
-        )
+        # Address-related Shippo message → sample label fallback
+        msg_str = str(messages).lower()
+        if "address" in msg_str or "complete" in msg_str:
+            logger.warning("[SHIPPO] Address issue in transaction — issuing SAMPLE label")
+            return _create_mock_label(order_id, db, order, store, background_tasks, sample=True)
+        raise HTTPException(status_code=400, detail=f"Shippo could not create label: {messages}")
 
     label = models.ShippingLabel(
         order_id=order_id,
@@ -371,28 +385,42 @@ def _email_label_to_seller(order, store, label):
 # ---------------------------------------------------------------------------
 
 @router.get("/mock-label/{order_id}")
-def mock_label_pdf(order_id: int, db: Session = Depends(get_db)):
-    """Generate a mock shipping label PDF for testing."""
+def mock_label_pdf(order_id: int, sample: int = 0, db: Session = Depends(get_db)):
+    """Generate a mock shipping label. Pass ?sample=1 to show SAMPLE - DO NOT SHIP watermark."""
     from fastapi.responses import Response
 
     label = db.query(models.ShippingLabel).filter(models.ShippingLabel.order_id == order_id).first()
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
 
+    is_sample = bool(sample) or (label and label.status == "sample")
     tracking = label.tracking_number if label else f"9400111899223{order_id:06d}"
     ship_to = ""
     if order:
-        ship_to = (
-            f"{order.shipping_name or ''}\n"
-            f"{order.shipping_address or ''}\n"
-            f"{order.shipping_city or ''}, {order.shipping_state or ''} {order.shipping_zip or ''}"
-        )
+        ship_to = "\n".join([
+            order.shipping_name or "",
+            order.shipping_address or "",
+            f"{order.shipping_city or ''}, {order.shipping_state or ''} {order.shipping_zip or ''}",
+        ])
+
+    watermark = (
+        '<div style="position:absolute;top:40%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);'
+        'font-size:72px;font-weight:900;color:rgba(220,0,0,0.18);pointer-events:none;'
+        'white-space:nowrap;z-index:99">SAMPLE &#8212; DO NOT SHIP</div>'
+    ) if is_sample else ""
+
+    note_style = 'color:#c00;font-weight:bold;font-size:13px;' if is_sample else ''
+    note_text = (
+        "&#9888; SAMPLE LABEL &mdash; Address incomplete. DO NOT SHIP. Ask customer to update their address."
+        if is_sample else
+        "TEST LABEL &mdash; For real shipments, ensure the shipping address is complete."
+    )
 
     html = f"""<!DOCTYPE html>
 <html>
 <head>
 <style>
   body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background: white; }}
-  .label {{ border: 3px solid black; padding: 20px; max-width: 500px; margin: auto; }}
+  .label {{ border: 3px solid black; padding: 20px; max-width: 500px; margin: auto; position: relative; overflow: hidden; }}
   .carrier {{ font-size: 36px; font-weight: 900; text-align: center; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 10px; }}
   .service {{ font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 16px; }}
   .section {{ margin-bottom: 14px; }}
@@ -406,6 +434,7 @@ def mock_label_pdf(order_id: int, db: Session = Depends(get_db)):
 </head>
 <body>
 <div class="label">
+  {watermark}
   <div class="carrier">USPS</div>
   <div class="service">PRIORITY MAIL 2-DAY</div>
 
@@ -427,10 +456,7 @@ def mock_label_pdf(order_id: int, db: Session = Depends(get_db)):
     <span style="font-size:13px;background:#1A5C38;color:white;padding:4px 12px;border-radius:4px">Afrizone Order #{order_id}</span>
   </div>
 
-  <div class="note">
-    TEST LABEL — For real shipments, add your Shippo API key to Render environment.<br>
-    Print this label and tape it to your package. Drop at any USPS location.
-  </div>
+  <div class="note" style="{note_style}">{note_text}</div>
 </div>
 <script>window.onload = function() {{ window.print(); }}</script>
 </body>
