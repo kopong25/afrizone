@@ -88,35 +88,41 @@ export default function AdminAdsPage() {
   };
 
   const handleImageUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const localUrl = URL.createObjectURL(file);
-    setImagePreview(localUrl);
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const sigRes = await fetch(`${API}/ads/upload-signature`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
-        body: formData,
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "Upload failed");
-      }
-      const data = await res.json();
-      setForm((f) => ({ ...f, image_url: data.image_url, emoji: "" }));
-      setImagePreview(data.image_url);
-      toast.success("Image uploaded");
-    } catch (e) {
-      toast.error(e.message);
-      setImagePreview(form.image_url || "");
-    } finally {
-      setUploading(false);
-    }
-  };
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setImagePreview(URL.createObjectURL(file));
+  setUploading(true);
+  try {
+    const sigRes = await fetch(`${API}/ads/upload-signature`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    const sigData = await sigRes.json();
+    const { signature, timestamp, cloud_name, api_key, folder } = sigData;
 
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("signature", signature);
+    formData.append("timestamp", timestamp);
+    formData.append("api_key", api_key);
+    formData.append("folder", folder);
+
+    const uploadRes = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloud_name}/image/upload`,
+      { method: "POST", body: formData }
+    );
+    const uploadData = await uploadRes.json();
+    if (uploadData.error) throw new Error(uploadData.error.message);
+
+    setForm((f) => ({ ...f, image_url: uploadData.secure_url, emoji: "" }));
+    setImagePreview(uploadData.secure_url);
+    toast.success("Image uploaded");
+  } catch (err) {
+    toast.error(err.message);
+    setImagePreview(form.image_url || "");
+  } finally {
+    setUploading(false);
+  }
+};
   const removeImage = () => {
     setForm((f) => ({ ...f, image_url: "" }));
     setImagePreview("");
