@@ -96,7 +96,7 @@ export default function AdminAdsPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`${API}/ads/upload-image`, {
+      const sigRes = await fetch(`${API}/ads/upload-signature`, {
         method: "POST",
         headers: { Authorization: `Bearer ${getToken()}` },
         body: formData,
