@@ -4,9 +4,9 @@ import Link from "next/link";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import ProductCard from "../components/ui/ProductCard";
-import PromoCarousel from "../components/ui/PromoCarousel"; // ✅ Added
+import PromoCarousel from "../components/ui/PromoCarousel";
 import { productsAPI, storesAPI } from "../lib/api";
-import { FiArrowRight, FiTrendingUp, FiStar, FiShield, FiTruck, FiPackage } from "react-icons/fi";
+import { FiArrowRight, FiTrendingUp } from "react-icons/fi";
 
 const CATEGORIES = [
   { name: "All", slug: "", icon: "🛒" },
@@ -131,49 +131,30 @@ export default function Home() {
     <>
       <Navbar />
 
-      {/* Hero */}
-      <div className="bg-gradient-to-br from-green-900 via-green-800 to-green-900 text-white relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="absolute top-10 left-10 w-64 h-64 bg-yellow-400 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-20 w-96 h-96 bg-green-400 rounded-full blur-3xl" />
-        </div>
-        <div className="max-w-5xl mx-auto px-4 py-16 text-center relative">
-          <div className="inline-flex items-center gap-2 bg-white bg-opacity-10 rounded-full px-4 py-1.5 text-sm mb-6">
-            <span>🌍</span>
-            <span className="text-green-100">Verified sellers · USA · Canada · Europe</span>
-          </div>
-          <h1 className="text-4xl md:text-6xl font-black mb-5 leading-tight">
-            Shop Authentic<br />
-            <span className="text-yellow-400">African Products</span>
+      {/* ── Compact Hero (Amazon-style) ── */}
+      <div className="bg-gradient-to-r from-green-900 via-green-800 to-green-900 text-white">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex flex-col md:flex-row items-center gap-3">
+          <h1 className="text-lg md:text-xl font-black whitespace-nowrap text-yellow-400 hidden md:block">
+            🌍 Afrizone
           </h1>
-          <p className="text-green-200 text-lg mb-8 max-w-2xl mx-auto">
-            From African stores across the USA, Canada & Europe — food, fashion, beauty, arts & more.
-          </p>
-          <div className="flex max-w-2xl mx-auto gap-2 mb-8">
-            <input type="text" placeholder="Search jollof rice, ankara fabric, shea butter..."
-              value={filters.q} onChange={(e) => setFilter("q", e.target.value)}
+          <div className="flex w-full gap-2">
+            <input
+              type="text"
+              placeholder="Search jollof rice, ankara fabric, shea butter..."
+              value={filters.q}
+              onChange={(e) => setFilter("q", e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && fetchProducts()}
-              className="flex-1 px-5 py-4 rounded-xl text-gray-900 focus:outline-none text-base shadow-lg" />
-            <button onClick={fetchProducts}
-              className="bg-yellow-500 hover:bg-yellow-400 text-green-900 font-bold px-6 py-4 rounded-xl shadow-lg transition-colors">
+              className="flex-1 px-4 py-2.5 rounded-xl text-gray-900 focus:outline-none text-sm shadow-lg"
+            />
+            <button
+              onClick={fetchProducts}
+              className="bg-yellow-500 hover:bg-yellow-400 text-green-900 font-bold px-5 py-2.5 rounded-xl shadow-lg transition-colors text-sm"
+            >
               Search
             </button>
           </div>
-          <div className="flex flex-wrap justify-center gap-6 text-sm text-green-200">
-            <span className="flex items-center gap-1.5"><FiShield size={14} className="text-yellow-400" /> Verified Sellers</span>
-            <span className="flex items-center gap-1.5"><FiTruck size={14} className="text-yellow-400" /> USA · Canada · Europe</span>
-            <span className="flex items-center gap-1.5"><FiStar size={14} className="text-yellow-400" /> 4.8★ Average Rating</span>
-            <span className="flex items-center gap-1.5"><FiPackage size={14} className="text-yellow-400" /> Secure Checkout</span>
-          </div>
         </div>
       </div>
-
-      {/* ✅ Promo Carousel — shown below hero, above category bar */}
-      {!hasActiveFilters && (
-        <div className="max-w-7xl mx-auto px-4 pt-6 pb-2">
-          <PromoCarousel />
-        </div>
-      )}
 
       {/* Category Bar */}
       <div className="bg-white border-b sticky top-16 z-40 shadow-sm">
@@ -189,22 +170,25 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Promo Carousel */}
+      {!hasActiveFilters && (
+        <div className="max-w-7xl mx-auto px-4 pt-4 pb-2">
+          <PromoCarousel />
+        </div>
+      )}
+
       {/* World Cup 2026 Promo Banner */}
       {!hasActiveFilters && (
-        <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="max-w-7xl mx-auto px-4 py-4">
           <a href="/jerseys" className="block group relative overflow-hidden rounded-3xl shadow-2xl"
             style={{background:'linear-gradient(135deg,#050505 0%,#0d1117 40%,#0f1f0f 70%,#1a0a00 100%)'}}>
-
-            {/* Animated background glow */}
             <div className="absolute inset-0 opacity-60" style={{
               background:'radial-gradient(ellipse at 20% 50%,rgba(252,209,22,0.2) 0%,transparent 55%),radial-gradient(ellipse at 80% 50%,rgba(0,107,63,0.2) 0%,transparent 55%)'
             }}/>
             <div className="absolute inset-0" style={{
               background:'repeating-linear-gradient(-55deg,transparent,transparent 20px,rgba(255,255,255,0.02) 20px,rgba(255,255,255,0.02) 40px)'
             }}/>
-
             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-8 py-7 gap-4">
-              {/* Left — text */}
               <div className="text-center md:text-left">
                 <div className="inline-flex items-center gap-2 bg-yellow-400 text-black text-xs font-black px-3 py-1 rounded-full mb-3 uppercase tracking-widest">
                   ⚽ FIFA World Cup 2026 · USA · Canada · Mexico
@@ -217,8 +201,6 @@ export default function Home() {
                   Ghana · Morocco · Senegal · Egypt · Côte d&apos;Ivoire + All 48 Nations
                 </p>
               </div>
-
-              {/* Right — flags + CTA */}
               <div className="flex flex-col items-center gap-3 flex-shrink-0">
                 <div className="flex gap-2 text-3xl">
                   {["🇬🇭","🇲🇦","🇸🇳","🇪🇬","🇨🇮","🇿🇦","🇩🇿","🇹🇳","🇨🇻"].map(f=>(
