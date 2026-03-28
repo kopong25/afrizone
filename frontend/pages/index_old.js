@@ -4,6 +4,7 @@ import Link from "next/link";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import ProductCard from "../components/ui/ProductCard";
+import PromoCarousel from "../components/ui/PromoCarousel"; // ✅ Added
 import { productsAPI, storesAPI } from "../lib/api";
 import { FiArrowRight, FiTrendingUp, FiStar, FiShield, FiTruck, FiPackage } from "react-icons/fi";
 
@@ -166,6 +167,15 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* ✅ Promo Carousel — shown below hero, above category bar */}
+      {!hasActiveFilters && (
+        <div className="max-w-7xl mx-auto px-4 pt-6 pb-2">
+          <div style={{ height: "140px" }}>
+            <PromoCarousel />
+          </div>
+        </div>
+      )}
 
       {/* Category Bar */}
       <div className="bg-white border-b sticky top-16 z-40 shadow-sm">

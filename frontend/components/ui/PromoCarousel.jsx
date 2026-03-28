@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
+const API = process.env.NEXT_PUBLIC_API_URL || "https://afrizone-loqr.onrender.com";
+
 // Fallback ads shown when no ads are configured in admin
 const FALLBACK_ADS = [
   {
@@ -51,7 +53,8 @@ export default function PromoCarousel() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/ads/featured")
+    // ✅ Fixed: fetch from the real backend, not a non-existent Next.js API route
+    fetch(`${API}/ads/featured`)
       .then((r) => r.json())
       .then((data) => {
         const list = Array.isArray(data) && data.length > 0 ? data : FALLBACK_ADS;
