@@ -317,7 +317,11 @@ export default function StoreSettings() {
               </label>
             </div>
 
-            {/* ── RESTAURANT OPERATING HOURS ── */}
+          </div>
+          )}
+
+          {/* ── RESTAURANT OPERATING HOURS ── */}
+          {isRestaurant && (
             <div className="mt-6 border-t pt-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -386,8 +390,9 @@ export default function StoreSettings() {
                 </div>
               </div>
             </div>
+          )}
 
-          ) : (
+          {!isRestaurant && (
           <div className="grid grid-cols-2 gap-3 mb-5">
             {DELIVERY_TYPES.filter(d => d.value !== "local_delivery").map((d) => (
               <label key={d.value}
