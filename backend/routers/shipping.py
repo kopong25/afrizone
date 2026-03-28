@@ -2,23 +2,35 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from database import get_db
 import models, auth as auth_utils
-import os, httpx
+import os, httpx, logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 SHIPPO_API_KEY = os.getenv("SHIPPO_API_KEY", "")
 SHIPPO_BASE = "https://api.goshippo.com"
+
+logger.info(f"[SHIPPO] API key loaded: {'YES' if SHIPPO_API_KEY else 'NO — will use mock'}")
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 async def shippo_post(endpoint: str, data: dict):
     async with httpx.AsyncClient() as client:
         r = await client.post(
             f"{SHIPPO_BASE}/{endpoint}",
             json=data,
-            headers={"Authorization": f"ShippoToken {SHIPPO_API_KEY}", "Content-Type": "application/json"},
+            headers={
+                "Authorization": f"ShippoToken {SHIPPO_API_KEY}",
+                "Content-Type": "application/json",
+            },
             timeout=30,
         )
         r.raise_for_status()
         return r.json()
+
 
 async def shippo_get(endpoint: str):
     async with httpx.AsyncClient() as client:
@@ -31,72 +43,151 @@ async def shippo_get(endpoint: str):
         return r.json()
 
 
+def validate_shipping_address(order: models.Order):
+    """Raise 400 if any required shipping field is missing."""
+    missing = []
+    if not order.shipping_name:    missing.append("recipient name")
+    if not order.shipping_address: missing.append("street address")
+    if not order.shipping_city:    missing.append("city")
+    if not order.shipping_state:   missing.append("state")
+    if not order.shipping_zip:     missing.append("zip code")
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Incomplete shipping address. Missing: {', '.join(missing)}. "
+                   f"Please ask the customer to update their address before creating a label.",
+        )
+
+
+def _build_address_from(store: models.Store) -> dict:
+    return {
+        "name":    store.name,
+        "street1": store.address,
+        "city":    store.city,
+        "state":   "TX",
+        "zip":     "77001",
+        "country": "US",
+    }
+
+
+def _build_address_to(order: models.Order) -> dict:
+    return {
+        "name":    order.shipping_name,
+        "street1": order.shipping_address,
+        "city":    order.shipping_city,
+        "state":   order.shipping_state,
+        "zip":     order.shipping_zip,
+        "country": "US",
+    }
+
+
+def _build_parcel(order: models.Order) -> dict:
+    total_weight = sum(
+        (item.product.weight_kg or 0.5) * item.quantity
+        for item in order.items
+    ) or 0.5
+    return {
+        "length": "12", "width": "10", "height": "6",
+        "distance_unit": "in",
+        "weight": str(round(total_weight * 2.205, 2)),  # kg → lbs
+        "mass_unit": "lb",
+    }
+
+
+def _create_mock_label(order_id: int, db: Session, order, store, background_tasks: BackgroundTasks):
+    """Persist and return a mock label (only used when SHIPPO_API_KEY is absent)."""
+    label = models.ShippingLabel(
+        order_id=order_id,
+        carrier="USPS",
+        service="Priority Mail",
+        tracking_number=f"9400111899223{order_id:06d}",
+        label_url=f"https://afrizone-loqr.onrender.com/shipping/mock-label/{order_id}",
+        rate=8.95,
+        status="created",
+    )
+    db.add(label)
+    order.tracking_number = label.tracking_number
+    order.status = models.OrderStatus.shipped
+    db.commit()
+    background_tasks.add_task(_email_label_to_seller, order, store, label)
+    return {
+        "label_url": label.label_url,
+        "tracking_number": label.tracking_number,
+        "carrier": label.carrier,
+        "mock": True,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
 @router.get("/rates/{order_id}")
 async def get_shipping_rates(
     order_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.get_current_user)
+    current_user: models.User = Depends(auth_utils.get_current_user),
 ):
     """Get available shipping rates for an order."""
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
+    # Validate address before touching Shippo
+    validate_shipping_address(order)
+
     store = db.query(models.Store).filter(models.Store.id == order.store_id).first()
 
-    # Calculate total weight from order items
-    total_weight = sum(
-        (item.product.weight_kg or 0.5) * item.quantity
-        for item in order.items
-    ) or 0.5
-
+    # No API key → return clearly-labelled mock rates for local dev
     if not SHIPPO_API_KEY:
-        # Return mock rates for testing
-        return {"rates": [
-            {"carrier": "USPS", "service": "Priority Mail", "amount": "8.95", "days": "2-3", "object_id": "mock_priority"},
-            {"carrier": "USPS", "service": "First Class", "amount": "4.50", "days": "3-5", "object_id": "mock_first"},
-            {"carrier": "UPS", "service": "Ground", "amount": "12.00", "days": "3-7", "object_id": "mock_ups"},
-        ]}
+        logger.warning("[SHIPPO] No API key — returning mock rates")
+        return {
+            "mock": True,
+            "rates": [
+                {"carrier": "USPS", "service": "Priority Mail",  "amount": "8.95",  "days": "2-3", "object_id": "mock_priority"},
+                {"carrier": "USPS", "service": "First Class",    "amount": "4.50",  "days": "3-5", "object_id": "mock_first"},
+                {"carrier": "UPS",  "service": "Ground",         "amount": "12.00", "days": "3-7", "object_id": "mock_ups"},
+            ],
+        }
 
     try:
         shipment = await shippo_post("shipments", {
-            "address_from": {
-                "name": store.name,
-                "street1": store.address or "123 Main St",
-                "city": store.city or "Houston",
-                "state": "TX",
-                "zip": "77001",
-                "country": "US",
-            },
-            "address_to": {
-                "name": order.shipping_name or "Customer",
-                "street1": order.shipping_address or "456 Oak Ave",
-                "city": order.shipping_city or "New York",
-                "state": order.shipping_state or "NY",
-                "zip": order.shipping_zip or "10001",
-                "country": "US",
-            },
-            "parcels": [{
-                "length": "12", "width": "10", "height": "6",
-                "distance_unit": "in",
-                "weight": str(round(total_weight * 2.205, 2)),  # kg to lbs
-                "mass_unit": "lb",
-            }],
+            "address_from": _build_address_from(store),
+            "address_to":   _build_address_to(order),
+            "parcels":      [_build_parcel(order)],
             "async": False,
         })
-        rates = shipment.get("rates", [])
-        return {"rates": [
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[SHIPPO] Shipment creation failed: {e.response.status_code} — {e.response.text}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Shippo rejected the shipment request: {e.response.text}",
+        )
+    except Exception as e:
+        logger.error(f"[SHIPPO] Unexpected error fetching rates: {e}")
+        raise HTTPException(status_code=502, detail=f"Could not reach Shippo: {str(e)}")
+
+    rates = shipment.get("rates", [])
+    if not rates:
+        raise HTTPException(
+            status_code=400,
+            detail="Shippo returned no rates for this address. "
+                   "Please verify the shipping address is correct and try again.",
+        )
+
+    return {
+        "mock": False,
+        "rates": [
             {
-                "carrier": r["provider"],
-                "service": r["servicelevel"]["name"],
-                "amount": r["amount"],
-                "days": r.get("estimated_days", "?"),
+                "carrier":   r["provider"],
+                "service":   r["servicelevel"]["name"],
+                "amount":    r["amount"],
+                "days":      r.get("estimated_days", "?"),
                 "object_id": r["object_id"],
             }
             for r in rates if r.get("object_id")
-        ]}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Shipping rate error: {str(e)}")
+        ],
+    }
 
 
 @router.post("/label/{order_id}")
@@ -114,129 +205,140 @@ async def create_shipping_label(
 
     store = db.query(models.Store).filter(
         models.Store.owner_id == current_user.id,
-        models.Store.id == order.store_id
+        models.Store.id == order.store_id,
     ).first()
     if not store:
         raise HTTPException(status_code=403, detail="Access denied")
 
+    # Return existing label if already created
     existing = db.query(models.ShippingLabel).filter(models.ShippingLabel.order_id == order_id).first()
     if existing:
-        return {"label_url": existing.label_url, "tracking_number": existing.tracking_number, "carrier": existing.carrier}
+        return {
+            "label_url":       existing.label_url,
+            "tracking_number": existing.tracking_number,
+            "carrier":         existing.carrier,
+        }
 
-    # If no Shippo key or mock rate, use mock label
-    if not SHIPPO_API_KEY or rate_id.startswith("mock_"):
-        label = models.ShippingLabel(
-            order_id=order_id, carrier="USPS", service="Priority Mail",
-            tracking_number=f"9400111899223{order_id:06d}",
-            label_url=f"https://afrizone-loqr.onrender.com/shipping/mock-label/{order_id}",
-            rate=8.95, status="created",
+    # No API key → mock label (dev/test only)
+    if not SHIPPO_API_KEY:
+        logger.warning("[SHIPPO] No API key — issuing mock label")
+        return _create_mock_label(order_id, db, order, store, background_tasks)
+
+    # Reject mock rate_ids when a real key is present
+    if rate_id.startswith("mock_"):
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot create a real label with a mock rate ID. "
+                   "Please call /rates first to get a valid Shippo rate.",
         )
-        db.add(label)
-        order.tracking_number = label.tracking_number
-        order.status = models.OrderStatus.shipped
-        db.commit()
-        background_tasks.add_task(_email_label_to_seller, order, store, label)
-        return {"label_url": label.label_url, "tracking_number": label.tracking_number, "carrier": label.carrier}
 
-    # Shippo key exists — get real rates first if rate_id is "auto"
+    # Validate address before touching Shippo
+    validate_shipping_address(order)
+
+    # Auto-select cheapest USPS Priority rate if no rate_id provided
     if rate_id == "auto":
         try:
-            total_weight = sum(
-                (item.product.weight_kg or 0.5) * item.quantity
-                for item in order.items
-            ) or 0.5
             shipment = await shippo_post("shipments", {
-                "address_from": {
-                    "name": store.name,
-                    "street1": store.address or "123 Main St",
-                    "city": store.city or "Houston",
-                    "state": "TX", "zip": "77001", "country": "US",
-                },
-                "address_to": {
-                    "name": order.shipping_name or "Customer",
-                    "street1": order.shipping_address or "456 Oak Ave",
-                    "city": order.shipping_city or "New York",
-                    "state": order.shipping_state or "NY",
-                    "zip": order.shipping_zip or "10001",
-                    "country": "US",
-                },
-                "parcels": [{
-                    "length": "12", "width": "10", "height": "6",
-                    "distance_unit": "in",
-                    "weight": str(round(total_weight * 2.205, 2)),
-                    "mass_unit": "lb",
-                }],
+                "address_from": _build_address_from(store),
+                "address_to":   _build_address_to(order),
+                "parcels":      [_build_parcel(order)],
                 "async": False,
             })
-            # Pick cheapest USPS Priority rate
             rates = shipment.get("rates", [])
-            priority = [r for r in rates if "PRIORITY" in r.get("servicelevel", {}).get("token", "").upper()]
-            rate_id = priority[0]["object_id"] if priority else (rates[0]["object_id"] if rates else None)
-            if not rate_id:
-                raise Exception("No rates available")
-        except Exception as e:
-            print(f"[SHIPPO RATE ERROR] {e} — falling back to mock label")
-            label = models.ShippingLabel(
-                order_id=order_id, carrier="USPS", service="Priority Mail",
-                tracking_number=f"9400111899223{order_id:06d}",
-                label_url=f"https://afrizone-loqr.onrender.com/shipping/mock-label/{order_id}",
-                rate=8.95, status="created",
-            )
-            db.add(label)
-            order.tracking_number = label.tracking_number
-            order.status = models.OrderStatus.shipped
-            db.commit()
-            background_tasks.add_task(_email_label_to_seller, order, store, label)
-            return {"label_url": label.label_url, "tracking_number": label.tracking_number, "carrier": label.carrier}
+            if not rates:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Shippo returned no rates for this address. "
+                           "Verify the shipping address and try again.",
+                )
+            priority = [
+                r for r in rates
+                if "PRIORITY" in r.get("servicelevel", {}).get("token", "").upper()
+            ]
+            rate_id = priority[0]["object_id"] if priority else rates[0]["object_id"]
+            logger.info(f"[SHIPPO] Auto-selected rate: {rate_id}")
 
+        except HTTPException:
+            raise  # Re-raise our own validation errors as-is
+        except httpx.HTTPStatusError as e:
+            logger.error(f"[SHIPPO] Rate fetch HTTP error: {e.response.status_code} — {e.response.text}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Shippo rejected the address: {e.response.text}",
+            )
+        except Exception as e:
+            logger.error(f"[SHIPPO] Rate fetch error: {e}")
+            raise HTTPException(status_code=502, detail=f"Could not fetch Shippo rates: {str(e)}")
+
+    # Purchase the label
     try:
         txn = await shippo_post("transactions", {
-            "rate": rate_id,
+            "rate":            rate_id,
             "label_file_type": "PDF_4x6",
-            "async": False,
+            "async":           False,
         })
-        if txn.get("status") != "SUCCESS":
-            raise Exception(f"Shippo error: {txn.get('messages', 'Unknown error')}")
-
-        label = models.ShippingLabel(
-            order_id=order_id,
-            shippo_transaction_id=txn["object_id"],
-            tracking_number=txn["tracking_number"],
-            label_url=txn["label_url"],
-            carrier="USPS", service="Priority Mail",
-            status="created",
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[SHIPPO] Transaction HTTP error: {e.response.status_code} — {e.response.text}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Shippo transaction failed: {e.response.text}",
         )
-        db.add(label)
-        order.tracking_number = txn["tracking_number"]
-        order.tracking_url = txn.get("tracking_url_provider", "")
-        order.status = models.OrderStatus.shipped
-        db.commit()
-        background_tasks.add_task(_email_label_to_seller, order, store, label)
-        return {"label_url": label.label_url, "tracking_number": label.tracking_number, "carrier": label.carrier}
-
     except Exception as e:
-        print(f"[SHIPPO TXN ERROR] {e} — falling back to mock label")
-        label = models.ShippingLabel(
-            order_id=order_id, carrier="USPS", service="Priority Mail",
-            tracking_number=f"9400111899223{order_id:06d}",
-            label_url=f"https://afrizone-loqr.onrender.com/shipping/mock-label/{order_id}",
-            rate=8.95, status="created",
+        logger.error(f"[SHIPPO] Transaction error: {e}")
+        raise HTTPException(status_code=502, detail=f"Could not purchase label: {str(e)}")
+
+    if txn.get("status") != "SUCCESS":
+        messages = txn.get("messages", "Unknown Shippo error")
+        logger.error(f"[SHIPPO] Transaction not SUCCESS: {messages}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Shippo could not create label: {messages}",
         )
-        db.add(label)
-        order.tracking_number = label.tracking_number
-        order.status = models.OrderStatus.shipped
-        db.commit()
-        background_tasks.add_task(_email_label_to_seller, order, store, label)
-        return {"label_url": label.label_url, "tracking_number": label.tracking_number, "carrier": label.carrier}
+
+    label = models.ShippingLabel(
+        order_id=order_id,
+        shippo_transaction_id=txn["object_id"],
+        tracking_number=txn["tracking_number"],
+        label_url=txn["label_url"],
+        carrier="USPS",
+        service="Priority Mail",
+        status="created",
+    )
+    db.add(label)
+    order.tracking_number = txn["tracking_number"]
+    order.tracking_url = txn.get("tracking_url_provider", "")
+    order.status = models.OrderStatus.shipped
+    db.commit()
+
+    background_tasks.add_task(_email_label_to_seller, order, store, label)
+    return {
+        "label_url":       label.label_url,
+        "tracking_number": label.tracking_number,
+        "carrier":         label.carrier,
+        "mock":            False,
+    }
 
 
 @router.get("/label/{order_id}")
-def get_label(order_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth_utils.get_current_user)):
+def get_label(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.get_current_user),
+):
     label = db.query(models.ShippingLabel).filter(models.ShippingLabel.order_id == order_id).first()
     if not label:
         raise HTTPException(status_code=404, detail="No label for this order")
-    return {"label_url": label.label_url, "tracking_number": label.tracking_number, "carrier": label.carrier, "status": label.status}
+    return {
+        "label_url":       label.label_url,
+        "tracking_number": label.tracking_number,
+        "carrier":         label.carrier,
+        "status":          label.status,
+    }
 
+
+# ---------------------------------------------------------------------------
+# Background tasks
+# ---------------------------------------------------------------------------
 
 def _email_label_to_seller(order, store, label):
     """Background task: email shipping label PDF to seller."""
@@ -261,14 +363,17 @@ def _email_label_to_seller(order, store, label):
         """
         send_email(store.owner.email, f"🏷️ Print Label — Afrizone Order #{order.id}", _wrap(body))
     except Exception as e:
-        print(f"Label email error: {e}")
+        logger.error(f"[EMAIL] Label email error: {e}")
 
+
+# ---------------------------------------------------------------------------
+# Mock label endpoint (dev/test only)
+# ---------------------------------------------------------------------------
 
 @router.get("/mock-label/{order_id}")
 def mock_label_pdf(order_id: int, db: Session = Depends(get_db)):
     """Generate a mock shipping label PDF for testing."""
     from fastapi.responses import Response
-    import textwrap
 
     label = db.query(models.ShippingLabel).filter(models.ShippingLabel.order_id == order_id).first()
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
@@ -276,9 +381,12 @@ def mock_label_pdf(order_id: int, db: Session = Depends(get_db)):
     tracking = label.tracking_number if label else f"9400111899223{order_id:06d}"
     ship_to = ""
     if order:
-        ship_to = f"{order.shipping_name or ''}\n{order.shipping_address or ''}\n{order.shipping_city or ''}, {order.shipping_state or ''} {order.shipping_zip or ''}"
+        ship_to = (
+            f"{order.shipping_name or ''}\n"
+            f"{order.shipping_address or ''}\n"
+            f"{order.shipping_city or ''}, {order.shipping_state or ''} {order.shipping_zip or ''}"
+        )
 
-    # Generate a simple HTML label that looks like a shipping label
     html = f"""<!DOCTYPE html>
 <html>
 <head>
