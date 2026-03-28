@@ -171,9 +171,7 @@ export default function Home() {
       {/* ✅ Promo Carousel — shown below hero, above category bar */}
       {!hasActiveFilters && (
         <div className="max-w-7xl mx-auto px-4 pt-6 pb-2">
-          <div style={{ height: "140px" }}>
-            <PromoCarousel />
-          </div>
+          <PromoCarousel />
         </div>
       )}
 
