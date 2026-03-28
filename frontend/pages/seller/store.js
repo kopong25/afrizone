@@ -96,7 +96,6 @@ export default function StoreSettings() {
 
   const handleLogoUpload = async (file, directUrl) => {
     if (directUrl) {
-      // Image was uploaded directly to Cloudinary — save URL to backend
       try {
         await storesAPI.updateMyStore({ logo_url: directUrl });
         setStore((s) => ({ ...s, logo_url: directUrl }));
@@ -105,7 +104,6 @@ export default function StoreSettings() {
       }
       return directUrl;
     }
-    // Fallback: upload via backend
     const formData = new FormData();
     formData.append("file", file);
     const res = await storesAPI.uploadLogo(formData);
@@ -115,7 +113,6 @@ export default function StoreSettings() {
 
   const handleBannerUpload = async (file, directUrl) => {
     if (directUrl) {
-      // Image was uploaded directly to Cloudinary — save URL to backend
       try {
         await storesAPI.updateMyStore({ banner_url: directUrl });
         setStore((s) => ({ ...s, banner_url: directUrl }));
@@ -124,7 +121,6 @@ export default function StoreSettings() {
       }
       return directUrl;
     }
-    // Fallback: upload via backend
     const formData = new FormData();
     formData.append("file", file);
     const res = await storesAPI.uploadBanner(formData);
@@ -273,7 +269,6 @@ export default function StoreSettings() {
                     setForm(f => ({
                       ...f,
                       vendor_type: vt,
-                      // Auto-set delivery type for restaurant
                       delivery_type: vt === "restaurant" ? "local_delivery" : f.delivery_type === "local_delivery" ? "shipping" : f.delivery_type,
                     }));
                   }}
@@ -294,6 +289,7 @@ export default function StoreSettings() {
           </h2>
           <p className="text-sm text-gray-500 mb-4">Choose how you fulfil orders for customers.</p>
 
+          {/* ── RESTAURANT: delivery options ── */}
           {isRestaurant ? (
             <div className="space-y-3">
               <div className="bg-green-50 border-2 border-green-700 rounded-xl p-4 flex items-start gap-3">
@@ -316,9 +312,7 @@ export default function StoreSettings() {
                 </div>
               </label>
             </div>
-
-          </div>
-          )}
+          ) : null}
 
           {/* ── RESTAURANT OPERATING HOURS ── */}
           {isRestaurant && (
@@ -392,27 +386,28 @@ export default function StoreSettings() {
             </div>
           )}
 
+          {/* ── NON-RESTAURANT: delivery selector ── */}
           {!isRestaurant && (
-          <div className="grid grid-cols-2 gap-3 mb-5">
-            {DELIVERY_TYPES.filter(d => d.value !== "local_delivery").map((d) => (
-              <label key={d.value}
-                className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                  form.delivery_type === d.value
-                    ? "border-green-700 bg-green-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}>
-                <input type="radio" name="delivery_type" value={d.value}
-                  checked={form.delivery_type === d.value}
-                  onChange={(e) => setForm({ ...form, delivery_type: e.target.value })}
-                  className="mt-1 accent-green-700" />
-                <div>
-                  <p className="font-semibold text-gray-800 text-sm">{d.icon} {d.label}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{d.desc}</p>
-                </div>
-              </label>
-            ))}
-          </div>
-          )} {/* end non-restaurant delivery selector */}
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              {DELIVERY_TYPES.filter(d => d.value !== "local_delivery").map((d) => (
+                <label key={d.value}
+                  className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                    form.delivery_type === d.value
+                      ? "border-green-700 bg-green-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}>
+                  <input type="radio" name="delivery_type" value={d.value}
+                    checked={form.delivery_type === d.value}
+                    onChange={(e) => setForm({ ...form, delivery_type: e.target.value })}
+                    className="mt-1 accent-green-700" />
+                  <div>
+                    <p className="font-semibold text-gray-800 text-sm">{d.icon} {d.label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{d.desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
 
           {/* Local delivery extra fields */}
           {isLocalDelivery && (
