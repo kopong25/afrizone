@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "https://afrizone-loqr.onrender.com";
 
-// Fallback ads shown when no ads are configured in admin
 const FALLBACK_ADS = [
   {
     id: 1,
@@ -53,7 +52,6 @@ export default function PromoCarousel() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    // ✅ Fixed: fetch from the real backend, not a non-existent Next.js API route
     fetch(`${API}/ads/featured`)
       .then((r) => r.json())
       .then((data) => {
@@ -67,15 +65,9 @@ export default function PromoCarousel() {
       });
   }, []);
 
-  const next = useCallback(() => {
-    setCurrent((c) => (c + 1) % ads.length);
-  }, [ads.length]);
+  const next = useCallback(() => setCurrent((c) => (c + 1) % ads.length), [ads.length]);
+  const prev = useCallback(() => setCurrent((c) => (c - 1 + ads.length) % ads.length), [ads.length]);
 
-  const prev = useCallback(() => {
-    setCurrent((c) => (c - 1 + ads.length) % ads.length);
-  }, [ads.length]);
-
-  // Auto-advance every 5 seconds
   useEffect(() => {
     if (!paused && ads.length > 1) {
       const timer = setInterval(next, 5000);
@@ -83,11 +75,9 @@ export default function PromoCarousel() {
     }
   }, [paused, next, ads.length]);
 
-  if (!loaded || ads.length === 0) {
+  if (!loaded) {
     return (
-      <div className="h-full rounded-2xl bg-gray-800 animate-pulse flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <div className="w-full rounded-2xl bg-gray-200 animate-pulse" style={{ height: "200px" }} />
     );
   }
 
@@ -95,55 +85,88 @@ export default function PromoCarousel() {
 
   return (
     <div
-      className="relative h-full rounded-2xl overflow-hidden shadow-xl cursor-pointer group"
+      className="relative w-full overflow-hidden rounded-2xl shadow-xl group"
+      style={{ height: "200px" }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
-      style={{ minHeight: "110px" }}
     >
       {/* Slides */}
       {ads.map((a, i) => (
         <a
           key={a.id}
           href={a.cta_url || "#"}
-          className="absolute inset-0 flex items-center justify-between px-5 py-4 transition-all duration-500"
+          className="absolute inset-0 transition-all duration-500"
           style={{
-            background: `linear-gradient(135deg, ${a.bg_color} 0%, ${a.bg_color}cc 60%, #111 100%)`,
             opacity: i === current ? 1 : 0,
             transform: i === current ? "translateX(0)" : i < current ? "translateX(-100%)" : "translateX(100%)",
             pointerEvents: i === current ? "auto" : "none",
             zIndex: i === current ? 2 : 1,
           }}
         >
-          {/* Glow */}
-          <div className="absolute inset-0 opacity-30" style={{
-            background: `radial-gradient(ellipse at 30% 50%, ${a.accent_color}44 0%, transparent 65%)`
-          }} />
+          {/* Full background: image or gradient */}
+          {a.image_url ? (
+            <>
+              <img
+                src={a.image_url}
+                alt={a.title}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+              {/* Dark overlay so text is always readable */}
+              <div className="absolute inset-0" style={{
+                background: "linear-gradient(90deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.10) 100%)"
+              }} />
+            </>
+          ) : (
+            <>
+              {/* Colour card fallback */}
+              <div className="absolute inset-0" style={{
+                background: `linear-gradient(135deg, ${a.bg_color} 0%, ${a.bg_color}cc 60%, #111 100%)`
+              }} />
+              {/* Accent glow */}
+              <div className="absolute inset-0 opacity-30" style={{
+                background: `radial-gradient(ellipse at 70% 50%, ${a.accent_color}55 0%, transparent 65%)`
+              }} />
+              {/* Big emoji watermark */}
+              <div className="absolute right-8 top-1/2 -translate-y-1/2 text-8xl opacity-20 select-none">
+                {a.emoji}
+              </div>
+            </>
+          )}
 
-          {/* Content */}
-          <div className="relative z-10 flex-1 min-w-0 pr-3">
-            {a.image_url ? (
-              <img src={a.image_url} alt={a.title}
-                className="w-10 h-10 rounded-lg object-cover mb-1.5" />
-            ) : (
-              <div className="text-2xl mb-1">{a.emoji || "⚡"}</div>
+          {/* Text content — always on the left */}
+          <div className="absolute inset-0 flex flex-col justify-center px-8 gap-2">
+            {!a.image_url && (
+              <div className="text-4xl mb-1">{a.emoji}</div>
             )}
-            <h3 className="text-white font-black text-base leading-tight truncate"
-              style={{ fontFamily: "Bebas Neue, sans-serif", letterSpacing: "1px", fontSize: "clamp(14px, 2vw, 18px)" }}>
+            <h3
+              className="text-white font-black leading-tight drop-shadow"
+              style={{
+                fontFamily: "Bebas Neue, sans-serif",
+                letterSpacing: "2px",
+                fontSize: "clamp(22px, 3.5vw, 36px)",
+              }}
+            >
               {a.title}
             </h3>
-            <p className="text-xs mt-0.5 truncate" style={{ color: `${a.accent_color}cc` }}>
-              {a.subtitle}
-            </p>
-          </div>
-
-          {/* CTA */}
-          <div className="flex-shrink-0">
-            <span
-              className="inline-flex items-center gap-1 font-black text-xs px-3 py-2 rounded-xl whitespace-nowrap group-hover:scale-105 transition-transform"
-              style={{ background: `linear-gradient(135deg, ${a.accent_color}, ${a.accent_color}cc)`, color: "#000" }}
-            >
-              {a.cta_text || "Shop"} →
-            </span>
+            {a.subtitle && (
+              <p
+                className="text-sm drop-shadow"
+                style={{ color: a.image_url ? "rgba(255,255,255,0.85)" : `${a.accent_color}dd` }}
+              >
+                {a.subtitle}
+              </p>
+            )}
+            <div className="mt-2">
+              <span
+                className="inline-flex items-center gap-1.5 font-black text-sm px-5 py-2.5 rounded-xl shadow-lg hover:scale-105 transition-transform"
+                style={{
+                  background: `linear-gradient(135deg, ${a.accent_color}, ${a.accent_color}cc)`,
+                  color: "#000",
+                }}
+              >
+                {a.cta_text || "Shop Now"} →
+              </span>
+            </div>
           </div>
         </a>
       ))}
@@ -153,27 +176,27 @@ export default function PromoCarousel() {
         <>
           <button
             onClick={(e) => { e.preventDefault(); prev(); }}
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-black/40 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+            className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/50 text-white text-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
           >‹</button>
           <button
             onClick={(e) => { e.preventDefault(); next(); }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-black/40 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/50 text-white text-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
           >›</button>
         </>
       )}
 
       {/* Dot indicators */}
       {ads.length > 1 && (
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 flex gap-1.5">
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex gap-2">
           {ads.map((_, i) => (
             <button
               key={i}
               onClick={(e) => { e.preventDefault(); setCurrent(i); }}
               className="rounded-full transition-all duration-300"
               style={{
-                width: i === current ? "16px" : "6px",
-                height: "6px",
-                background: i === current ? ad.accent_color : "rgba(255,255,255,0.4)",
+                width: i === current ? "20px" : "7px",
+                height: "7px",
+                background: i === current ? ad.accent_color : "rgba(255,255,255,0.5)",
               }}
             />
           ))}
@@ -181,20 +204,21 @@ export default function PromoCarousel() {
       )}
 
       {/* Progress bar */}
-      {!paused && (
-        <div className="absolute bottom-0 left-0 h-0.5 z-10 rounded-full transition-none"
+      {!paused && ads.length > 1 && (
+        <div
+          key={current}
+          className="absolute bottom-0 left-0 h-1 z-10 rounded-full"
           style={{
             background: ad.accent_color,
-            animation: "progress 5s linear infinite",
-            width: "100%",
+            animation: "adProgress 5s linear forwards",
           }}
         />
       )}
 
       <style>{`
-        @keyframes progress {
-          from { transform: scaleX(0); transform-origin: left; }
-          to   { transform: scaleX(1); transform-origin: left; }
+        @keyframes adProgress {
+          from { width: 0%; }
+          to   { width: 100%; }
         }
       `}</style>
     </div>

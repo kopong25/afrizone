@@ -4,9 +4,9 @@ import Link from "next/link";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import ProductCard from "../components/ui/ProductCard";
+import PromoCarousel from "../components/ui/PromoCarousel"; // ✅ Added
 import { productsAPI, storesAPI } from "../lib/api";
 import { FiArrowRight, FiTrendingUp, FiStar, FiShield, FiTruck, FiPackage } from "react-icons/fi";
-import PromoCarousel from "../components/ui/PromoCarousel";
 
 const CATEGORIES = [
   { name: "All", slug: "", icon: "🛒" },
@@ -100,7 +100,7 @@ export default function Home() {
   }, [router.query]);
 
   useEffect(() => {
-    productsAPI.list({ featured: true, size: 4 }).then((r) => setFeaturedProducts(r.data.items ?? r.data ?? [])).catch(() => {});
+    productsAPI.list({ featured: true, size: 4 }).then((r) => setFeaturedProducts(r.data.items)).catch(() => {});
     storesAPI.list({ limit: 4 }).then((r) => setFeaturedStores(r.data)).catch(() => {});
   }, []);
 
@@ -131,62 +131,49 @@ export default function Home() {
     <>
       <Navbar />
 
-      {/* ── HERO — compact 1/3 height ── */}
+      {/* Hero */}
       <div className="bg-gradient-to-br from-green-900 via-green-800 to-green-900 text-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="absolute top-4 left-10 w-40 h-40 bg-yellow-400 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-20 w-56 h-56 bg-green-400 rounded-full blur-3xl" />
+          <div className="absolute top-10 left-10 w-64 h-64 bg-yellow-400 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-20 w-96 h-96 bg-green-400 rounded-full blur-3xl" />
         </div>
-        <div className="max-w-5xl mx-auto px-4 py-5 relative">
-          {/* Top row: badge + trust signals */}
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <div className="inline-flex items-center gap-2 bg-white bg-opacity-10 rounded-full px-3 py-1 text-xs">
-              <span>🌍</span>
-              <span className="text-green-100">Verified sellers · USA · Canada · Europe</span>
-            </div>
-            <div className="hidden md:flex flex-wrap gap-4 text-xs text-green-200">
-              <span className="flex items-center gap-1"><FiShield size={11} className="text-yellow-400" /> Verified Sellers</span>
-              <span className="flex items-center gap-1"><FiTruck size={11} className="text-yellow-400" /> USA · Canada · Europe</span>
-              <span className="flex items-center gap-1"><FiStar size={11} className="text-yellow-400" /> 4.8★ Average</span>
-              <span className="flex items-center gap-1"><FiPackage size={11} className="text-yellow-400" /> Secure Checkout</span>
-            </div>
+        <div className="max-w-5xl mx-auto px-4 py-16 text-center relative">
+          <div className="inline-flex items-center gap-2 bg-white bg-opacity-10 rounded-full px-4 py-1.5 text-sm mb-6">
+            <span>🌍</span>
+            <span className="text-green-100">Verified sellers · USA · Canada · Europe</span>
           </div>
-
-          {/* Headline + search on same row for compact layout */}
-          <div className="flex flex-col md:flex-row md:items-center gap-3">
-            <div className="flex-shrink-0">
-              <h1 className="text-2xl md:text-3xl font-black leading-tight">
-                Shop Authentic<br />
-                <span className="text-yellow-400">African Products</span>
-              </h1>
-            </div>
-            <div className="flex-1 flex gap-2 md:ml-6">
-              <input
-                type="text"
-                placeholder="Search jollof rice, ankara fabric, shea butter..."
-                value={filters.q}
-                onChange={(e) => setFilter("q", e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && fetchProducts()}
-                className="flex-1 px-4 py-2.5 rounded-xl text-gray-900 focus:outline-none text-sm shadow-lg"
-              />
-              <button
-                onClick={fetchProducts}
-                className="bg-yellow-500 hover:bg-yellow-400 text-green-900 font-bold px-5 py-2.5 rounded-xl shadow-lg transition-colors text-sm whitespace-nowrap"
-              >
-                Search
-              </button>
-            </div>
+          <h1 className="text-4xl md:text-6xl font-black mb-5 leading-tight">
+            Shop Authentic<br />
+            <span className="text-yellow-400">African Products</span>
+          </h1>
+          <p className="text-green-200 text-lg mb-8 max-w-2xl mx-auto">
+            From African stores across the USA, Canada & Europe — food, fashion, beauty, arts & more.
+          </p>
+          <div className="flex max-w-2xl mx-auto gap-2 mb-8">
+            <input type="text" placeholder="Search jollof rice, ankara fabric, shea butter..."
+              value={filters.q} onChange={(e) => setFilter("q", e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && fetchProducts()}
+              className="flex-1 px-5 py-4 rounded-xl text-gray-900 focus:outline-none text-base shadow-lg" />
+            <button onClick={fetchProducts}
+              className="bg-yellow-500 hover:bg-yellow-400 text-green-900 font-bold px-6 py-4 rounded-xl shadow-lg transition-colors">
+              Search
+            </button>
           </div>
-
-          {/* Trust signals mobile */}
-          <div className="flex md:hidden flex-wrap gap-3 mt-2 text-xs text-green-200">
-            <span className="flex items-center gap-1"><FiShield size={11} className="text-yellow-400" /> Verified</span>
-            <span className="flex items-center gap-1"><FiTruck size={11} className="text-yellow-400" /> USA · Canada</span>
-            <span className="flex items-center gap-1"><FiStar size={11} className="text-yellow-400" /> 4.8★</span>
-            <span className="flex items-center gap-1"><FiPackage size={11} className="text-yellow-400" /> Secure</span>
+          <div className="flex flex-wrap justify-center gap-6 text-sm text-green-200">
+            <span className="flex items-center gap-1.5"><FiShield size={14} className="text-yellow-400" /> Verified Sellers</span>
+            <span className="flex items-center gap-1.5"><FiTruck size={14} className="text-yellow-400" /> USA · Canada · Europe</span>
+            <span className="flex items-center gap-1.5"><FiStar size={14} className="text-yellow-400" /> 4.8★ Average Rating</span>
+            <span className="flex items-center gap-1.5"><FiPackage size={14} className="text-yellow-400" /> Secure Checkout</span>
           </div>
         </div>
       </div>
+
+      {/* ✅ Promo Carousel — shown below hero, above category bar */}
+      {!hasActiveFilters && (
+        <div className="max-w-7xl mx-auto px-4 pt-6 pb-2">
+          <PromoCarousel />
+        </div>
+      )}
 
       {/* Category Bar */}
       <div className="bg-white border-b sticky top-16 z-40 shadow-sm">
@@ -202,98 +189,73 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── PROMO STRIP — 30% FIFA | 40% Carousel | 30% Fitness ── */}
+      {/* World Cup 2026 Promo Banner */}
       {!hasActiveFilters && (
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex gap-3 items-stretch" style={{minHeight:'110px'}}>
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <a href="/jerseys" className="block group relative overflow-hidden rounded-3xl shadow-2xl"
+            style={{background:'linear-gradient(135deg,#050505 0%,#0d1117 40%,#0f1f0f 70%,#1a0a00 100%)'}}>
 
-            {/* LEFT 30% — FIFA World Cup */}
-            <a href="/jerseys"
-              className="group relative overflow-hidden rounded-2xl shadow-xl flex-none flex flex-col justify-between p-4"
-              style={{
-                width:'30%',
-                background:'linear-gradient(135deg,#050505 0%,#0d1117 40%,#0f1f0f 70%,#1a0a00 100%)',
-              }}>
-              <div className="absolute inset-0 opacity-60" style={{
-                background:'radial-gradient(ellipse at 20% 50%,rgba(252,209,22,0.2) 0%,transparent 55%),radial-gradient(ellipse at 80% 50%,rgba(0,107,63,0.2) 0%,transparent 55%)'
-              }}/>
-              <div className="absolute inset-0" style={{
-                background:'repeating-linear-gradient(-55deg,transparent,transparent 20px,rgba(255,255,255,0.02) 20px,rgba(255,255,255,0.02) 40px)'
-              }}/>
-              <div className="relative z-10">
-                <div className="inline-flex items-center bg-yellow-400 text-black text-xs font-black px-2 py-0.5 rounded-full mb-1.5 uppercase tracking-wider">
-                  FIFA 2026
+            {/* Animated background glow */}
+            <div className="absolute inset-0 opacity-60" style={{
+              background:'radial-gradient(ellipse at 20% 50%,rgba(252,209,22,0.2) 0%,transparent 55%),radial-gradient(ellipse at 80% 50%,rgba(0,107,63,0.2) 0%,transparent 55%)'
+            }}/>
+            <div className="absolute inset-0" style={{
+              background:'repeating-linear-gradient(-55deg,transparent,transparent 20px,rgba(255,255,255,0.02) 20px,rgba(255,255,255,0.02) 40px)'
+            }}/>
+
+            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-8 py-7 gap-4">
+              {/* Left — text */}
+              <div className="text-center md:text-left">
+                <div className="inline-flex items-center gap-2 bg-yellow-400 text-black text-xs font-black px-3 py-1 rounded-full mb-3 uppercase tracking-widest">
+                  ⚽ FIFA World Cup 2026 · USA · Canada · Mexico
                 </div>
-                <h3 className="text-white font-black leading-tight"
-                  style={{fontFamily:'Bebas Neue,sans-serif',letterSpacing:'2px',fontSize:'clamp(13px,1.8vw,20px)'}}>
-                  AFRICA <span style={{color:'#FCD116'}}>RISES</span>
+                <h3 className="text-white font-black text-3xl md:text-4xl leading-tight mb-1"
+                  style={{fontFamily:'Bebas Neue,sans-serif',letterSpacing:'2px'}}>
+                  AFRICA <span style={{color:'#FCD116'}}>RISES</span> — SHOP THE KITS
                 </h3>
-                <p className="text-gray-400 mt-0.5" style={{fontSize:'clamp(9px,1vw,11px)'}}>
-                  Ghana · Morocco · Senegal · Egypt
+                <p className="text-gray-400 text-sm">
+                  Ghana · Morocco · Senegal · Egypt · Côte d&apos;Ivoire + All 48 Nations
                 </p>
-                <div className="flex gap-0.5 mt-1.5 flex-wrap">
-                  {["🇬🇭","🇲🇦","🇸🇳","🇪🇬","🇨🇮"].map(f=>(
-                    <span key={f} style={{fontSize:'clamp(10px,1.2vw,16px)'}}>{f}</span>
+              </div>
+
+              {/* Right — flags + CTA */}
+              <div className="flex flex-col items-center gap-3 flex-shrink-0">
+                <div className="flex gap-2 text-3xl">
+                  {["🇬🇭","🇲🇦","🇸🇳","🇪🇬","🇨🇮","🇿🇦","🇩🇿","🇹🇳","🇨🇻"].map(f=>(
+                    <span key={f} className="hover:scale-125 transition-transform">{f}</span>
                   ))}
                 </div>
-              </div>
-              <div className="relative z-10 mt-2">
-                <span className="inline-flex items-center font-black text-black rounded-lg group-hover:scale-105 transition-transform"
-                  style={{
-                    background:'linear-gradient(135deg,#FCD116,#f5a623)',
-                    fontSize:'clamp(9px,1vw,11px)',
-                    padding:'4px 10px',
-                  }}>
-                  Shop Kits →
-                </span>
-              </div>
-            </a>
-
-            {/* MIDDLE 40% — Dynamic Ad Carousel */}
-            <div className="flex-none" style={{width:'40%'}}>
-              <PromoCarousel />
-            </div>
-
-            {/* RIGHT 30% — Fitness */}
-            <a href="/fitness"
-              className="group relative overflow-hidden rounded-2xl shadow-xl flex-none flex flex-col justify-between p-4"
-              style={{
-                width:'30%',
-                background:'linear-gradient(135deg,#050505 0%,#1a0a00 50%,#0d0d0d 100%)',
-              }}>
-              <div className="absolute inset-0 opacity-50" style={{
-                background:'radial-gradient(ellipse at 30% 50%,rgba(255,107,53,0.25) 0%,transparent 60%)'
-              }}/>
-              <div className="relative z-10">
-                <div className="inline-flex items-center bg-orange-500 text-white text-xs font-black px-2 py-0.5 rounded-full mb-1.5 uppercase tracking-wider">
-                  Fitness
+                <div className="flex items-center gap-2 font-black text-black text-sm px-6 py-3 rounded-2xl group-hover:scale-105 transition-transform"
+                  style={{background:'linear-gradient(135deg,#FCD116,#f5a623)'}}>
+                  Shop All Jerseys →
                 </div>
-                <h3 className="text-white font-black leading-tight"
-                  style={{fontFamily:'Bebas Neue,sans-serif',letterSpacing:'2px',fontSize:'clamp(13px,1.8vw,20px)'}}>
+              </div>
+            </div>
+          </a>
+
+          {/* Fitness Banner */}
+          <a href="/fitness" className="block group relative overflow-hidden rounded-3xl shadow-2xl mt-4"
+            style={{background:'linear-gradient(135deg,#050505 0%,#1a0a00 50%,#0d0d0d 100%)'}}>
+            <div className="absolute inset-0 opacity-50" style={{
+              background:'radial-gradient(ellipse at 30% 50%,rgba(255,107,53,0.25) 0%,transparent 60%),radial-gradient(ellipse at 80% 50%,rgba(252,209,22,0.15) 0%,transparent 50%)'
+            }}/>
+            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-8 py-6 gap-4">
+              <div className="text-center md:text-left">
+                <div className="inline-flex items-center gap-2 bg-orange-500 text-white text-xs font-black px-3 py-1 rounded-full mb-2 uppercase tracking-widest">
+                  💪 New — African Fitness & Streetwear
+                </div>
+                <h3 className="text-white font-black text-2xl md:text-3xl leading-tight"
+                  style={{fontFamily:'Bebas Neue,sans-serif',letterSpacing:'2px'}}>
                   TRAIN LIKE AN <span style={{color:'#FF6B35'}}>AFRICAN</span>
                 </h3>
-                <p className="text-gray-400 mt-0.5" style={{fontSize:'clamp(9px,1vw,11px)'}}>
-                  Nike · Adidas · Puma · African Brands
-                </p>
-                <div className="flex gap-0.5 mt-1.5">
-                  {["💪","🏋️","🥊","👟"].map((e,i)=>(
-                    <span key={i} style={{fontSize:'clamp(10px,1.2vw,16px)'}}>{e}</span>
-                  ))}
-                </div>
+                <p className="text-gray-400 text-xs">Nike · Adidas · Puma + African Brands · Ships Worldwide</p>
               </div>
-              <div className="relative z-10 mt-2">
-                <span className="inline-flex items-center font-black text-white rounded-lg group-hover:scale-105 transition-transform"
-                  style={{
-                    background:'linear-gradient(135deg,#FF6B35,#e84d00)',
-                    fontSize:'clamp(9px,1vw,11px)',
-                    padding:'4px 10px',
-                  }}>
-                  Shop Fitness →
-                </span>
+              <div className="flex items-center gap-2 font-black text-white text-sm px-6 py-3 rounded-2xl group-hover:scale-105 transition-transform flex-shrink-0"
+                style={{background:'linear-gradient(135deg,#FF6B35,#e84d00)'}}>
+                💪 Shop Fitness →
               </div>
-            </a>
-
-          </div>
+            </div>
+          </a>
         </div>
       )}
 
@@ -308,18 +270,13 @@ export default function Home() {
                 </h2>
                 <p className="text-green-700 text-sm mt-0.5">Hand-picked by our team</p>
               </div>
-              <button
-                onClick={() => {
-                  setFilter("sort", "popular");
-                  document.getElementById("main-content")?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className="text-green-900 font-semibold text-sm flex items-center gap-1 hover:underline"
-              >
+              <button onClick={() => setFilter("sort", "popular")}
+                className="text-green-900 font-semibold text-sm flex items-center gap-1 hover:underline">
                 View all <FiArrowRight size={14} />
               </button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {featuredProducts.slice(0, 4).map((p) => (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {featuredProducts.map((p) => (
                 <ProductCard key={p.id} product={p} wishlisted={wishlist.includes(p.id)} onWishlist={() => toggleWishlist(p.id)} />
               ))}
             </div>
