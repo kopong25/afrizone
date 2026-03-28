@@ -57,6 +57,18 @@ export default function StoreSettings() {
           website: r.data.website || "",
           vendor_type: r.data.vendor_type || "other",
           delivery_type: r.data.delivery_type || "shipping",
+          is_open_now: r.data.is_open_now !== undefined ? r.data.is_open_now : true,
+          prep_time_minutes: r.data.prep_time_minutes || 30,
+          opening_hours: r.data.opening_hours || "",
+          weekly_hours: r.data.weekly_hours ? JSON.parse(r.data.weekly_hours) : {
+            Monday:    {open:"11:00",close:"21:00",closed:false},
+            Tuesday:   {open:"11:00",close:"21:00",closed:false},
+            Wednesday: {open:"11:00",close:"21:00",closed:false},
+            Thursday:  {open:"11:00",close:"21:00",closed:false},
+            Friday:    {open:"11:00",close:"22:00",closed:false},
+            Saturday:  {open:"12:00",close:"22:00",closed:false},
+            Sunday:    {open:"12:00",close:"20:00",closed:false},
+          },
           delivery_radius_miles: r.data.delivery_radius_miles || "",
           delivery_note: r.data.delivery_note || "",
         });
@@ -304,6 +316,77 @@ export default function StoreSettings() {
                 </div>
               </label>
             </div>
+
+            {/* ── RESTAURANT OPERATING HOURS ── */}
+            <div className="mt-6 border-t pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-black text-gray-900">⏰ Operating Hours</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Customers cannot order outside these hours</p>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-sm text-gray-600">Store Status:</span>
+                  <div className={`relative w-12 h-6 rounded-full transition-colors cursor-pointer ${form.is_open_now ? "bg-green-500" : "bg-gray-300"}`}
+                    onClick={() => setForm(f => ({...f, is_open_now: !f.is_open_now}))}>
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.is_open_now ? "translate-x-7" : "translate-x-1"}`}/>
+                  </div>
+                  <span className={`text-sm font-black ${form.is_open_now ? "text-green-600" : "text-red-500"}`}>
+                    {form.is_open_now ? "OPEN" : "CLOSED"}
+                  </span>
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map(day => {
+                  const hours = (form.weekly_hours && form.weekly_hours[day]) || {open:"11:00",close:"21:00",closed:false};
+                  return (
+                    <div key={day} className={`grid grid-cols-12 gap-2 items-center p-2 rounded-lg ${hours.closed ? "bg-gray-50 opacity-60" : "bg-green-50"}`}>
+                      <div className="col-span-3">
+                        <p className="text-sm font-semibold text-gray-700">{day.slice(0,3)}</p>
+                      </div>
+                      <div className="col-span-3">
+                        <input type="time" value={hours.open} disabled={hours.closed}
+                          onChange={e => setForm(f => ({...f, weekly_hours: {...(f.weekly_hours||{}), [day]: {...hours, open: e.target.value}}}))}
+                          className="w-full border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-100" />
+                      </div>
+                      <div className="col-span-1 text-center text-gray-400 text-xs">to</div>
+                      <div className="col-span-3">
+                        <input type="time" value={hours.close} disabled={hours.closed}
+                          onChange={e => setForm(f => ({...f, weekly_hours: {...(f.weekly_hours||{}), [day]: {...hours, close: e.target.value}}}))}
+                          className="w-full border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-100" />
+                      </div>
+                      <div className="col-span-2 flex items-center justify-end gap-1">
+                        <input type="checkbox" checked={hours.closed}
+                          onChange={e => setForm(f => ({...f, weekly_hours: {...(f.weekly_hours||{}), [day]: {...hours, closed: e.target.checked}}}))}
+                          className="accent-red-500" />
+                        <span className="text-xs text-gray-500">Closed</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Avg Prep Time</label>
+                  <select value={form.prep_time_minutes || 30}
+                    onChange={e => setForm(f => ({...f, prep_time_minutes: Number(e.target.value)}))}
+                    className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700">
+                    {[15,20,25,30,40,45,60,90].map(t => (
+                      <option key={t} value={t}>{t} minutes</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Special Hours Note</label>
+                  <input value={form.opening_hours || ""}
+                    onChange={e => setForm(f => ({...f, opening_hours: e.target.value}))}
+                    placeholder="e.g. Closed public holidays"
+                    className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+                </div>
+              </div>
+            </div>
+
           ) : (
           <div className="grid grid-cols-2 gap-3 mb-5">
             {DELIVERY_TYPES.filter(d => d.value !== "local_delivery").map((d) => (

@@ -14,19 +14,48 @@ const INITIAL_FORM = {
   currency: "USD", ships_from: "",
 };
 
-// Industry-standard size presets
+// Amazon-standard variant presets per product category
 const SIZE_PRESETS = {
-  "Clothing": ["XS", "S", "M", "L", "XL", "2XL", "3XL"],
-  "Shoes": ["5", "6", "7", "8", "9", "10", "11", "12", "13"],
-  "Kids": ["0-3M", "3-6M", "6-12M", "1Y", "2Y", "3Y", "4Y", "5Y", "6Y"],
-  "One Size": ["One Size"],
+  "Clothing":    ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"],
+  "Shoes":       ["5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "12", "13"],
+  "Kids":        ["0-3M", "3-6M", "6-12M", "1Y", "2Y", "3Y", "4Y", "5Y", "6Y", "7Y", "8Y"],
+  "Hair Length": ["8"", "10"", "12"", "14"", "16"", "18"", "20"", "22"", "24"", "26"", "28"", "30""],
+  "Wig Cap":     ["Petite", "Average", "Large"],
+  "One Size":    ["One Size"],
 };
 
 const COLOR_PRESETS = [
-  "Black", "White", "Red", "Blue", "Green", "Yellow", "Orange", "Purple",
-  "Pink", "Brown", "Gray", "Navy", "Beige", "Gold", "Silver",
+  // Natural hair colors
+  "Natural Black", "Off Black", "Dark Brown", "Medium Brown", "Light Brown",
+  "Blonde", "Platinum Blonde", "Strawberry Blonde", "Honey Blonde",
+  "Auburn", "Burgundy", "Dark Red",
+  // Fashion colors
+  "Ombre Black to Brown", "Ombre Black to Blonde", "Ombre Brown to Blonde",
+  "Salt & Pepper", "Grey", "Silver",
+  // African fashion colors
   "Kente Gold", "Ankara Blue", "Earth Brown", "Safari Green",
+  // Standard
+  "Black", "White", "Red", "Blue", "Green", "Navy", "Beige", "Gold", "Pink",
 ];
+
+// Amazon-style hair & wig specific variant attributes
+const HAIR_VARIANT_TYPES = {
+  "Hair Length":   { icon: "📏", presets: SIZE_PRESETS["Hair Length"], note: "Measured when straight" },
+  "Hair Texture":  { icon: "〰️", presets: ["Straight", "Body Wave", "Loose Wave", "Deep Wave", "Kinky Curly", "Afro Kinky", "Loose Curly", "Water Wave", "Jerry Curl", "Coily"], note: "Natural texture pattern" },
+  "Hair Color":    { icon: "🎨", presets: COLOR_PRESETS, note: "Select all available colors" },
+  "Density":       { icon: "💪", presets: ["130%", "150%", "180%", "200%", "250%"], note: "Hair fullness (150% is natural looking)" },
+  "Wig Type":      { icon: "👑", presets: ["Lace Front", "Full Lace", "360 Lace", "Headband Wig", "U-Part", "V-Part", "Closure Wig", "Glueless"], note: "Wig construction type" },
+  "Cap Size":      { icon: "📐", presets: SIZE_PRESETS["Wig Cap"], note: "Head circumference fit" },
+  "Hair Origin":   { icon: "🌍", presets: ["Brazilian", "Peruvian", "Malaysian", "Indian", "Cambodian", "Vietnamese", "Burmese", "African"], note: "Origin affects texture quality" },
+  "Hair Grade":    { icon: "⭐", presets: ["8A", "9A", "10A", "12A"], note: "Higher grade = better quality" },
+};
+
+// Standard fashion variants
+const FASHION_VARIANT_TYPES = {
+  "Size":   { icon: "📐", presets: SIZE_PRESETS["Clothing"] },
+  "Color":  { icon: "🎨", presets: COLOR_PRESETS.slice(0, 20) },
+  "Shoes":  { icon: "👟", presets: SIZE_PRESETS["Shoes"] },
+};
 
 const COUNTRIES = ["Nigeria", "Ghana", "Ethiopia", "Kenya", "Senegal", "Cameroon",
   "South Africa", "Congo", "Ivory Coast", "Tanzania", "Uganda", "Rwanda",
@@ -159,40 +188,77 @@ function VariantManager({ productId, productName }) {
 
       {/* Add variant UI */}
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-        <p className="text-sm font-bold text-blue-900 mb-3">Add Variants</p>
+        <p className="text-sm font-bold text-blue-900 mb-1">Add Variants</p>
+        <p className="text-xs text-gray-500 mb-3">Amazon-style: add sizes, colors, hair length, texture, density and more</p>
 
-        {/* Variant type selector */}
-        <div className="flex gap-2 mb-3 flex-wrap">
-          {["Size", "Color", "Custom"].map(t => (
-            <button key={t} type="button"
-              onClick={() => { setVariantType(t); setBulkMode(t !== "Custom"); setBulkSelected([]); }}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                variantType === t ? "bg-blue-700 text-white" : "bg-white text-gray-600 hover:bg-gray-100 border"
-              }`}>
-              {t === "Size" ? "📐 Size" : t === "Color" ? "🎨 Color" : "✏️ Custom"}
-            </button>
-          ))}
+        {/* Category tabs */}
+        <div className="mb-3">
+          <div className="flex gap-2 mb-2 flex-wrap">
+            {[
+              { id: "hair", label: "💆 Hair & Wigs" },
+              { id: "fashion", label: "👗 Fashion" },
+              { id: "custom", label: "✏️ Custom" },
+            ].map(tab => (
+              <button key={tab.id} type="button"
+                onClick={() => { setVariantType(tab.id === "custom" ? "Custom" : Object.keys(tab.id === "hair" ? HAIR_VARIANT_TYPES : FASHION_VARIANT_TYPES)[0]); setBulkMode(tab.id !== "custom"); setBulkSelected([]); }}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+                  (tab.id === "hair" && Object.keys(HAIR_VARIANT_TYPES).includes(variantType)) ||
+                  (tab.id === "fashion" && Object.keys(FASHION_VARIANT_TYPES).includes(variantType)) ||
+                  (tab.id === "custom" && variantType === "Custom")
+                    ? "bg-blue-700 text-white border-blue-700"
+                    : "bg-white text-gray-600 hover:bg-gray-100"
+                }`}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Hair variant attributes */}
+          {Object.keys(HAIR_VARIANT_TYPES).includes(variantType) && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {Object.entries(HAIR_VARIANT_TYPES).map(([name, cfg]) => (
+                <button key={name} type="button"
+                  onClick={() => { setVariantType(name); setBulkSelected([]); }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border ${
+                    variantType === name ? "bg-blue-100 border-blue-400 text-blue-800" : "bg-white border-gray-200 text-gray-600"
+                  }`}>
+                  {cfg.icon} {name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Fashion variant attributes */}
+          {Object.keys(FASHION_VARIANT_TYPES).includes(variantType) && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {Object.entries(FASHION_VARIANT_TYPES).map(([name, cfg]) => (
+                <button key={name} type="button"
+                  onClick={() => { setVariantType(name); setBulkSelected([]); }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border ${
+                    variantType === name ? "bg-blue-100 border-blue-400 text-blue-800" : "bg-white border-gray-200 text-gray-600"
+                  }`}>
+                  {cfg.icon} {name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Note for selected type */}
+          {(HAIR_VARIANT_TYPES[variantType]?.note || FASHION_VARIANT_TYPES[variantType]?.note) && (
+            <p className="text-xs text-blue-600 mt-1.5 italic">
+              ℹ️ {HAIR_VARIANT_TYPES[variantType]?.note || FASHION_VARIANT_TYPES[variantType]?.note}
+            </p>
+          )}
         </div>
 
-        {/* Size category for size variants */}
-        {variantType === "Size" && (
-          <div className="mb-3">
-            <label className="text-xs font-semibold text-gray-600 block mb-1">Size Category</label>
-            <select value={sizeCategory} onChange={e => { setSizeCategory(e.target.value); setBulkSelected([]); }}
-              className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-              {Object.keys(SIZE_PRESETS).map(k => <option key={k}>{k}</option>)}
-            </select>
-          </div>
-        )}
-
-        {/* Bulk preset picker for Size/Color */}
+        {/* Bulk preset picker */}
         {variantType !== "Custom" && (
           <div className="mb-3">
             <label className="text-xs font-semibold text-gray-600 block mb-2">
-              Select {variantType}s <span className="font-normal text-gray-400">(click to toggle)</span>
+              Select options <span className="font-normal text-gray-400">(click to add)</span>
             </label>
             <div className="flex flex-wrap gap-2">
-              {presets.map(p => (
+              {(HAIR_VARIANT_TYPES[variantType]?.presets || FASHION_VARIANT_TYPES[variantType]?.presets || presets).map(p => (
                 <button key={p} type="button"
                   onClick={() => setBulkSelected(prev =>
                     prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]

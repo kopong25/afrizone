@@ -5,16 +5,11 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // ─── Token store ─────────────────────────────────────────────────────────────
 // Priority: sessionStorage (works in iOS Private) → localStorage → cookie
-// sessionStorage survives page navigation within the same tab on ALL browsers
-// including iOS Safari Private mode where localStorage quota is 0.
 let _memoryToken = null;
 
 function _write(token) {
-  // sessionStorage: works in iOS Private mode, survives navigation within tab
   try { if (token) sessionStorage.setItem("az_tok", token); else sessionStorage.removeItem("az_tok"); } catch {}
-  // localStorage: survives across tabs/sessions (blocked in iOS Private — silent fail)
   try { if (token) localStorage.setItem("afrizone_token", token); else localStorage.removeItem("afrizone_token"); } catch {}
-  // Cookie: fallback for SSR / desktop
   try {
     if (token) {
       const isProd = typeof window !== "undefined" && window.location.protocol === "https:";
@@ -44,14 +39,31 @@ export function setAuthToken(token) {
   _write(token || null);
 }
 
+export function clearAuthToken() {
+  _memoryToken = null;
+  _write(null);
+}
+
+/**
+ * Call this once on app boot (in _app.js useEffect).
+ * Reads token from all storage layers and warms _memoryToken so the
+ * first protected API call never fires without a token.
+ */
 export function loadStoredToken() {
   const token = _read();
   if (token) {
     _memoryToken = token;
-    // Ensure sessionStorage has it for this tab session
     try { sessionStorage.setItem("az_tok", token); } catch {}
   }
   return token;
+}
+
+/**
+ * Returns true if a token exists in any storage layer.
+ * Use this to gate protected pages without making an API call.
+ */
+export function hasToken() {
+  return !!(_memoryToken || _read());
 }
 
 // ─── Axios instance ──────────────────────────────────────────────────────────
@@ -60,36 +72,43 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Read token on EVERY request — never trust cached _memoryToken alone
-// because iOS Safari resets module state on every page navigation
+// Attach token to EVERY request — re-read storage each time to handle
+// iOS Safari resetting module state on page navigation.
 api.interceptors.request.use((config) => {
-  // Use memory if set, otherwise read fresh from all storage layers
-  let token = _memoryToken || _read();
-  // Last resort: check window-level token set during checkout
-  if (!token) { try { token = window._azMemToken || null; } catch {} }
+  // FIX: removed window._azMemToken fallback — it could inject a stale/wrong token.
+  // _memoryToken is kept in sync by loadStoredToken() and setAuthToken().
+  const token = _memoryToken || _read();
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-    // Keep memory in sync so next call is faster
-    if (!_memoryToken) _memoryToken = token;
+    if (!_memoryToken) _memoryToken = token; // keep in sync
   }
   return config;
 });
 
-// Handle 401 globally
+// ─── Global 401 handler ──────────────────────────────────────────────────────
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       const url = error.config?.url || "";
-      // If /auth/me returns 401, token is expired — let _app.js handle cleanup
-      // For other endpoints, if user appears logged out redirect to login
-      if (!url.includes("/auth/me") && !url.includes("/auth/login")) {
+      const isAuthRoute = url.includes("/auth/me") || url.includes("/auth/login");
+
+      if (!isAuthRoute) {
         const stored = _read();
         if (!stored) {
-          // No token at all — silently fail, user is not logged in
+          // No token — user is logged out, clear memory just in case
+          _memoryToken = null;
         }
-        // Token exists but server rejected it — may be expired
-        // Don't redirect automatically, let each page handle it
+        // Token exists but server rejected it (expired/revoked).
+        // Clear it so the next request doesn't keep sending a bad token.
+        else {
+          clearAuthToken();
+          // Redirect to login if we're in a browser context
+          if (typeof window !== "undefined") {
+            window.location.href = "/login";
+          }
+        }
       }
     }
     return Promise.reject(error);
@@ -109,7 +128,6 @@ export const productsAPI = {
   list: (params) => api.get("/products", { params }),
   get: (slug) => api.get(`/products/${slug}`),
   categories: () => api.get("/products/categories"),
-  // Seller actions
   myProducts: () => api.get("/products/seller/mine"),
   create: (data) => api.post("/products/seller/create", data),
   update: (id, data) => api.put(`/products/seller/${id}`, data),
@@ -153,7 +171,6 @@ export const ordersAPI = {
   sellerOrders: (params) => api.get("/orders/store-orders", { params }),
   get: (id) => api.get(`/orders/${id}`),
   updateStatus: (id, data) => api.put(`/orders/${id}/status`, data),
-  // Cart
   cart: () => api.get("/orders/cart/items"),
   addToCart: (data) => api.post("/orders/cart/add", data),
   removeFromCart: (id) => api.delete(`/orders/cart/${id}`),
@@ -187,8 +204,6 @@ export const adminAPI = {
   featureProduct: (id) => api.put(`/admin/products/${id}/feature`),
 };
 
-export default api;
-
 // ── Wishlist ──
 export const wishlistAPI = {
   get: () => api.get("/wishlist/"),
@@ -211,6 +226,7 @@ export const variantsAPI = {
   delete: (id) => api.delete(`/variants/${id}`),
 };
 
+// ── Messages ──
 export const messagesAPI = {
   list: () => api.get("/messages/"),
   start: (data) => api.post("/messages/start", data),
@@ -219,24 +235,30 @@ export const messagesAPI = {
   unread: () => api.get("/messages/unread/count"),
 };
 
+// ── Shipping ──
 export const shippingAPI = {
   getRates: (orderId) => api.get(`/shipping/rates/${orderId}`),
   createLabel: (orderId, rateId) => api.post(`/shipping/label/${orderId}?rate_id=${rateId}`),
   getLabel: (orderId) => api.get(`/shipping/label/${orderId}`),
 };
 
+// ── Subscriptions ──
 export const subscriptionsAPI = {
   plans: () => api.get("/subscriptions/plans"),
   myPlan: () => api.get("/subscriptions/my-plan"),
   upgrade: (tier) => api.post(`/subscriptions/upgrade/${tier}`),
 };
 
+// ── Referrals ──
 export const referralsAPI = {
   myCode: () => api.get("/referrals/my-code"),
   stats: () => api.get("/referrals/stats"),
   use: (code) => api.post(`/referrals/use/${code}`),
 };
 
+// ── Admin Analytics ──
 export const adminAnalyticsAPI = {
   get: (days = 30) => api.get(`/admin/analytics?days=${days}`),
 };
+
+export default api;
