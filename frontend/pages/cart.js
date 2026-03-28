@@ -17,6 +17,17 @@ const apiErr = (e, fallback = "Something went wrong") => {
   return String(fallback);
 };
 
+// ─── FIX 1: Centralised address validator ────────────────────────────────────
+function validateAddress(shipping) {
+  const missing = [];
+  if (!shipping.name?.trim())    missing.push("Full Name");
+  if (!shipping.address?.trim()) missing.push("Street Address");
+  if (!shipping.city?.trim())    missing.push("City");
+  if (!shipping.state?.trim())   missing.push("State");
+  if (!shipping.zip?.trim())     missing.push("ZIP Code");
+  return missing;
+}
+
 export default function CartPage() {
   const router = useRouter();
   const { user, token, loading: authLoading } = useAuth();
@@ -62,19 +73,13 @@ export default function CartPage() {
 
   // ── Delivery routing ───────────────────────────────────────────────────────
   const fetchDeliveryOptions = async () => {
-    if (!shipping.address || !shipping.city || !shipping.zip) {
-      toast.error("Please fill in your address first");
-      return false;
-    }
     setLoadingDelivery(true);
     setDeliveryOptions([]);
     setSelectedDelivery(null);
 
     try {
-      // storeId: always use product.store_id (reliably present even without store join)
       const storeId = items[0]?.product?.store_id || primaryStore?.id;
 
-      // Always fetch fresh store data - enum fields can return null from SQLAlchemy
       let storeVendorType = null;
       let storeDeliveryType = null;
       if (storeId) {
@@ -95,7 +100,6 @@ export default function CartPage() {
       const offersLocal = ["local_delivery", "both"].includes(storeDeliveryType);
       console.log("[Delivery Debug]", { storeId, storeVendorType, storeDeliveryType, isRestaurant });
 
-      // Geocode customer address
       let customerLat = null, customerLng = null;
       try {
         const geo = await fetch(
@@ -129,7 +133,6 @@ export default function CartPage() {
       let options = [];
 
       if (isRestaurant) {
-        // Restaurant — Uber delivery always available
         options = [
           {
             id: "uber_express",
@@ -142,7 +145,6 @@ export default function CartPage() {
             quote_id: uberData.options?.find(o => o.id === "uber_express")?.quote_id || null,
           }
         ];
-        // Also offer pickup if store supports it
         if (storeDeliveryType === "both") {
           options.push({
             id: "pickup",
@@ -155,7 +157,6 @@ export default function CartPage() {
           });
         }
       } else {
-        // Non-restaurant — USPS + Uber
         options = [
           { id: "usps_priority", label: "Chippo USPS Shipping", icon: "📬", price: 6.99, eta: "1–2 business days", description: "Fast tracked shipping.", provider: "usps" },
           {
@@ -168,7 +169,6 @@ export default function CartPage() {
             provider: "uber_direct",
           },
         ];
-        // Add pickup if store offers it
         if (["pickup", "both"].includes(storeDeliveryType)) {
           options.push({
             id: "pickup",
@@ -180,7 +180,6 @@ export default function CartPage() {
             provider: "pickup",
           });
         }
-        // If pickup-only store, remove delivery options
         if (storeDeliveryType === "pickup") {
           options = [{
             id: "pickup",
@@ -198,8 +197,8 @@ export default function CartPage() {
       setSelectedDelivery(options[0]);
       return true;
     } catch (err) {
-      const isRest = storeVendorType === "restaurant" || primaryStore?.vendor_type === "restaurant";
-      const storeDelType = storeDeliveryType;  // already fetched fresh from /sellers/{id}/public
+      const isRest = primaryStore?.vendor_type === "restaurant";
+      const storeDelType = primaryStore?.delivery_type;
       const pickupOption = { id: "pickup", label: "Customer Pickup", icon: "🏪", price: 0, eta: "Pick up at store", description: "Collect your order in person. No delivery charge.", provider: "pickup" };
       const fallback = isRest
         ? storeDelType === "both"
@@ -236,7 +235,6 @@ export default function CartPage() {
     return acc;
   }, {});
 
-  // Determine if ANY store in cart is a restaurant
   const hasRestaurant = Object.values(byStore).some(
     ({ store }) => store.vendor_type === "restaurant"
   );
@@ -257,7 +255,15 @@ export default function CartPage() {
 
   const handleCheckout = async () => {
     if (items.length === 0) return;
-    // Read token from all storage layers — never trust React state alone
+
+    // ─── FIX 2: Final address validation before order is placed ──────────────
+    const missingFields = validateAddress(shipping);
+    if (missingFields.length > 0) {
+      toast.error(`Address incomplete — missing: ${missingFields.join(", ")}`);
+      setStep("shipping");
+      return;
+    }
+
     let authToken = token;
     if (!authToken) { try { authToken = sessionStorage.getItem("az_tok"); } catch {} }
     if (!authToken) { try { authToken = localStorage.getItem("afrizone_token"); } catch {} }
@@ -273,7 +279,6 @@ export default function CartPage() {
       router.push("/login?redirect=/cart");
       return;
     }
-    // Sync token to memory so all subsequent API calls use it
     if (typeof window !== "undefined") {
       try { window._azMemToken = authToken; } catch {}
     }
@@ -286,7 +291,6 @@ export default function CartPage() {
           product_id: i.product.id,
           quantity: i.quantity,
         }));
-        // Get store_id reliably — from store object or directly from product
         const resolvedStoreId = parseInt(storeGroup.store?.id) || 
           parseInt(storeGroup.items[0]?.product?.store_id) ||
           parseInt(items[0]?.product?.store_id);
@@ -300,13 +304,14 @@ export default function CartPage() {
         const orderPayload = {
           store_id: resolvedStoreId,
           items: orderItems,
+          // ─── FIX 3: No fake defaults — send real values only ─────────────
           shipping: {
-            name: shipping.name || "Customer",
-            address: shipping.address,
-            city: shipping.city,
-            state: shipping.state || "N/A",
+            name:    shipping.name.trim(),
+            address: shipping.address.trim(),
+            city:    shipping.city.trim(),
+            state:   shipping.state.trim(),
             country: shipping.country || "USA",
-            zip: shipping.zip,
+            zip:     shipping.zip.trim(),
           },
           delivery_method: selectedDelivery?.id || "usps_priority",
           delivery_fee: shippingCost || 0,
@@ -380,7 +385,6 @@ export default function CartPage() {
             <div className="lg:col-span-2 space-y-4">
 
               {/* STEP 1 — Cart Items */}
-              {/* Multi-store block */}
               {step === "cart" && Object.keys(byStore).length > 1 && (
                 <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 flex items-start gap-3">
                   <span className="text-2xl flex-shrink-0">🛒</span>
@@ -445,25 +449,28 @@ export default function CartPage() {
                   <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><FiMapPin /> Delivery Address</h2>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-sm font-medium text-gray-700 block mb-1">Full Name</label>
+                      <label className="text-sm font-medium text-gray-700 block mb-1">Full Name <span className="text-red-500">*</span></label>
                       <input value={shipping.name} onChange={(e) => setShipping({...shipping, name: e.target.value})}
+                        placeholder="e.g. John Smith"
                         className="w-full border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-900" />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-700 block mb-1">Street Address</label>
+                      <label className="text-sm font-medium text-gray-700 block mb-1">Street Address <span className="text-red-500">*</span></label>
                       <input value={shipping.address} onChange={(e) => setShipping({...shipping, address: e.target.value})}
                         placeholder="123 Main St"
                         className="w-full border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-900" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm font-medium text-gray-700 block mb-1">City</label>
+                        <label className="text-sm font-medium text-gray-700 block mb-1">City <span className="text-red-500">*</span></label>
                         <input value={shipping.city} onChange={(e) => setShipping({...shipping, city: e.target.value})}
+                          placeholder="e.g. Houston"
                           className="w-full border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-900" />
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-700 block mb-1">State</label>
+                        <label className="text-sm font-medium text-gray-700 block mb-1">State <span className="text-red-500">*</span></label>
                         <input value={shipping.state} onChange={(e) => setShipping({...shipping, state: e.target.value})}
+                          placeholder="e.g. TX"
                           className="w-full border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-900" />
                       </div>
                     </div>
@@ -477,8 +484,9 @@ export default function CartPage() {
                         </select>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-700 block mb-1">ZIP Code</label>
+                        <label className="text-sm font-medium text-gray-700 block mb-1">ZIP Code <span className="text-red-500">*</span></label>
                         <input value={shipping.zip} onChange={(e) => setShipping({...shipping, zip: e.target.value})}
+                          placeholder="e.g. 77001"
                           className="w-full border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-900" />
                       </div>
                     </div>
@@ -551,6 +559,7 @@ export default function CartPage() {
                     <p className="text-sm font-semibold text-gray-700">📦 Delivering to:</p>
                     <p className="text-sm text-gray-600">{shipping.name}</p>
                     <p className="text-sm text-gray-600">{shipping.address}, {shipping.city}, {shipping.state} {shipping.zip}</p>
+                    <p className="text-sm text-gray-600">{shipping.country}</p>
                   </div>
                   {selectedDelivery && (
                     <div className="bg-green-50 rounded-xl p-4 mb-4 flex items-center gap-3">
@@ -641,12 +650,26 @@ export default function CartPage() {
                     Continue to Address <FiArrowRight />
                   </button>
                 )}
+
                 {step === "shipping" && (
                   <div className="space-y-2 mt-5">
                     <button onClick={async () => {
-                      if (!shipping.name || !shipping.address || !shipping.city || !shipping.zip) {
-                        toast.error("Please fill in all address fields"); return;
+                      // ─── FIX 4: Trim whitespace + validate state field ────
+                      const trimmed = {
+                        name:    shipping.name.trim(),
+                        address: shipping.address.trim(),
+                        city:    shipping.city.trim(),
+                        state:   shipping.state.trim(),
+                        country: shipping.country,
+                        zip:     shipping.zip.trim(),
+                      };
+                      const missing = validateAddress(trimmed);
+                      if (missing.length > 0) {
+                        toast.error(`Please fill in: ${missing.join(", ")}`);
+                        return;
                       }
+                      // Save trimmed values back to state before proceeding
+                      setShipping(trimmed);
                       const ok = await fetchDeliveryOptions();
                       if (ok) setStep("delivery");
                     }} disabled={loadingDelivery}
@@ -656,6 +679,7 @@ export default function CartPage() {
                     <button onClick={() => setStep("cart")} className="w-full btn-secondary py-2.5 text-sm">← Back to Cart</button>
                   </div>
                 )}
+
                 {step === "delivery" && (
                   <div className="space-y-2 mt-5">
                     <button onClick={() => { if (!selectedDelivery) { toast.error("Please select a delivery option"); return; } setStep("confirm"); }}
@@ -665,6 +689,7 @@ export default function CartPage() {
                     <button onClick={() => setStep("shipping")} className="w-full btn-secondary py-2.5 text-sm">← Back</button>
                   </div>
                 )}
+
                 {step === "confirm" && (
                   <div className="space-y-2 mt-5">
                     <button onClick={handleCheckout} disabled={checkingOut}
@@ -675,6 +700,7 @@ export default function CartPage() {
                     <button onClick={() => setStep("delivery")} className="w-full btn-secondary py-2.5 text-sm">← Back</button>
                   </div>
                 )}
+
                 <p className="text-xs text-gray-400 text-center mt-3 flex items-center justify-center gap-1">
                   <FiLock size={10} /> Secure & encrypted checkout
                 </p>
