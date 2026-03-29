@@ -9,8 +9,9 @@ logger = logging.getLogger(__name__)
 
 SHIPPO_API_KEY = os.getenv("SHIPPO_API_KEY", "")
 SHIPPO_BASE = "https://api.goshippo.com"
+SHIPPO_TEST_MODE = SHIPPO_API_KEY.startswith("shippo_test_") or not SHIPPO_API_KEY
 
-logger.info(f"[SHIPPO] API key loaded: {'YES' if SHIPPO_API_KEY else 'NO — will use mock'}")
+logger.info(f"[SHIPPO] API key loaded: {'YES' if SHIPPO_API_KEY else 'NO'} | mode: {'TEST — sample labels' if SHIPPO_TEST_MODE else 'LIVE'}")
 
 
 # ---------------------------------------------------------------------------
@@ -41,6 +42,23 @@ async def shippo_get(endpoint: str):
         )
         r.raise_for_status()
         return r.json()
+
+
+def _pick_best_rate(rates: list) -> str | None:
+    """Pick the best rate — prefer USPS Priority, fall back to cheapest (handles test mode empty servicelevel)."""
+    if not rates:
+        return None
+    # Live mode: prefer USPS Priority by servicelevel token
+    priority = [
+        r for r in rates
+        if "PRIORITY" in r.get("servicelevel", {}).get("token", "").upper()
+    ]
+    if priority:
+        return priority[0]["object_id"]
+    # Test mode or no servicelevel: pick cheapest available rate
+    cheapest = min(rates, key=lambda r: float(r.get("amount", 9999)))
+    logger.info(f"[SHIPPO] No priority rate found — using cheapest: {cheapest.get('object_id')} (${cheapest.get('amount')})")
+    return cheapest["object_id"]
 
 
 def validate_shipping_address(order: models.Order):
@@ -262,11 +280,7 @@ async def create_shipping_label(
                     detail="Shippo returned no rates for this address. "
                            "Verify the shipping address and try again.",
                 )
-            priority = [
-                r for r in rates
-                if "PRIORITY" in r.get("servicelevel", {}).get("token", "").upper()
-            ]
-            rate_id = priority[0]["object_id"] if priority else rates[0]["object_id"]
+            rate_id = _pick_best_rate(rates)
             logger.info(f"[SHIPPO] Auto-selected rate: {rate_id}")
 
         except HTTPException:
