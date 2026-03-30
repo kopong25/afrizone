@@ -212,7 +212,7 @@ function StripeSetupForm({ onConnect }) {
 }
 
 export default function SellerDashboard() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();`n  const { supported: pushSupported, subscribed: pushSubscribed, loading: pushLoading, error: pushError, permission, subscribe: enablePush, unsubscribe: disablePush } = usePushNotifications();
   const router = useRouter();
   const [store, setStore] = useState(null);
   const [products, setProducts] = useState([]);
