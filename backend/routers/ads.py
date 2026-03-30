@@ -13,7 +13,7 @@ import models
 import auth as auth_utils
 from utils.cloudinary import upload_image
 
-router = APIRouter(prefix="/ads", tags=["ads"])
+router = APIRouter(tags=["ads"])
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
