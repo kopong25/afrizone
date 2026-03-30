@@ -153,83 +153,93 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 
-              {/* FIFA WC 2026 card — Amazon deal-tile style */}
+              {/* FIFA WC 2026 card — full image background */}
               <a href="/jerseys"
-                className="group bg-white rounded-lg overflow-hidden border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all flex flex-col"
+                className="group relative rounded-lg overflow-hidden hover:shadow-lg transition-all flex flex-col"
                 style={{ minHeight: "170px" }}>
-                {/* Accent header bar */}
-                <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg,#1a6b2e,#FCD116,#1a6b2e)" }} />
-                <div className="flex flex-1 gap-0 overflow-hidden">
-                  {/* Dark visual panel */}
-                  <div
-                    className="w-28 flex-shrink-0 flex flex-col justify-center items-start px-4 py-3 relative overflow-hidden"
-                    style={{ background: "linear-gradient(135deg,#0a1a0d,#0f2e14)" }}>
-                    <div className="absolute inset-0 opacity-10"
-                      style={{ backgroundImage: "radial-gradient(circle at 50% 50%, #FCD116 0%, transparent 70%)" }} />
-                    <span className="text-2xl leading-none relative z-10">⚽</span>
-                    <div className="mt-2 relative z-10">
-                      {["🇬🇭","🇲🇦","🇸🇳","🇪🇬"].map(f => (
-                        <span key={f} className="text-base leading-none mr-0.5">{f}</span>
+                {/* Background image */}
+                <img
+                  src="https://images.unsplash.com/photo-1551854838-212c50b4c184?w=600&q=80"
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                />
+                {/* Dark gradient overlay */}
+                <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,rgba(0,0,0,0.72) 0%,rgba(0,40,10,0.60) 100%)" }} />
+                {/* Top accent bar */}
+                <div className="absolute top-0 left-0 right-0 h-1" style={{ background: "linear-gradient(90deg,#1a6b2e,#FCD116,#1a6b2e)" }} />
+                {/* Content */}
+                <div className="relative z-10 flex flex-col justify-between h-full p-4" style={{ minHeight: "170px" }}>
+                  <div>
+                    <span className="inline-block bg-yellow-400 text-green-900 text-xs font-black px-2 py-0.5 rounded uppercase tracking-wide leading-none mb-2">⚽ FIFA 2026</span>
+                    <h3 className="text-white font-black text-lg leading-tight tracking-tight drop-shadow">
+                      Africa <span style={{ color: "#FCD116" }}>Rises</span>
+                    </h3>
+                    <div className="flex gap-0.5 mt-1.5">
+                      {["🇬🇭","🇲🇦","🇸🇳","🇪🇬","🇨🇮"].map(f => (
+                        <span key={f} className="text-sm leading-none">{f}</span>
                       ))}
                     </div>
+                    <p className="text-gray-300 text-xs mt-1.5 leading-relaxed">Official kits · Flags · Fan gear</p>
                   </div>
-                  {/* Content panel */}
-                  <div className="flex-1 px-4 py-3 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="bg-yellow-400 text-green-900 text-xs font-black px-1.5 py-0.5 rounded uppercase tracking-wide leading-none">FIFA 2026</span>
-                      </div>
-                      <h3 className="text-gray-900 font-black text-base leading-snug tracking-tight">
-                        Africa <span className="text-green-700">Rises</span>
-                      </h3>
-                      <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">Official kits · Flags · Fan gear</p>
-                    </div>
-                    <span className="inline-flex items-center gap-1 text-green-700 font-bold text-xs group-hover:text-green-900 transition-colors mt-2">
-                      Shop Kits <FiArrowRight size={11} />
-                    </span>
-                  </div>
+                  <span className="inline-flex items-center gap-1 text-yellow-400 font-bold text-xs group-hover:text-yellow-300 transition-colors mt-3">
+                    Shop Kits <FiArrowRight size={11} />
+                  </span>
                 </div>
               </a>
 
-              {/* PromoCarousel — constrained height */}
-              <div className="bg-white rounded-lg overflow-hidden border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all"
-                style={{ minHeight: "170px", maxHeight: "200px" }}>
+              {/* PromoCarousel — constrained height with desktop font fixes */}
+              <div className="rounded-lg overflow-hidden border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all"
+                style={{ minHeight: "170px", maxHeight: "200px", position: "relative" }}>
                 <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg,#7c3aed,#db2777,#7c3aed)" }} />
-                <div style={{ height: "calc(100% - 6px)", overflow: "hidden" }}>
+                {/* CSS overrides: scale fonts down & expose nav arrows on desktop */}
+                <style>{`
+                  .carousel-desktop-fix { height: calc(100% - 6px); overflow: hidden; }
+                  .carousel-desktop-fix h2,
+                  .carousel-desktop-fix h3,
+                  .carousel-desktop-fix .text-2xl { font-size: 1rem !important; line-height: 1.3 !important; }
+                  .carousel-desktop-fix p,
+                  .carousel-desktop-fix .text-lg { font-size: 0.75rem !important; line-height: 1.4 !important; }
+                  .carousel-desktop-fix button svg,
+                  .carousel-desktop-fix [aria-label],
+                  .carousel-desktop-fix .carousel-arrow,
+                  .carousel-desktop-fix button[class*="arrow"],
+                  .carousel-desktop-fix button[class*="prev"],
+                  .carousel-desktop-fix button[class*="next"],
+                  .carousel-desktop-fix button[class*="control"],
+                  .carousel-desktop-fix button[class*="nav"] { display: flex !important; visibility: visible !important; opacity: 1 !important; z-index: 20 !important; }
+                  .carousel-desktop-fix button { z-index: 20 !important; }
+                `}</style>
+                <div className="carousel-desktop-fix">
                   <PromoCarousel compact={true} />
                 </div>
               </div>
 
-              {/* Fitness card — Amazon deal-tile style */}
+              {/* Fitness card — full image background */}
               <a href="/fitness"
-                className="group bg-white rounded-lg overflow-hidden border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all flex flex-col"
+                className="group relative rounded-lg overflow-hidden hover:shadow-lg transition-all flex flex-col"
                 style={{ minHeight: "170px" }}>
-                <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg,#c2410c,#f97316,#c2410c)" }} />
-                <div className="flex flex-1 gap-0 overflow-hidden">
-                  {/* Dark visual panel */}
-                  <div
-                    className="w-28 flex-shrink-0 flex flex-col justify-center items-start px-4 py-3 relative overflow-hidden"
-                    style={{ background: "linear-gradient(135deg,#1a0a00,#2d1200)" }}>
-                    <div className="absolute inset-0 opacity-15"
-                      style={{ backgroundImage: "radial-gradient(circle at 50% 50%, #f97316 0%, transparent 70%)" }} />
-                    <span className="text-2xl leading-none relative z-10">💪</span>
-                    <div className="mt-2 text-xs text-orange-400 font-black relative z-10 leading-tight">TRAIN<br/>HARD</div>
+                {/* Background image */}
+                <img
+                  src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&q=80"
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                />
+                {/* Dark gradient overlay */}
+                <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,rgba(0,0,0,0.70) 0%,rgba(80,20,0,0.58) 100%)" }} />
+                {/* Top accent bar */}
+                <div className="absolute top-0 left-0 right-0 h-1" style={{ background: "linear-gradient(90deg,#c2410c,#f97316,#c2410c)" }} />
+                {/* Content */}
+                <div className="relative z-10 flex flex-col justify-between h-full p-4" style={{ minHeight: "170px" }}>
+                  <div>
+                    <span className="inline-block bg-orange-500 text-white text-xs font-black px-2 py-0.5 rounded uppercase tracking-wide leading-none mb-2">💪 Fitness</span>
+                    <h3 className="text-white font-black text-lg leading-tight tracking-tight drop-shadow">
+                      Train Like An <span style={{ color: "#fb923c" }}>African</span>
+                    </h3>
+                    <p className="text-gray-300 text-xs mt-1.5 leading-relaxed">Nike · Adidas · Puma · African brands</p>
                   </div>
-                  {/* Content panel */}
-                  <div className="flex-1 px-4 py-3 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="bg-orange-500 text-white text-xs font-black px-1.5 py-0.5 rounded uppercase tracking-wide leading-none">Fitness</span>
-                      </div>
-                      <h3 className="text-gray-900 font-black text-base leading-snug tracking-tight">
-                        Train Like An <span className="text-orange-600">African</span>
-                      </h3>
-                      <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">Nike · Adidas · African brands</p>
-                    </div>
-                    <span className="inline-flex items-center gap-1 text-orange-600 font-bold text-xs group-hover:text-orange-800 transition-colors mt-2">
-                      Shop Fitness <FiArrowRight size={11} />
-                    </span>
-                  </div>
+                  <span className="inline-flex items-center gap-1 text-orange-400 font-bold text-xs group-hover:text-orange-300 transition-colors mt-3">
+                    Shop Fitness <FiArrowRight size={11} />
+                  </span>
                 </div>
               </a>
 
