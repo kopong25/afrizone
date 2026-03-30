@@ -13,7 +13,7 @@ from routers import (
     uber_direct,
     reviews, admin, wishlist, discounts, variants,
     shipping, messages, subscriptions, referrals,
-    ads
+    ads, push_notifications
 )
 
 from database import engine
@@ -58,6 +58,8 @@ async def validation_exception_handler(request, exc):
         content={"detail": [{"msg": e["msg"], "loc": e["loc"]} for e in exc.errors()]},
     )
 
+
+
 # Phase 1 & 2
 app.include_router(auth.router,          prefix="/auth",          tags=["Auth"])
 app.include_router(sellers.router,       prefix="/sellers",       tags=["Sellers"])
@@ -75,10 +77,9 @@ app.include_router(shipping.router,      prefix="/shipping",      tags=["Shippin
 app.include_router(messages.router,      prefix="/messages",      tags=["Messages"])
 app.include_router(subscriptions.router, prefix="/subscriptions", tags=["Subscriptions"])
 app.include_router(referrals.router,     prefix="/referrals",     tags=["Referrals"])
-app.include_router(uber_direct.router,   prefix="/uber-direct",   tags=["Uber Direct"])
-
-# Ads — homepage carousel
-app.include_router(ads.router,                                    tags=["Ads"])
+app.include_router(ads.router,           prefix="/ads",           tags=["Ads"])
+app.include_router(push_notifications.router, prefix="/push",        tags=["Push"])
+app.include_router(uber_direct.router,    prefix="/uber-direct",   tags=["Uber Direct"])
 
 @app.get("/", tags=["Health"])
 def root():

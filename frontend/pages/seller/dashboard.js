@@ -4,6 +4,7 @@ import Navbar from "../../components/layout/Navbar";
 import Footer from "../../components/layout/Footer";
 import { storesAPI, productsAPI, ordersAPI, paymentsAPI } from "../../lib/api";
 import { useAuth } from "../_app";
+import { usePushNotifications } from "../../hooks/usePushNotifications";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { FiPackage, FiShoppingBag, FiDollarSign, FiStar, FiAlertCircle } from "react-icons/fi";
@@ -292,6 +293,43 @@ export default function SellerDashboard() {
             <Link href="/seller/products" className="text-sm bg-green-900 hover:bg-green-800 text-white py-2 px-4 rounded-xl font-bold">+ Add Product</Link>
           </div>
         </div>
+
+        {/* Push Notification Banner */}
+        {pushSupported && (
+          <div className={`rounded-xl p-4 mb-4 flex items-center justify-between gap-4 ${
+            pushSubscribed ? "bg-green-50 border border-green-200" : "bg-blue-50 border border-blue-200"
+          }`}>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{pushSubscribed ? "🔔" : "🔕"}</span>
+              <div>
+                <p className="font-bold text-gray-900 text-sm">
+                  {pushSubscribed ? "Order Notifications Active" : "Enable Order Notifications"}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {pushSubscribed
+                    ? "You'll get instant alerts on this device when orders arrive"
+                    : "Get instant alerts on your phone when a customer places an order"}
+                </p>
+                {pushError && <p className="text-xs text-red-500 mt-1">{pushError}</p>}
+                {permission === "denied" && (
+                  <p className="text-xs text-orange-600 mt-1">
+                    ⚠️ Notifications blocked — enable in your browser/phone settings
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={pushSubscribed ? disablePush : enablePush}
+              disabled={pushLoading || permission === "denied"}
+              className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-black transition-colors disabled:opacity-50 ${
+                pushSubscribed
+                  ? "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                  : "bg-green-900 hover:bg-green-800 text-white"
+              }`}>
+              {pushLoading ? "..." : pushSubscribed ? "Turn Off" : "Enable Now"}
+            </button>
+          </div>
+        )}
 
         {/* Stripe Connect Banner */}
         {stripeStatus?.connected ? (

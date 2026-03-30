@@ -93,12 +93,20 @@ def create_checkout(
         currency="usd",
         metadata={"order_id": order.id, "buyer_id": current_user.id, "store_id": store.id},
         automatic_payment_methods={"enabled": True},
+        # Stripe Tax: automatically calculates + collects sales tax (US states)
+        # Requires Stripe Tax to be enabled in your Stripe Dashboard
+        # automatic_tax={"enabled": True},  # Uncomment after enabling Stripe Tax in Dashboard
     )
 
     # Use Connect transfer only if seller has completed Stripe onboarding
     if store.stripe_account_id and store.stripe_onboarding_complete:
         kwargs["application_fee_amount"] = platform_fee_cents
         kwargs["transfer_data"] = {"destination": store.stripe_account_id}
+    else:
+        # Seller not connected: hold full payment in Afrizone account
+        # Funds will be manually transferred once seller completes onboarding
+        # platform_fee still recorded, seller_amount held for future payout
+        kwargs["metadata"]["payout_status"] = "held_pending_seller_connect"
 
     payment_intent = stripe.PaymentIntent.create(**kwargs)
     order.stripe_payment_intent_id = payment_intent.id
@@ -168,6 +176,20 @@ async def stripe_webhook(
                             seller_amount=order.seller_amount,
                             buyer_name=buyer.full_name if buyer else "Customer",
                         )
+                    # Push notification to seller
+                    try:
+                        from routers.push_notifications import send_push_to_user
+                        if store and store.owner_id:
+                            send_push_to_user(
+                                user_id=store.owner_id,
+                                title=f"🛒 New Order #{order.id}",
+                                body=f"{buyer.full_name if buyer else 'Customer'} ordered ${order.total:.2f} — tap to view",
+                                url=f"/seller/orders",
+                                db=db
+                            )
+                    except Exception as pe:
+                        print(f"Push error: {pe}")
+
                 except Exception as e:
                     print(f"Email error: {e}")
 
@@ -221,73 +243,3 @@ def get_seller_payouts(
         models.Payout.store_id == store.id
     ).order_by(models.Payout.created_at.desc()).all()
     return payouts
-# ─── PAYMENT STATUS POLL ──────────────────────────────────────
-
-@router.get("/status/{order_id}")
-def get_payment_status(
-    order_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.get_current_user),
-):
-    """Frontend polls this on /order-success page to confirm payment."""
-    order = db.query(models.Order).filter(
-        models.Order.id == order_id,
-        models.Order.buyer_id == current_user.id,
-    ).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    stripe_status = None
-    if order.stripe_payment_intent_id:
-        try:
-            intent = stripe.PaymentIntent.retrieve(order.stripe_payment_intent_id)
-            stripe_status = intent.status
-        except Exception:
-            pass
-
-    return {
-        "order_id": order.id,
-        "order_status": order.status,
-        "stripe_status": stripe_status,
-        "total": order.total,
-        "paid": order.status == models.OrderStatus.paid,
-    }
-
-
-# ─── REFUND ───────────────────────────────────────────────────
-
-@router.post("/refund")
-def refund_order(
-    payload: dict,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.get_current_user),
-):
-    """Admin or buyer can refund a paid order."""
-    order_id = payload.get("order_id")
-    reason = payload.get("reason", "requested_by_customer")
-
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    is_admin = current_user.role == models.UserRole.admin
-    is_buyer = order.buyer_id == current_user.id
-    if not (is_admin or is_buyer):
-        raise HTTPException(status_code=403, detail="Not authorized")
-
-    if order.status not in [models.OrderStatus.paid, models.OrderStatus.processing]:
-        raise HTTPException(status_code=400, detail=f"Cannot refund order with status '{order.status}'")
-
-    if not order.stripe_payment_intent_id:
-        raise HTTPException(status_code=400, detail="No payment on record for this order")
-
-    try:
-        refund = stripe.Refund.create(
-            payment_intent=order.stripe_payment_intent_id,
-            reason=reason,
-        )
-        order.status = models.OrderStatus.refunded
-        db.commit()
-        return {"refunded": True, "refund_id": refund.id, "amount": refund.amount / 100}
-    except stripe.error.StripeError as e:
-        raise HTTPException(status_code=502, detail=f"Stripe refund failed: {str(e)}")

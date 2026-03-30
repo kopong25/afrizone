@@ -18,4 +18,4 @@ shippo==3.1.0
 bcrypt==4.0.1
 
 slowapi==0.1.9
-limits==3.6.0
+limits==3.6.0pywebpush==2.0.0
