@@ -5,6 +5,8 @@ from database import get_db
 import models, schemas, auth as auth_utils
 import os
 import math
+import json
+from datetime import datetime
 
 PLATFORM_FEE_PERCENT = float(os.getenv("PLATFORM_FEE_PERCENT", "8"))
 
@@ -25,12 +27,50 @@ def create_order(
     current_user: models.User = Depends(auth_utils.get_current_user)
 ):
     """Create a new order. All items must belong to the same store."""
+    from sqlalchemy import text
+
     store = db.query(models.Store).filter(
         models.Store.id == order_in.store_id,
         models.Store.status == models.SellerStatus.approved
     ).first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found or not active")
+
+    # ── Block orders to closed restaurants ──────────────────────────────────
+    raw = db.execute(
+        text("SELECT vendor_type, weekly_hours, is_open_now FROM stores WHERE id = :id"),
+        {"id": store.id}
+    ).fetchone()
+
+    if raw and raw[0] == "restaurant":
+        if not raw[2]:
+            raise HTTPException(
+                status_code=400,
+                detail="This restaurant is currently closed. Please check back during opening hours."
+            )
+        if raw[1]:
+            try:
+                hours = json.loads(raw[1]) if isinstance(raw[1], str) else raw[1]
+                day_name = datetime.now().strftime("%A")
+                today = hours.get(day_name, {})
+                if today.get("closed"):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"This restaurant is closed on {day_name}."
+                    )
+                open_time = today.get("open", "00:00")
+                close_time = today.get("close", "23:59")
+                now_time = datetime.now().strftime("%H:%M")
+                if not (open_time <= now_time <= close_time):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"This restaurant is closed right now. Hours today: {open_time} – {close_time}."
+                    )
+            except HTTPException:
+                raise
+            except Exception:
+                pass
+    # ────────────────────────────────────────────────────────────────────────
 
     # Validate products and calculate subtotal
     order_items = []
@@ -147,8 +187,6 @@ def get_seller_orders(
     return {"items": orders, "total": total, "page": page, "pages": math.ceil(total / size), "size": size}
 
 
-
-
 @router.get("/store-orders")
 def get_store_orders(
     page: int = 1,
@@ -257,8 +295,6 @@ def update_order_status(
         print(f"Email error: {e}")
 
     return order
-
-
 
 
 # ─── CART ───

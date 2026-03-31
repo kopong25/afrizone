@@ -28,6 +28,38 @@ function validateAddress(shipping) {
   return missing;
 }
 
+// ─── Check if a restaurant store is open right now ───────────────────────────
+function checkRestaurantOpen(storeData) {
+  if (storeData.is_open_now === false) {
+    return { open: false, reason: "This restaurant is currently closed. Please check back during opening hours." };
+  }
+  if (storeData.weekly_hours) {
+    try {
+      const hours = typeof storeData.weekly_hours === "string"
+        ? JSON.parse(storeData.weekly_hours)
+        : storeData.weekly_hours;
+      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const today = days[new Date().getDay()];
+      const todayHours = hours[today];
+      if (todayHours?.closed) {
+        return { open: false, reason: `This restaurant is closed on ${today}.` };
+      }
+      if (todayHours?.open && todayHours?.close) {
+        const now = new Date().toTimeString().slice(0, 5); // "HH:MM"
+        if (now < todayHours.open || now > todayHours.close) {
+          return {
+            open: false,
+            reason: `This restaurant is closed right now. Hours today: ${todayHours.open} – ${todayHours.close}.`,
+          };
+        }
+      }
+    } catch {
+      // If parsing fails, let the backend enforce it
+    }
+  }
+  return { open: true };
+}
+
 export default function CartPage() {
   const router = useRouter();
   const { user, token, loading: authLoading } = useAuth();
@@ -263,6 +295,22 @@ export default function CartPage() {
       setStep("shipping");
       return;
     }
+
+    // ─── Restaurant hours check — block order if store is closed ─────────────
+    if (primaryStore?.vendor_type === "restaurant") {
+      try {
+        const storeRes = await api.get(`/sellers/${primaryStore.id}/public`);
+        const result = checkRestaurantOpen(storeRes.data);
+        if (!result.open) {
+          toast.error(result.reason);
+          setCheckingOut(false);
+          return;
+        }
+      } catch {
+        // If the check fails, let the backend enforce it
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     let authToken = token;
     if (!authToken) { try { authToken = sessionStorage.getItem("az_tok"); } catch {} }
