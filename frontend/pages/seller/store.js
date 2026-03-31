@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+aimport { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Navbar from "../../components/layout/Navbar";
 import Footer from "../../components/layout/Footer";
@@ -26,6 +26,24 @@ const DELIVERY_TYPES = [
   { value: "pickup",         icon: "🏪", label: "Pickup Only",            desc: "Customers come to your location" },
   { value: "both",           icon: "🔀", label: "Shipping + Pickup",      desc: "Offer both shipping and in-store pickup" },
 ];
+
+function parseWeeklyHours(wh) {
+  const defaults = {
+    Monday:    {open:"11:00",close:"21:00",closed:false},
+    Tuesday:   {open:"11:00",close:"21:00",closed:false},
+    Wednesday: {open:"11:00",close:"21:00",closed:false},
+    Thursday:  {open:"11:00",close:"21:00",closed:false},
+    Friday:    {open:"11:00",close:"22:00",closed:false},
+    Saturday:  {open:"12:00",close:"22:00",closed:false},
+    Sunday:    {open:"12:00",close:"20:00",closed:false},
+  };
+  if (!wh) return defaults;
+  const parsed = typeof wh === "string" ? JSON.parse(wh) : wh;
+  Object.keys(parsed).forEach(day => {
+    parsed[day].closed = Boolean(parsed[day].closed);
+  });
+  return parsed;
+}
 
 export default function StoreSettings() {
   const { user } = useAuth();
@@ -60,24 +78,7 @@ export default function StoreSettings() {
           is_open_now: r.data.is_open_now !== undefined ? r.data.is_open_now : true,
           prep_time_minutes: r.data.prep_time_minutes || 30,
           opening_hours: r.data.opening_hours || "",
-          weekly_hours: (() => {
-          const wh = r.data.weekly_hours;
-          const defaults = {
-            Monday:    {open:"11:00",close:"21:00",closed:false},
-            Tuesday:   {open:"11:00",close:"21:00",closed:false},
-            Wednesday: {open:"11:00",close:"21:00",closed:false},
-            Thursday:  {open:"11:00",close:"21:00",closed:false},
-            Friday:    {open:"11:00",close:"22:00",closed:false},
-            Saturday:  {open:"12:00",close:"22:00",closed:false},
-            Sunday:    {open:"12:00",close:"20:00",closed:false},
-  };
-  if (!wh) return defaults;
-  const parsed = typeof wh === "string" ? JSON.parse(wh) : wh;
-  Object.keys(parsed).forEach(day => {
-    parsed[day].closed = Boolean(parsed[day].closed);
-  });
-  return parsed;
-})(),
+          weekly_hours: parseWeeklyHours(r.data.weekly_hours),
           delivery_radius_miles: r.data.delivery_radius_miles || "",
           delivery_note: r.data.delivery_note || "",
         });
@@ -92,7 +93,6 @@ export default function StoreSettings() {
       const payload = {
         ...form,
         delivery_radius_miles: form.delivery_radius_miles ? parseInt(form.delivery_radius_miles) : null,
-        // Serialize weekly_hours as JSON string for backend storage
         weekly_hours: form.weekly_hours ? JSON.stringify(form.weekly_hours) : null,
       };
       const res = await storesAPI.updateMyStore(payload);
@@ -107,7 +107,6 @@ export default function StoreSettings() {
 
   const handleLogoUpload = async (file, directUrl) => {
     if (directUrl) {
-      // Image was uploaded directly to Cloudinary — save URL to backend
       try {
         await storesAPI.updateMyStore({ logo_url: directUrl });
         setStore((s) => ({ ...s, logo_url: directUrl }));
@@ -116,7 +115,6 @@ export default function StoreSettings() {
       }
       return directUrl;
     }
-    // Fallback: upload via backend
     const formData = new FormData();
     formData.append("file", file);
     const res = await storesAPI.uploadLogo(formData);
@@ -126,7 +124,6 @@ export default function StoreSettings() {
 
   const handleBannerUpload = async (file, directUrl) => {
     if (directUrl) {
-      // Image was uploaded directly to Cloudinary — save URL to backend
       try {
         await storesAPI.updateMyStore({ banner_url: directUrl });
         setStore((s) => ({ ...s, banner_url: directUrl }));
@@ -135,7 +132,6 @@ export default function StoreSettings() {
       }
       return directUrl;
     }
-    // Fallback: upload via backend
     const formData = new FormData();
     formData.append("file", file);
     const res = await storesAPI.uploadBanner(formData);
@@ -284,7 +280,6 @@ export default function StoreSettings() {
                     setForm(f => ({
                       ...f,
                       vendor_type: vt,
-                      // Auto-set delivery type for restaurant
                       delivery_type: vt === "restaurant" ? "local_delivery" : f.delivery_type === "local_delivery" ? "shipping" : f.delivery_type,
                     }));
                   }}
@@ -421,7 +416,7 @@ export default function StoreSettings() {
               </label>
             ))}
           </div>
-          )} {/* end non-restaurant delivery selector */}
+          )}
 
           {/* Local delivery extra fields */}
           {isLocalDelivery && (
