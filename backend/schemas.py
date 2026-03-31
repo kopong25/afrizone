@@ -77,7 +77,7 @@ class StoreUpdate(BaseModel):
     is_open_now: Optional[bool] = None
     prep_time_minutes: Optional[int] = None
     opening_hours: Optional[str] = None
-    weekly_hours: Optional[str] = None
+    weekly_hours: Optional[Any] = None
 
 
 class StoreOut(BaseModel):
@@ -107,6 +107,10 @@ class StoreOut(BaseModel):
     delivery_radius_miles: Optional[int] = None
     delivery_note: Optional[str] = None
     created_at: datetime
+    is_open_now: Optional[bool] = None
+    prep_time_minutes: Optional[int] = None
+    opening_hours: Optional[str] = None
+    weekly_hours: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
