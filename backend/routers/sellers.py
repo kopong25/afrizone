@@ -48,14 +48,16 @@ def get_my_store(
         db.add(store)
         db.commit()
         db.refresh(store)
-    # Patch enum fields directly from DB to bypass SQLAlchemy enum mapping issues
+    # Patch fields directly from DB to bypass SQLAlchemy caching issues
     row = db.execute(
-        text("SELECT vendor_type, delivery_type FROM stores WHERE id = :id"),
+        text("SELECT vendor_type, delivery_type, weekly_hours, is_open_now FROM stores WHERE id = :id"),
         {"id": store.id}
     ).fetchone()
     if row:
         store.vendor_type = row[0]
         store.delivery_type = row[1]
+        store.weekly_hours = row[2]
+        store.is_open_now = row[3]
     return store
 
 
@@ -98,12 +100,17 @@ def update_my_store(
 
     db.commit()
     db.refresh(store)
-    # Patch enum fields from raw SQL to bypass SQLAlchemy mapping issues
+    # Patch fields from raw SQL to bypass SQLAlchemy caching issues
     from sqlalchemy import text as _text
-    row = db.execute(_text("SELECT vendor_type, delivery_type FROM stores WHERE id = :id"), {"id": store.id}).fetchone()
+    row = db.execute(
+        _text("SELECT vendor_type, delivery_type, weekly_hours, is_open_now FROM stores WHERE id = :id"),
+        {"id": store.id}
+    ).fetchone()
     if row:
         store.vendor_type = row[0]
         store.delivery_type = row[1]
+        store.weekly_hours = row[2]
+        store.is_open_now = row[3]
     return store
 
 
@@ -277,16 +284,22 @@ def get_store_analytics(
         "status_breakdown": status_counts,
     }
 
+
 @router.get("/{store_id}/public", response_model=schemas.StoreOut)
 def get_store_by_id(store_id: int, db: Session = Depends(get_db)):
-    """Get store by ID (public) — includes vendor_type and delivery_type."""
+    """Get store by ID (public) — includes vendor_type, delivery_type, and hours."""
     from sqlalchemy import text
     store = db.query(models.Store).filter(models.Store.id == store_id).first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
-    # Patch enum fields via raw SQL
-    row = db.execute(text("SELECT vendor_type, delivery_type FROM stores WHERE id = :id"), {"id": store.id}).fetchone()
+    # Patch all fields that SQLAlchemy may cache stale values for
+    row = db.execute(
+        text("SELECT vendor_type, delivery_type, weekly_hours, is_open_now FROM stores WHERE id = :id"),
+        {"id": store.id}
+    ).fetchone()
     if row:
         store.vendor_type = row[0]
         store.delivery_type = row[1]
+        store.weekly_hours = row[2]
+        store.is_open_now = row[3]
     return store
