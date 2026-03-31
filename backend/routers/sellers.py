@@ -69,7 +69,7 @@ def update_my_store(
     store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
-    data = updates.model_dump(exclude_none=True)
+    data = updates.model_dump(exclude_unset=True)
 
     # Enforce business rules: restaurant must use local_delivery, both, or pickup
     if data.get("vendor_type") == "restaurant":

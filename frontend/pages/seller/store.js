@@ -60,7 +60,9 @@ export default function StoreSettings() {
           is_open_now: r.data.is_open_now !== undefined ? r.data.is_open_now : true,
           prep_time_minutes: r.data.prep_time_minutes || 30,
           opening_hours: r.data.opening_hours || "",
-          weekly_hours: r.data.weekly_hours ? JSON.parse(r.data.weekly_hours) : {
+          weekly_hours: (() => {
+          const wh = r.data.weekly_hours;
+          const defaults = {
             Monday:    {open:"11:00",close:"21:00",closed:false},
             Tuesday:   {open:"11:00",close:"21:00",closed:false},
             Wednesday: {open:"11:00",close:"21:00",closed:false},
@@ -68,7 +70,14 @@ export default function StoreSettings() {
             Friday:    {open:"11:00",close:"22:00",closed:false},
             Saturday:  {open:"12:00",close:"22:00",closed:false},
             Sunday:    {open:"12:00",close:"20:00",closed:false},
-          },
+  };
+  if (!wh) return defaults;
+  const parsed = typeof wh === "string" ? JSON.parse(wh) : wh;
+  Object.keys(parsed).forEach(day => {
+    parsed[day].closed = Boolean(parsed[day].closed);
+  });
+  return parsed;
+})(),
           delivery_radius_miles: r.data.delivery_radius_miles || "",
           delivery_note: r.data.delivery_note || "",
         });
