@@ -318,7 +318,7 @@ export default function StoreSettings() {
                 </div>
               </label>
             </div>
-          </div>
+          ) : null}
 
           {/* ── RESTAURANT OPERATING HOURS ── */}
           {isRestaurant && (
