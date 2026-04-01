@@ -61,6 +61,32 @@ function parseWeeklyHours(wh) {
   return parsed;
 }
 
+/**
+ * Compute whether the store is open right now based on weekly_hours + timezone.
+ * This mirrors the backend Python logic so the UI stays in sync without
+ * relying on the stored `is_open_now` boolean.
+ */
+function computeIsOpenNow(weekly_hours, timezone) {
+  if (!weekly_hours) return false;
+  try {
+    const now = new Date();
+    const localStr = now.toLocaleString("en-US", { timeZone: timezone, hour12: false });
+    // localStr format: "M/D/YYYY, HH:MM:SS"
+    const [datePart, timePart] = localStr.split(", ");
+    const [month, day, year] = datePart.split("/");
+    const localDate = new Date(`${year}-${month.padStart(2,"0")}-${day.padStart(2,"0")}T${timePart}`);
+    const dayName = localDate.toLocaleDateString("en-US", { timeZone: timezone, weekday: "long" });
+    const nowTime = timePart.slice(0, 5); // "HH:MM"
+
+    const hours = typeof weekly_hours === "string" ? JSON.parse(weekly_hours) : weekly_hours;
+    const today = hours[dayName];
+    if (!today || today.closed) return false;
+    return today.open <= nowTime && nowTime <= today.close;
+  } catch {
+    return false;
+  }
+}
+
 export default function StoreSettings() {
   const { user } = useAuth();
   const router = useRouter();
@@ -73,7 +99,17 @@ export default function StoreSettings() {
     vendor_type: "other", delivery_type: "shipping",
     delivery_radius_miles: "", delivery_note: "",
     timezone: "America/Chicago",
+    // NOTE: is_open_now is intentionally NOT in the save payload.
+    // It is computed from weekly_hours + timezone on both backend and frontend.
+    // manually_closed is the only override sellers can set.
+    manually_closed: false,
+    prep_time_minutes: 30,
+    opening_hours: "",
+    weekly_hours: null,
   });
+
+  // Live-computed open status shown in the UI (not saved to DB)
+  const [liveIsOpen, setLiveIsOpen] = useState(false);
 
   useEffect(() => {
     if (!user) { router.push("/login"); return; }
@@ -81,6 +117,8 @@ export default function StoreSettings() {
     storesAPI.myStore()
       .then((r) => {
         setStore(r.data);
+        const wh = parseWeeklyHours(r.data.weekly_hours);
+        const tz = r.data.timezone || "America/Chicago";
         setForm({
           name: r.data.name || "",
           description: r.data.description || "",
@@ -92,36 +130,68 @@ export default function StoreSettings() {
           website: r.data.website || "",
           vendor_type: r.data.vendor_type || "other",
           delivery_type: r.data.delivery_type || "shipping",
-          is_open_now: r.data.is_open_now !== undefined ? r.data.is_open_now : true,
+          // Use manually_closed as the only override flag
+          manually_closed: r.data.manually_closed ?? false,
           prep_time_minutes: r.data.prep_time_minutes || 30,
           opening_hours: r.data.opening_hours || "",
-          weekly_hours: parseWeeklyHours(r.data.weekly_hours),
+          weekly_hours: wh,
           delivery_radius_miles: r.data.delivery_radius_miles || "",
           delivery_note: r.data.delivery_note || "",
-          timezone: r.data.timezone || "America/Chicago",
+          timezone: tz,
         });
+        setLiveIsOpen(computeIsOpenNow(wh, tz));
       })
       .catch(() => toast.error("Failed to load store"))
       .finally(() => setLoading(false));
   }, [user]);
 
+  // Recompute live open status whenever hours or timezone changes
+  useEffect(() => {
+    if (form.weekly_hours && form.timezone) {
+      setLiveIsOpen(computeIsOpenNow(form.weekly_hours, form.timezone));
+    }
+  }, [form.weekly_hours, form.timezone]);
+
   const handleSave = async () => {
     setSaving(true);
     try {
+      // ✅ FIX: Do NOT include is_open_now in the payload.
+      // The backend computes open/closed from weekly_hours + timezone.
+      // Only send manually_closed as the override flag.
       const payload = {
-        ...form,
-        delivery_radius_miles: form.delivery_radius_miles ? parseInt(form.delivery_radius_miles) : null,
+        name: form.name,
+        description: form.description,
+        country: form.country,
+        city: form.city,
+        address: form.address,
+        business_type: form.business_type,
+        phone: form.phone,
+        website: form.website,
+        vendor_type: form.vendor_type,
+        delivery_type: form.delivery_type,
+        manually_closed: form.manually_closed,   // ← only override flag
+        prep_time_minutes: form.prep_time_minutes,
+        opening_hours: form.opening_hours,
         weekly_hours: form.weekly_hours ? JSON.stringify(form.weekly_hours) : null,
+        delivery_radius_miles: form.delivery_radius_miles ? parseInt(form.delivery_radius_miles) : null,
+        delivery_note: form.delivery_note,
+        timezone: form.timezone,
+        // is_open_now is deliberately excluded — backend derives it
       };
+
       const res = await storesAPI.updateMyStore(payload);
       setStore(res.data);
-      // Re-hydrate form from server response to confirm what was saved
+
+      // Re-hydrate form from server response
+      const wh = parseWeeklyHours(res.data.weekly_hours);
+      const tz = res.data.timezone || "America/Chicago";
       setForm(f => ({
         ...f,
-        weekly_hours: parseWeeklyHours(res.data.weekly_hours),
-        is_open_now: res.data.is_open_now,
-        timezone: res.data.timezone || "America/Chicago",
+        weekly_hours: wh,
+        manually_closed: res.data.manually_closed ?? false,
+        timezone: tz,
       }));
+      setLiveIsOpen(computeIsOpenNow(wh, tz));
       toast.success("Store updated!");
     } catch (err) {
       toast.error(err.response?.data?.detail || "Failed to save");
@@ -166,6 +236,9 @@ export default function StoreSettings() {
 
   const isLocalDelivery = ["local_delivery", "both"].includes(form.delivery_type);
   const isRestaurant = form.vendor_type === "restaurant";
+
+  // Effective open status: hours say open AND not manually closed
+  const effectiveIsOpen = liveIsOpen && !form.manually_closed;
 
   if (loading) return (
     <>
@@ -357,16 +430,31 @@ export default function StoreSettings() {
                   <h3 className="font-black text-gray-900">⏰ Operating Hours</h3>
                   <p className="text-xs text-gray-500 mt-0.5">Customers cannot order outside these hours</p>
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <span className="text-sm text-gray-600">Store Status:</span>
-                  <div className={`relative w-12 h-6 rounded-full transition-colors cursor-pointer ${form.is_open_now ? "bg-green-500" : "bg-gray-300"}`}
-                    onClick={() => setForm(f => ({...f, is_open_now: !f.is_open_now}))}>
-                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.is_open_now ? "translate-x-7" : "translate-x-1"}`}/>
-                  </div>
-                  <span className={`text-sm font-black ${form.is_open_now ? "text-green-600" : "text-red-500"}`}>
-                    {form.is_open_now ? "OPEN" : "CLOSED"}
-                  </span>
-                </label>
+
+                {/* ✅ FIX: Toggle is now "Force Close" (manually_closed), not is_open_now.
+                    Open/closed status is computed from weekly_hours + timezone automatically.
+                    This toggle only overrides when you need to close unexpectedly. */}
+                <div className="flex flex-col items-end gap-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className="text-sm text-gray-600">Store Status:</span>
+                    <div
+                      className={`relative w-12 h-6 rounded-full transition-colors cursor-pointer ${effectiveIsOpen ? "bg-green-500" : "bg-gray-300"}`}
+                      onClick={() => setForm(f => ({ ...f, manually_closed: !f.manually_closed }))}
+                    >
+                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${effectiveIsOpen ? "translate-x-7" : "translate-x-1"}`} />
+                    </div>
+                    <span className={`text-sm font-black ${effectiveIsOpen ? "text-green-600" : "text-red-500"}`}>
+                      {effectiveIsOpen ? "OPEN" : "CLOSED"}
+                    </span>
+                  </label>
+                  <p className="text-xs text-gray-400">
+                    {form.manually_closed
+                      ? "⚠️ Manually closed — overrides your schedule"
+                      : liveIsOpen
+                        ? "✅ Open per your weekly schedule"
+                        : "🕐 Closed per your weekly schedule"}
+                  </p>
+                </div>
               </div>
 
               {/* Timezone selector */}
@@ -437,25 +525,25 @@ export default function StoreSettings() {
           )}
 
           {!isRestaurant && (
-          <div className="grid grid-cols-2 gap-3 mb-5">
-            {DELIVERY_TYPES.filter(d => d.value !== "local_delivery").map((d) => (
-              <label key={d.value}
-                className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                  form.delivery_type === d.value
-                    ? "border-green-700 bg-green-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}>
-                <input type="radio" name="delivery_type" value={d.value}
-                  checked={form.delivery_type === d.value}
-                  onChange={(e) => setForm({ ...form, delivery_type: e.target.value })}
-                  className="mt-1 accent-green-700" />
-                <div>
-                  <p className="font-semibold text-gray-800 text-sm">{d.icon} {d.label}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{d.desc}</p>
-                </div>
-              </label>
-            ))}
-          </div>
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              {DELIVERY_TYPES.filter(d => d.value !== "local_delivery").map((d) => (
+                <label key={d.value}
+                  className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                    form.delivery_type === d.value
+                      ? "border-green-700 bg-green-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}>
+                  <input type="radio" name="delivery_type" value={d.value}
+                    checked={form.delivery_type === d.value}
+                    onChange={(e) => setForm({ ...form, delivery_type: e.target.value })}
+                    className="mt-1 accent-green-700" />
+                  <div>
+                    <p className="font-semibold text-gray-800 text-sm">{d.icon} {d.label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{d.desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
           )}
 
           {/* Local delivery extra fields */}
