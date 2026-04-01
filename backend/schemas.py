@@ -78,6 +78,7 @@ class StoreUpdate(BaseModel):
     prep_time_minutes: Optional[int] = None
     opening_hours: Optional[str] = None
     weekly_hours: Optional[Any] = None
+    timezone: Optional[str] = None
 
 
 class StoreOut(BaseModel):
@@ -111,6 +112,7 @@ class StoreOut(BaseModel):
     prep_time_minutes: Optional[int] = None
     opening_hours: Optional[str] = None
     weekly_hours: Optional[str] = None
+    timezone: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

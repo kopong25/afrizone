@@ -58,6 +58,7 @@ def get_my_store(
         store.delivery_type = row[1]
         store.weekly_hours = row[2]
         store.is_open_now = row[3]
+        store.timezone = row[4]
     return store
 
 

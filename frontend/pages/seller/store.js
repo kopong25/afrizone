@@ -12,6 +12,22 @@ import { FiSave, FiArrowLeft, FiShoppingBag, FiTruck, FiPackage, FiMapPin } from
 const COUNTRIES = ["USA", "Canada", "UK", "Germany", "France", "Netherlands", "Belgium", "Sweden", "Other"];
 const BUSINESS_TYPES = ["Restaurant", "Food & Groceries", "Fashion & Clothing", "Beauty & Hair", "Arts & Crafts", "Electronics", "Books & Media", "Health & Wellness", "Home & Living", "Other"];
 
+const TIMEZONES = [
+  { value: "America/New_York",    label: "Eastern Time (ET) — New York, Atlanta, Miami" },
+  { value: "America/Chicago",     label: "Central Time (CT) — Houston, Dallas, Chicago" },
+  { value: "America/Denver",      label: "Mountain Time (MT) — Denver, Phoenix" },
+  { value: "America/Los_Angeles", label: "Pacific Time (PT) — Los Angeles, Seattle" },
+  { value: "America/Toronto",     label: "Eastern Time — Toronto, Canada" },
+  { value: "America/Vancouver",   label: "Pacific Time — Vancouver, Canada" },
+  { value: "Europe/London",       label: "GMT/BST — London, UK" },
+  { value: "Europe/Berlin",       label: "CET — Berlin, Germany" },
+  { value: "Europe/Paris",        label: "CET — Paris, France" },
+  { value: "Europe/Amsterdam",    label: "CET — Amsterdam, Netherlands" },
+  { value: "Africa/Lagos",        label: "WAT — Lagos, Nigeria" },
+  { value: "Africa/Accra",        label: "GMT — Accra, Ghana" },
+  { value: "Africa/Nairobi",      label: "EAT — Nairobi, Kenya" },
+];
+
 const VENDOR_TYPES = [
   { value: "grocery",    label: "🛒 Grocery / Shelf-stable Food", desc: "Fufu, garri, spices, canned goods — ships nationwide via USPS" },
   { value: "restaurant", label: "🍽️ Restaurant / Hot Food",        desc: "Jollof rice, suya, pepper soup — local delivery only" },
@@ -56,6 +72,7 @@ export default function StoreSettings() {
     address: "", business_type: "", phone: "", website: "",
     vendor_type: "other", delivery_type: "shipping",
     delivery_radius_miles: "", delivery_note: "",
+    timezone: "America/Chicago",
   });
 
   useEffect(() => {
@@ -81,6 +98,7 @@ export default function StoreSettings() {
           weekly_hours: parseWeeklyHours(r.data.weekly_hours),
           delivery_radius_miles: r.data.delivery_radius_miles || "",
           delivery_note: r.data.delivery_note || "",
+          timezone: r.data.timezone || "America/Chicago",
         });
       })
       .catch(() => toast.error("Failed to load store"))
@@ -97,6 +115,13 @@ export default function StoreSettings() {
       };
       const res = await storesAPI.updateMyStore(payload);
       setStore(res.data);
+      // Re-hydrate form from server response to confirm what was saved
+      setForm(f => ({
+        ...f,
+        weekly_hours: parseWeeklyHours(res.data.weekly_hours),
+        is_open_now: res.data.is_open_now,
+        timezone: res.data.timezone || "America/Chicago",
+      }));
       toast.success("Store updated!");
     } catch (err) {
       toast.error(err.response?.data?.detail || "Failed to save");
@@ -342,6 +367,21 @@ export default function StoreSettings() {
                     {form.is_open_now ? "OPEN" : "CLOSED"}
                   </span>
                 </label>
+              </div>
+
+              {/* Timezone selector */}
+              <div className="mb-4">
+                <label className="text-xs font-semibold text-gray-600 block mb-1">🌍 Store Timezone</label>
+                <select value={form.timezone}
+                  onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))}
+                  className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700">
+                  {TIMEZONES.map(tz => (
+                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  Your hours are enforced in this timezone. Make sure it matches your restaurant's location.
+                </p>
               </div>
 
               <div className="space-y-2">

@@ -6,7 +6,7 @@ import models, schemas, auth as auth_utils
 import os
 import math
 import json
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 
 PLATFORM_FEE_PERCENT = float(os.getenv("PLATFORM_FEE_PERCENT", "8"))
 
@@ -18,6 +18,15 @@ def calculate_order_amounts(subtotal: float, shipping: float = 0.0):
     seller_amount = round(subtotal - platform_fee, 2)
     total = round(subtotal + shipping, 2)
     return platform_fee, seller_amount, total
+
+
+def get_local_time(tz_name: str) -> datetime:
+    """Return current time in the given timezone using stdlib zoneinfo (Python 3.9+)."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo(tz_name))
+    except Exception:
+        return datetime.now(dt_timezone.utc)
 
 
 @router.post("/", response_model=schemas.OrderOut, status_code=201)
@@ -38,20 +47,30 @@ def create_order(
 
     # ── Block orders to closed restaurants ──────────────────────────────────
     raw = db.execute(
-        text("SELECT vendor_type, weekly_hours, is_open_now FROM stores WHERE id = :id"),
+        text("SELECT vendor_type, weekly_hours, is_open_now, timezone FROM stores WHERE id = :id"),
         {"id": store.id}
     ).fetchone()
 
     if raw and raw[0] == "restaurant":
-        if not raw[2]:
+        is_open_now = raw[2]
+        weekly_hours_raw = raw[1]
+        store_tz = raw[3] or "America/Chicago"
+
+        # Primary gate: seller's manual open/closed toggle
+        if not is_open_now:
             raise HTTPException(
                 status_code=400,
                 detail="This restaurant is currently closed. Please check back during opening hours."
             )
-        if raw[1]:
+
+        # Secondary gate: weekly hours in the store's local timezone
+        if weekly_hours_raw:
             try:
-                hours = json.loads(raw[1]) if isinstance(raw[1], str) else raw[1]
-                day_name = datetime.now().strftime("%A")
+                hours = json.loads(weekly_hours_raw) if isinstance(weekly_hours_raw, str) else weekly_hours_raw
+                local_now = get_local_time(store_tz)
+                day_name = local_now.strftime("%A")
+                now_time = local_now.strftime("%H:%M")
+
                 today = hours.get(day_name, {})
                 if today.get("closed"):
                     raise HTTPException(
@@ -60,7 +79,6 @@ def create_order(
                     )
                 open_time = today.get("open", "00:00")
                 close_time = today.get("close", "23:59")
-                now_time = datetime.now().strftime("%H:%M")
                 if not (open_time <= now_time <= close_time):
                     raise HTTPException(
                         status_code=400,
@@ -93,7 +111,6 @@ def create_order(
     shipping_cost = order_in.delivery_fee or 0.0
     platform_fee, seller_amount, total = calculate_order_amounts(subtotal, shipping_cost)
 
-    # Create order
     order = models.Order(
         buyer_id=current_user.id,
         store_id=store.id,
@@ -109,16 +126,14 @@ def create_order(
         shipping_country=order_in.shipping.country,
         shipping_zip=order_in.shipping.zip,
     )
-    # Set delivery fields safely (in case migration hasn't run yet)
     try:
         order.delivery_method = order_in.delivery_method
         order.delivery_fee = shipping_cost
     except Exception:
         pass
     db.add(order)
-    db.flush()  # Get order.id before committing
+    db.flush()
 
-    # Create order items and deduct stock
     for product, qty, unit_price, line_total in order_items:
         db.add(models.OrderItem(
             order_id=order.id,
@@ -130,7 +145,6 @@ def create_order(
         product.stock -= qty
         product.sale_count += qty
 
-    # Clear ordered items from cart
     ordered_product_ids = [item.product_id for item in order_in.items]
     db.query(models.CartItem).filter(
         models.CartItem.user_id == current_user.id,
@@ -139,14 +153,10 @@ def create_order(
 
     db.commit()
 
-    # Reload order with all relationships needed for serialization
     order = db.query(models.Order).options(
         joinedload(models.Order.items).joinedload(models.OrderItem.product).joinedload(models.Product.store),
         joinedload(models.Order.store),
     ).filter(models.Order.id == order.id).first()
-
-    # NOTE: Emails are sent after payment confirmed via Stripe webhook (payments.py)
-    # Do NOT send confirmation here — order is not yet paid
 
     return order
 
@@ -158,7 +168,6 @@ def get_my_orders(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.get_current_user)
 ):
-    """Get all orders placed by the current buyer."""
     query = db.query(models.Order).filter(models.Order.buyer_id == current_user.id)
     total = query.count()
     orders = query.order_by(models.Order.created_at.desc()).offset((page - 1) * size).limit(size).all()
@@ -173,15 +182,12 @@ def get_seller_orders(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.require_seller)
 ):
-    """Get all orders for the seller's store."""
     store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
-
     query = db.query(models.Order).filter(models.Order.store_id == store.id)
     if status:
         query = query.filter(models.Order.status == status)
-
     total = query.count()
     orders = query.order_by(models.Order.created_at.desc()).offset((page - 1) * size).limit(size).all()
     return {"items": orders, "total": total, "page": page, "pages": math.ceil(total / size), "size": size}
@@ -195,11 +201,9 @@ def get_store_orders(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.require_seller)
 ):
-    """Get all orders for the seller's store."""
     store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
-
     query = db.query(models.Order).options(
         joinedload(models.Order.items).joinedload(models.OrderItem.product),
         joinedload(models.Order.buyer)
@@ -207,10 +211,10 @@ def get_store_orders(
     if status:
         query = query.filter(models.Order.status == status)
     query = query.order_by(models.Order.created_at.desc())
-
     total = query.count()
     orders = query.offset((page - 1) * size).limit(size).all()
     return {"items": orders, "total": total, "page": page, "size": size}
+
 
 @router.get("/{order_id}", response_model=schemas.OrderOut)
 def get_order(
@@ -218,20 +222,15 @@ def get_order(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.get_current_user)
 ):
-    """Get a single order (buyer sees their own; seller sees their store's orders)."""
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-
-    # Check access rights
     is_buyer = order.buyer_id == current_user.id
     store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     is_seller = store and order.store_id == store.id
     is_admin = current_user.role == models.UserRole.admin
-
     if not (is_buyer or is_seller or is_admin):
         raise HTTPException(status_code=403, detail="Access denied")
-
     return order
 
 
@@ -242,58 +241,42 @@ def update_order_status(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.require_seller)
 ):
-    """Seller updates order status (e.g., shipped, delivered)."""
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-
     store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     if not store or order.store_id != store.id:
         raise HTTPException(status_code=403, detail="Access denied")
-
     order.status = update.status
     if update.tracking_number:
         order.tracking_number = update.tracking_number
     if update.tracking_url:
         order.tracking_url = update.tracking_url
-
-    # Update store stats when delivered
     if update.status == models.OrderStatus.delivered:
         store.total_sales += 1
         store.total_revenue += order.seller_amount
-
     db.commit()
-
-    # Reload order with all relationships needed for serialization
     order = db.query(models.Order).options(
         joinedload(models.Order.items).joinedload(models.OrderItem.product).joinedload(models.Product.store),
         joinedload(models.Order.store),
     ).filter(models.Order.id == order.id).first()
-
-    # Send status-change emails
     try:
         from utils.email import send_shipping_update, send_delivery_confirmation
         buyer = db.query(models.User).filter(models.User.id == order.buyer_id).first()
         if buyer:
             if update.status == models.OrderStatus.shipped:
                 send_shipping_update(
-                    buyer_email=buyer.email,
-                    buyer_name=buyer.full_name,
-                    order_id=order.id,
-                    tracking_number=order.tracking_number,
-                    tracking_url=order.tracking_url,
-                    store_name=store.name,
+                    buyer_email=buyer.email, buyer_name=buyer.full_name,
+                    order_id=order.id, tracking_number=order.tracking_number,
+                    tracking_url=order.tracking_url, store_name=store.name,
                 )
             elif update.status == models.OrderStatus.delivered:
                 send_delivery_confirmation(
-                    buyer_email=buyer.email,
-                    buyer_name=buyer.full_name,
-                    order_id=order.id,
-                    store_name=store.name,
+                    buyer_email=buyer.email, buyer_name=buyer.full_name,
+                    order_id=order.id, store_name=store.name,
                 )
     except Exception as e:
         print(f"Email error: {e}")
-
     return order
 
 
@@ -307,13 +290,10 @@ def get_cart(
     from sqlalchemy import text
     cart_items = (
         db.query(models.CartItem)
-        .options(
-            joinedload(models.CartItem.product).joinedload(models.Product.store)
-        )
+        .options(joinedload(models.CartItem.product).joinedload(models.Product.store))
         .filter(models.CartItem.user_id == current_user.id)
         .all()
     )
-    # Patch vendor_type/delivery_type on each store via raw SQL (enum mapping fix)
     store_ids = list({item.product.store_id for item in cart_items if item.product and item.product.store_id})
     if store_ids:
         placeholders = ",".join(str(s) for s in store_ids)
@@ -337,8 +317,6 @@ def add_to_cart(
     product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
     if not product or not product.is_active:
         raise HTTPException(status_code=404, detail="Product not found")
-
-    # Check if already in cart
     existing = db.query(models.CartItem).filter(
         models.CartItem.user_id == current_user.id,
         models.CartItem.product_id == item.product_id
@@ -348,7 +326,6 @@ def add_to_cart(
         db.commit()
         db.refresh(existing)
         return existing
-
     cart_item = models.CartItem(user_id=current_user.id, **item.model_dump())
     db.add(cart_item)
     db.commit()
@@ -361,9 +338,9 @@ def clear_cart(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.get_current_user)
 ):
-    """Clear all items from the user's cart."""
     db.query(models.CartItem).filter(models.CartItem.user_id == current_user.id).delete()
     db.commit()
+
 
 @router.delete("/cart/{item_id}", status_code=204)
 def remove_from_cart(
@@ -387,7 +364,6 @@ def send_order_confirmation_email(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.get_current_user)
 ):
-    """Send order confirmation email. Called from frontend after payment succeeds."""
     order = db.query(models.Order).options(
         joinedload(models.Order.items).joinedload(models.OrderItem.product),
         joinedload(models.Order.store).joinedload(models.Store.owner),
@@ -395,37 +371,24 @@ def send_order_confirmation_email(
         models.Order.id == order_id,
         models.Order.buyer_id == current_user.id,
     ).first()
-
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-
     try:
         from utils.email import send_order_confirmation, send_new_order_to_seller
         email_items = [{"name": oi.product.name, "quantity": oi.quantity, "price": oi.unit_price} for oi in order.items]
-        
         send_order_confirmation(
-            buyer_email=current_user.email,
-            buyer_name=current_user.full_name,
-            order_id=order.id,
-            items=email_items,
-            subtotal=order.subtotal,
-            shipping=order.shipping_cost,
-            total=order.total,
+            buyer_email=current_user.email, buyer_name=current_user.full_name,
+            order_id=order.id, items=email_items, subtotal=order.subtotal,
+            shipping=order.shipping_cost, total=order.total,
             store_name=order.store.name if order.store else "Afrizone",
         )
-
         seller_email = order.store.owner.email if order.store and order.store.owner else None
         if seller_email:
             send_new_order_to_seller(
-                seller_email=seller_email,
-                store_name=order.store.name,
-                order_id=order.id,
-                items=email_items,
-                total=order.total,
-                seller_amount=order.seller_amount,
-                buyer_name=current_user.full_name,
+                seller_email=seller_email, store_name=order.store.name,
+                order_id=order.id, items=email_items, total=order.total,
+                seller_amount=order.seller_amount, buyer_name=current_user.full_name,
             )
     except Exception as e:
         print(f"Email error: {e}")
-
     return {"sent": True}

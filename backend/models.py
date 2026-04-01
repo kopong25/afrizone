@@ -123,6 +123,7 @@ class Store(Base):
     is_open_now           = Column(Boolean, default=True)    # Restaurant open/closed toggle
     opening_hours         = Column(String, nullable=True)    # e.g. "Mon-Fri 11am-9pm"
     weekly_hours          = Column(Text, nullable=True)
+    timezone              = Column(String, nullable=True, default="America/Chicago")  # IANA timezone e.g. America/Chicago
     phone = Column(String, nullable=True)
     website = Column(String, nullable=True)
 
@@ -405,12 +406,6 @@ class ProductVariant(Base):
 
     product = relationship("Product", backref="variants")
 
-
-# ─────────────────────────────────────────────
-# REVIEW PHOTOS
-# ─────────────────────────────────────────────
-
-# Add photos column to Review — we'll handle via migration note
 
 # ─────────────────────────────────────────────
 # MESSAGES (Buyer/Seller Chat)
