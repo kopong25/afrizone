@@ -48,9 +48,8 @@ def get_my_store(
         db.add(store)
         db.commit()
         db.refresh(store)
-    # Patch fields directly from DB to bypass SQLAlchemy caching issues
     row = db.execute(
-        text("SELECT vendor_type, delivery_type, weekly_hours, is_open_now FROM stores WHERE id = :id"),
+        text("SELECT vendor_type, delivery_type, weekly_hours, is_open_now, timezone FROM stores WHERE id = :id"),
         {"id": store.id}
     ).fetchone()
     if row:
@@ -74,19 +73,16 @@ def update_my_store(
         raise HTTPException(status_code=404, detail="Store not found")
     data = updates.model_dump(exclude_unset=True)
 
-    # Enforce business rules: restaurant must use local_delivery, both, or pickup
     if data.get("vendor_type") == "restaurant":
         if "delivery_type" not in data:
             data["delivery_type"] = "local_delivery"
         elif data["delivery_type"] not in ("local_delivery", "both", "pickup"):
             data["delivery_type"] = "local_delivery"
     elif data.get("vendor_type") and data.get("vendor_type") != "restaurant":
-        # Non-restaurant: if they were on local_delivery, switch back to shipping
         if store.delivery_type == "local_delivery" and "delivery_type" not in data:
             data["delivery_type"] = "shipping"
 
     for key, value in data.items():
-        # Use raw SQL update for enum columns to avoid SQLAlchemy coercion issues
         if key in ("vendor_type", "delivery_type"):
             from sqlalchemy import text
             db.execute(
@@ -101,10 +97,9 @@ def update_my_store(
 
     db.commit()
     db.refresh(store)
-    # Patch fields from raw SQL to bypass SQLAlchemy caching issues
     from sqlalchemy import text as _text
     row = db.execute(
-        _text("SELECT vendor_type, delivery_type, weekly_hours, is_open_now FROM stores WHERE id = :id"),
+        _text("SELECT vendor_type, delivery_type, weekly_hours, is_open_now, timezone FROM stores WHERE id = :id"),
         {"id": store.id}
     ).fetchone()
     if row:
@@ -112,6 +107,7 @@ def update_my_store(
         store.delivery_type = row[1]
         store.weekly_hours = row[2]
         store.is_open_now = row[3]
+        store.timezone = row[4]
     return store
 
 
@@ -125,7 +121,6 @@ async def upload_store_logo(
     store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
-
     url = await upload_image(file, folder=f"afrizone/stores/{store.id}/logo")
     store.logo_url = url
     db.commit()
@@ -142,7 +137,6 @@ async def upload_store_banner(
     store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
-
     url = await upload_image(file, folder=f"afrizone/stores/{store.id}/banner")
     store.banner_url = url
     db.commit()
@@ -186,7 +180,6 @@ def get_store_analytics(
 
     since = datetime.now(timezone.utc) - timedelta(days=days)
 
-    # All orders in period (eager load items + products)
     from sqlalchemy.orm import joinedload as _jl
     orders = db.query(models.Order).options(
         _jl(models.Order.items).joinedload(models.OrderItem.product)
@@ -196,7 +189,6 @@ def get_store_analytics(
         models.Order.status != models.OrderStatus.cancelled,
     ).all()
 
-    # All-time stats
     all_orders = db.query(models.Order).filter(
         models.Order.store_id == store.id,
         models.Order.status != models.OrderStatus.cancelled,
@@ -206,13 +198,11 @@ def get_store_analytics(
     total_orders = len(orders)
     avg_order_value = total_revenue / total_orders if total_orders > 0 else 0
 
-    # Status breakdown
     status_counts = {}
     for o in all_orders:
         s = str(o.status.value) if hasattr(o.status, "value") else str(o.status)
         status_counts[s] = status_counts.get(s, 0) + 1
 
-    # Daily revenue for chart (last N days)
     daily = {}
     for i in range(days):
         day = (datetime.now(timezone.utc) - timedelta(days=days - i - 1)).strftime("%Y-%m-%d")
@@ -230,7 +220,6 @@ def get_store_analytics(
             daily[day]["revenue"] += o.seller_amount
             daily[day]["orders"] += 1
 
-    # Top products by revenue
     item_stats = {}
     for o in orders:
         try:
@@ -254,7 +243,6 @@ def get_store_analytics(
 
     top_products = sorted(item_stats.values(), key=lambda x: x["revenue"], reverse=True)[:5]
 
-    # Previous period for comparison
     prev_since = since - timedelta(days=days)
     prev_orders = db.query(models.Order).filter(
         models.Order.store_id == store.id,
@@ -293,9 +281,8 @@ def get_store_by_id(store_id: int, db: Session = Depends(get_db)):
     store = db.query(models.Store).filter(models.Store.id == store_id).first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
-    # Patch all fields that SQLAlchemy may cache stale values for
     row = db.execute(
-        text("SELECT vendor_type, delivery_type, weekly_hours, is_open_now FROM stores WHERE id = :id"),
+        text("SELECT vendor_type, delivery_type, weekly_hours, is_open_now, timezone FROM stores WHERE id = :id"),
         {"id": store.id}
     ).fetchone()
     if row:
@@ -303,4 +290,5 @@ def get_store_by_id(store_id: int, db: Session = Depends(get_db)):
         store.delivery_type = row[1]
         store.weekly_hours = row[2]
         store.is_open_now = row[3]
+        store.timezone = row[4]
     return store
