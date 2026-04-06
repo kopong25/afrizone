@@ -39,6 +39,16 @@ export const getSavedUTM = () => {
   } catch { return {}; }
 };
 
+// ── Pages that skip the install wall ───────────────────────────
+// Add any page you want accessible without install (e.g. /download itself)
+const WALL_BYPASS_PAGES = [
+  "/download",
+  "/install",
+  "/login",
+  "/register",
+  "/reset-password",
+];
+
 const AuthContext = createContext(null);
 
 export function useAuth() {
@@ -54,18 +64,15 @@ function AuthProvider({ children }) {
     const stored = loadStoredToken();
     if (stored) {
       setToken(stored);
-      setAuthToken(stored); // sync to _memoryToken so axios interceptor sends it
+      setAuthToken(stored);
       authAPI.me()
         .then((res) => setUser(res.data))
         .catch((err) => {
           if (err.response?.status === 401) {
-            // Token is expired/invalid — clear everything cleanly
             setAuthToken(null);
             setToken(null);
             setUser(null);
           }
-          // For network errors (no err.response), keep token — may be temporary
-          // setUser stays null so user appears logged out until next successful /me
         })
         .finally(() => setLoading(false));
     } else {
@@ -93,19 +100,59 @@ function AuthProvider({ children }) {
   );
 }
 
-// PWA Install prompt
+// ── PWA Install Wall (Temu-style) ──────────────────────────────
+// Redirects mobile users to /download if they haven't installed yet.
+// Users can skip via "Continue as Guest" on the download page,
+// which sets localStorage "pwa-skipped" and lets them through.
+function useMobileInstallWall() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Only run on client
+    if (typeof window === "undefined") return;
+
+    // Skip for non-mobile devices (tablets and desktops browse freely)
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (!isMobile) return;
+
+    // Skip if already installed as a PWA (standalone mode)
+    const isStandalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.navigator.standalone === true;
+    if (isStandalone) return;
+
+    // Skip if user already dismissed / skipped the wall
+    const skipped = localStorage.getItem("pwa-skipped");
+    if (skipped) return;
+
+    // Skip for pages that should always be accessible
+    const path = router.pathname;
+    const isBypassPage = WALL_BYPASS_PAGES.some((p) => path.startsWith(p));
+    if (isBypassPage) return;
+
+    // Redirect to download/install page
+    router.replace("/download");
+  }, [router.pathname]);
+}
+
+// ── Soft install banner (shown AFTER user is inside the app) ───
+// Only appears if user skipped the wall but hasn't installed yet.
 function PWAInstallBanner() {
   const [prompt, setPrompt] = React.useState(null);
   const [show, setShow] = React.useState(false);
   const [isIOS, setIsIOS] = React.useState(false);
-  const [dismissed, setDismissed] = React.useState(false);
 
   React.useEffect(() => {
     // Don't show if already installed
     if (window.matchMedia("(display-mode: standalone)").matches) return;
-    
-    const alreadyDismissed = localStorage.getItem("pwa-dismissed");
-    if (alreadyDismissed) return;
+
+    // Don't show if user never dismissed the full wall (they're in guest mode)
+    const skipped = localStorage.getItem("pwa-skipped");
+    if (!skipped) return;
+
+    // Don't show if banner was dismissed before
+    const bannerDismissed = localStorage.getItem("pwa-banner-dismissed");
+    if (bannerDismissed) return;
 
     // Android/Chrome install prompt
     const handler = (e) => {
@@ -115,12 +162,12 @@ function PWAInstallBanner() {
     };
     window.addEventListener("beforeinstallprompt", handler);
 
-    // iOS Safari - show manual instructions
+    // iOS Safari manual instructions
     const isIOSDevice = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
     const isSafari = /safari/i.test(navigator.userAgent) && !/chrome/i.test(navigator.userAgent);
     if (isIOSDevice && isSafari) {
       setIsIOS(true);
-      setTimeout(() => setShow(true), 3000);
+      setTimeout(() => setShow(true), 5000); // show after 5s on iOS
     }
 
     return () => window.removeEventListener("beforeinstallprompt", handler);
@@ -128,27 +175,40 @@ function PWAInstallBanner() {
 
   const dismiss = () => {
     setShow(false);
-    localStorage.setItem("pwa-dismissed", "1");
+    localStorage.setItem("pwa-banner-dismissed", "1");
   };
 
-  if (!show || dismissed) return null;
+  if (!show) return null;
 
   return (
-    <div style={{position:"fixed",bottom:16,left:16,right:16,zIndex:9999,background:"#1A5C38",color:"white",borderRadius:16,padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:"0 8px 30px rgba(0,0,0,0.35)",maxWidth:500,margin:"0 auto"}}>
-      <div style={{display:"flex",alignItems:"center",gap:12}}>
-        <img src="/icons/icon-72x72.png" style={{width:44,height:44,borderRadius:10}} alt="Afrizone" />
+    <div style={{
+      position: "fixed", bottom: 16, left: 16, right: 16, zIndex: 9999,
+      background: "#1A5C38", color: "white", borderRadius: 16,
+      padding: "14px 16px", display: "flex", alignItems: "center",
+      justifyContent: "space-between", boxShadow: "0 8px 30px rgba(0,0,0,0.35)",
+      maxWidth: 500, margin: "0 auto",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <img src="/icons/icon-72x72.png" style={{ width: 44, height: 44, borderRadius: 10 }} alt="Afrizone" />
         <div>
-          <p style={{fontWeight:900,margin:0,fontSize:14}}>Install Afrizone App</p>
+          <p style={{ fontWeight: 900, margin: 0, fontSize: 14 }}>Install Afrizone App</p>
           {isIOS
-            ? <p style={{margin:0,fontSize:11,opacity:0.85}}>Tap <strong>Share</strong> then <strong>"Add to Home Screen"</strong></p>
-            : <p style={{margin:0,fontSize:11,opacity:0.85}}>Shop faster · Works offline · Free</p>
+            ? <p style={{ margin: 0, fontSize: 11, opacity: 0.85 }}>Tap <strong>Share</strong> then <strong>"Add to Home Screen"</strong></p>
+            : <p style={{ margin: 0, fontSize: 11, opacity: 0.85 }}>Shop faster · Works offline · Free</p>
           }
         </div>
       </div>
-      <div style={{display:"flex",gap:8,flexShrink:0}}>
-        <button onClick={dismiss} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"white",padding:"6px 10px",borderRadius:8,cursor:"pointer",fontSize:12}}>Later</button>
-        {!isIOS && (
-          <button onClick={async () => { await prompt.prompt(); dismiss(); }} style={{background:"#FFD700",border:"none",color:"#1A5C38",padding:"6px 14px",borderRadius:8,cursor:"pointer",fontWeight:900,fontSize:12}}>
+      <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+        <button onClick={dismiss} style={{
+          background: "rgba(255,255,255,0.15)", border: "none", color: "white",
+          padding: "6px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12,
+        }}>Later</button>
+        {!isIOS && prompt && (
+          <button onClick={async () => { await prompt.prompt(); dismiss(); }} style={{
+            background: "#FFD700", border: "none", color: "#1A5C38",
+            padding: "6px 14px", borderRadius: 8, cursor: "pointer",
+            fontWeight: 900, fontSize: 12,
+          }}>
             Install
           </button>
         )}
@@ -160,21 +220,18 @@ function PWAInstallBanner() {
 export default function App({ Component, pageProps }) {
   const router = useRouter();
 
-  useEffect(() => {
-    // Save UTM params when user first lands
-    saveUTM();
+  // ✅ Temu-style mobile install wall
+  useMobileInstallWall();
 
-    // Track page views on route change
-    const handleRouteChange = (url) => {
-      fbq("track", "PageView");
-    };
+  useEffect(() => {
+    saveUTM();
+    const handleRouteChange = () => fbq("track", "PageView");
     router.events.on("routeChangeComplete", handleRouteChange);
     return () => router.events.off("routeChangeComplete", handleRouteChange);
   }, [router.events]);
 
   return (
     <AuthProvider>
-      {/* Facebook Pixel */}
       {FB_PIXEL_ID && FB_PIXEL_ID !== "PLACEHOLDER" && (
         <>
           <Script id="fb-pixel" strategy="afterInteractive">
@@ -192,13 +249,14 @@ export default function App({ Component, pageProps }) {
             `}
           </Script>
           <noscript>
-            <img height="1" width="1" style={{display:"none"}}
+            <img height="1" width="1" style={{ display: "none" }}
               src={`https://www.facebook.com/tr?id=${FB_PIXEL_ID}&ev=PageView&noscript=1`}
               alt="" />
           </noscript>
         </>
       )}
       <Component {...pageProps} />
+      <PWAInstallBanner />
       <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
     </AuthProvider>
   );

@@ -1,9 +1,10 @@
-// pages/download.js  (or app/download/page.js for App Router)
+// pages/download.js
 // Android: place your APK at /public/afrizone.apk
 // iOS icons: /public/icon-192.png, /public/icon-512.png, /public/apple-touch-icon.png
 
 import Head from "next/head";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
 
 const androidSteps = [
   { num: "01", title: "Tap Download APK", body: "Your browser saves the file to your Downloads folder automatically." },
@@ -31,11 +32,18 @@ export default function DownloadPage() {
   const [tab, setTab] = useState("android");
   const [openFaq, setOpenFaq] = useState(null);
   const [downloaded, setDownloaded] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const ua = navigator.userAgent || "";
     if (/iphone|ipad|ipod/i.test(ua)) setTab("ios");
   }, []);
+
+  // ✅ "Continue as Guest" — skips the wall and sends user to homepage
+  const handleSkip = () => {
+    localStorage.setItem("pwa-skipped", "1");
+    router.push("/");
+  };
 
   const steps = tab === "android" ? androidSteps : iosSteps;
 
@@ -56,11 +64,14 @@ export default function DownloadPage() {
           --earth: #1A1208; --sand: #F5EDD8; --sand-dark: #EAD9B8;
           --cream: #FDFAF4; --text: #1A1208; --text-muted: #7A6A52;
           --ios: #1A73C8; --ios-pale: #E3EFFC;
+          --green: #1A5C38;
         }
         body { background: var(--cream); color: var(--text); font-family: 'DM Sans', sans-serif; -webkit-font-smoothing: antialiased; }
 
         nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 40px; border-bottom: 1px solid var(--sand-dark); position: sticky; top: 0; background: var(--cream); z-index: 100; }
         .nav-logo { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 800; color: var(--clay); letter-spacing: -0.5px; }
+        .nav-skip { font-size: 13px; color: var(--text-muted); background: none; border: none; cursor: pointer; text-decoration: underline; font-family: 'DM Sans', sans-serif; padding: 6px; }
+        .nav-skip:hover { color: var(--text); }
 
         .hero { max-width: 1100px; margin: 0 auto; padding: 72px 40px 56px; display: grid; grid-template-columns: 1fr 460px; gap: 60px; align-items: center; }
         .hero-eyebrow { font-size: 12px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: var(--clay); margin-bottom: 20px; }
@@ -83,6 +94,39 @@ export default function DownloadPage() {
         .dl-meta { margin-top: 14px; font-size: 12px; color: var(--text-muted); }
 
         .safari-hint { display: inline-flex; align-items: center; gap: 8px; background: var(--ios-pale); color: var(--ios); padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; margin-bottom: 24px; border: 1px solid rgba(26,115,200,.15); }
+
+        /* ✅ CTA block — Sign Up / Continue as Guest */
+        .cta-block {
+          margin-top: 32px;
+          padding: 24px;
+          background: #f0faf4;
+          border: 1.5px solid #bbdecb;
+          border-radius: 12px;
+          max-width: 420px;
+        }
+        .cta-block p { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.6; }
+        .cta-block p strong { color: var(--green); }
+        .cta-btns { display: flex; flex-direction: column; gap: 10px; }
+        .btn-signup {
+          display: block; text-align: center; background: var(--green); color: #fff;
+          padding: 14px; border-radius: 8px; font-weight: 700; font-size: 15px;
+          text-decoration: none; font-family: 'DM Sans', sans-serif;
+          transition: background .2s;
+        }
+        .btn-signup:hover { background: #155030; }
+        .btn-login {
+          display: block; text-align: center; background: #fff; color: var(--green);
+          padding: 13px; border-radius: 8px; font-weight: 600; font-size: 15px;
+          text-decoration: none; font-family: 'DM Sans', sans-serif;
+          border: 1.5px solid #bbdecb; transition: border-color .2s;
+        }
+        .btn-login:hover { border-color: var(--green); }
+        .btn-guest {
+          background: none; border: none; color: var(--text-muted); font-size: 13px;
+          cursor: pointer; text-decoration: underline; font-family: 'DM Sans', sans-serif;
+          text-align: center; padding: 4px; margin-top: 4px;
+        }
+        .btn-guest:hover { color: var(--text); }
 
         .phones-wrap { display: flex; justify-content: center; align-items: flex-end; gap: 24px; }
         .phone-col { display: flex; flex-direction: column; align-items: center; }
@@ -151,6 +195,7 @@ export default function DownloadPage() {
           .phones-wrap { gap: 14px; }
           .phone.android-phone { width: 150px; height: 300px; }
           .phone.ios-phone { width: 134px; height: 272px; }
+          .cta-block { max-width: 100%; }
         }
 
         @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -164,6 +209,10 @@ export default function DownloadPage() {
 
       <nav>
         <span className="nav-logo">Afrizone</span>
+        {/* ✅ Always visible skip link in nav */}
+        <button className="nav-skip" onClick={handleSkip}>
+          Continue as Guest →
+        </button>
       </nav>
 
       {/* HERO */}
@@ -183,7 +232,7 @@ export default function DownloadPage() {
               🤖 Android
             </button>
             <button className={`dtab ${tab === "ios" ? "active-ios" : ""}`} onClick={() => { setTab("ios"); setDownloaded(false); }}>
-               iPhone / iPad
+              🍎 iPhone / iPad
             </button>
           </div>
 
@@ -206,6 +255,20 @@ export default function DownloadPage() {
                 <p className="dl-meta">iOS 14+ · No download needed · Free</p>
               </>
             )}
+
+            {/* ✅ Sign Up / Login / Guest CTA block */}
+            <div className="cta-block">
+              <p>
+                <strong>Already installed?</strong> Create your free account to track orders, save favourites and get exclusive deals.
+              </p>
+              <div className="cta-btns">
+                <a href="/register" className="btn-signup">Create Free Account →</a>
+                <a href="/login" className="btn-login">I already have an account</a>
+                <button className="btn-guest" onClick={handleSkip}>
+                  Continue as Guest — browse without signing up
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -242,7 +305,7 @@ export default function DownloadPage() {
           </h2>
           <div className="steps-tabs">
             <button className={`stab stab-android ${tab === "android" ? "active" : ""}`} onClick={() => setTab("android")}>🤖 Android</button>
-            <button className={`stab stab-ios ${tab === "ios" ? "active" : ""}`} onClick={() => setTab("ios")}> iPhone</button>
+            <button className={`stab stab-ios ${tab === "ios" ? "active" : ""}`} onClick={() => setTab("ios")}>🍎 iPhone</button>
           </div>
           <div className="steps-grid">
             {steps.map((s) => (
