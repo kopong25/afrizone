@@ -1,17 +1,56 @@
-// pages/download.js — Temu-style minimal install wall
+// pages/download.js — One-tap install (Temu/Alibaba style)
 import Head from "next/head";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 
 export default function DownloadPage() {
-  const [tab, setTab] = useState("android");
-  const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const [platform, setPlatform] = useState("android"); // "android" | "ios"
+  const [installReady, setInstallReady] = useState(false); // PWA prompt available
+  const [installing, setInstalling] = useState(false);
+  const [installed, setInstalled] = useState(false);
+  const deferredPrompt = useRef(null);
   const router = useRouter();
 
   useEffect(() => {
     const ua = navigator.userAgent || "";
-    if (/iphone|ipad|ipod/i.test(ua)) setTab("ios");
+    if (/iphone|ipad|ipod/i.test(ua)) {
+      setPlatform("ios");
+    }
+
+    // Capture the native PWA install prompt (Android Chrome / Edge)
+    const handler = (e) => {
+      e.preventDefault();
+      deferredPrompt.current = e;
+      setInstallReady(true);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+
+    // Detect if already installed as PWA
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+      setInstalled(true);
+    }
+
+    return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
+
+  // ── Android: one-tap PWA install, fallback to APK download ──
+  const handleAndroidInstall = async () => {
+    if (installReady && deferredPrompt.current) {
+      // Native one-tap prompt
+      setInstalling(true);
+      deferredPrompt.current.prompt();
+      const { outcome } = await deferredPrompt.current.userChoice;
+      deferredPrompt.current = null;
+      setInstalling(false);
+      if (outcome === "accepted") setInstalled(true);
+    } else {
+      // Fallback: direct APK download — browser handles it instantly
+      const a = document.createElement("a");
+      a.href = "/afrizone.apk";
+      a.download = "afrizone.apk";
+      a.click();
+    }
+  };
 
   const handleSkip = () => {
     localStorage.setItem("pwa-skipped", "1");
@@ -23,13 +62,18 @@ export default function DownloadPage() {
       <Head>
         <title>Get the Afrizone App</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap"
+          rel="stylesheet"
+        />
       </Head>
 
       <style>{`
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          background: #f7f7f7;
+          font-family: 'Sora', -apple-system, sans-serif;
+          background: #0d1a12;
           min-height: 100vh;
           display: flex;
           flex-direction: column;
@@ -37,208 +81,290 @@ export default function DownloadPage() {
           justify-content: center;
           padding: 24px 20px;
           -webkit-font-smoothing: antialiased;
+          overflow-x: hidden;
+        }
+
+        /* ── Ambient glow behind card ── */
+        body::before {
+          content: '';
+          position: fixed;
+          top: 10%;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 340px;
+          height: 340px;
+          background: radial-gradient(circle, rgba(34,197,94,0.18) 0%, transparent 70%);
+          pointer-events: none;
+          z-index: 0;
         }
 
         .card {
-          background: #fff;
-          border-radius: 20px;
-          padding: 36px 28px 28px;
+          position: relative;
+          background: #ffffff;
+          border-radius: 28px;
+          padding: 36px 28px 32px;
           width: 100%;
           max-width: 360px;
           text-align: center;
-          box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+          box-shadow: 0 24px 80px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.06);
+          z-index: 1;
         }
 
+        /* ── Icon ── */
         .app-icon {
-          width: 88px;
-          height: 88px;
-          background: #1A5C38;
+          width: 86px;
+          height: 86px;
+          background: linear-gradient(145deg, #1a7a48, #0f4f2e);
           border-radius: 22px;
-          margin: 0 auto 16px;
+          margin: 0 auto 18px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 36px;
-          box-shadow: 0 4px 16px rgba(26,92,56,0.3);
+          font-size: 38px;
+          box-shadow: 0 8px 28px rgba(26,92,56,0.45);
         }
 
         .app-name {
-          font-size: 24px;
+          font-size: 26px;
           font-weight: 800;
-          color: #1a1a1a;
-          margin-bottom: 6px;
-          letter-spacing: -0.5px;
+          color: #0f1a14;
+          letter-spacing: -0.6px;
+          margin-bottom: 4px;
         }
-
         .app-tagline {
-          font-size: 14px;
-          color: #888;
-          margin-bottom: 20px;
+          font-size: 13px;
+          color: #8a9a8e;
           line-height: 1.5;
+          margin-bottom: 18px;
         }
 
+        /* ── Rating ── */
         .rating-row {
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 6px;
-          margin-bottom: 20px;
+          margin-bottom: 22px;
         }
-        .stars { color: #f5a623; font-size: 14px; letter-spacing: 1px; }
-        .rating-text { font-size: 12px; color: #aaa; }
+        .stars { color: #f5a623; font-size: 13px; letter-spacing: 2px; }
+        .rating-text { font-size: 12px; color: #b0bab4; font-weight: 600; }
 
+        /* ── Feature pills ── */
         .features {
           display: flex;
           justify-content: center;
-          gap: 20px;
+          gap: 8px;
           margin-bottom: 28px;
+          flex-wrap: wrap;
         }
         .feature {
           display: flex;
-          flex-direction: column;
           align-items: center;
-          gap: 4px;
+          gap: 5px;
+          background: #f3faf6;
+          border: 1px solid #d4eedd;
+          border-radius: 20px;
+          padding: 5px 11px;
         }
-        .feature-icon { font-size: 22px; }
-        .feature-label { font-size: 11px; color: #aaa; }
+        .feature-icon { font-size: 13px; }
+        .feature-label { font-size: 11px; color: #2d6e4a; font-weight: 600; }
 
+        /* ── Primary install button ── */
         .btn-install {
-          display: block;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
           width: 100%;
-          background: #1A5C38;
+          background: linear-gradient(160deg, #22c55e, #16a34a);
           color: #fff;
           border: none;
-          border-radius: 12px;
-          padding: 16px;
+          border-radius: 14px;
+          padding: 17px 20px;
           font-size: 16px;
           font-weight: 700;
+          font-family: inherit;
           cursor: pointer;
           text-decoration: none;
           margin-bottom: 12px;
-          transition: background 0.2s;
-          font-family: inherit;
+          box-shadow: 0 6px 24px rgba(22,163,74,0.4);
+          transition: all 0.18s ease;
+          letter-spacing: -0.2px;
         }
-        .btn-install:hover { background: #155030; }
-        .btn-install:active { transform: scale(0.98); }
+        .btn-install:hover { background: linear-gradient(160deg, #16a34a, #15803d); transform: translateY(-1px); box-shadow: 0 10px 30px rgba(22,163,74,0.45); }
+        .btn-install:active { transform: scale(0.98) translateY(0); }
+        .btn-install:disabled { background: linear-gradient(160deg, #86efac, #4ade80); box-shadow: none; cursor: not-allowed; }
 
-        .btn-login {
-          display: block;
+        .btn-install .dl-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 30px;
+          height: 30px;
+          background: rgba(255,255,255,0.2);
+          border-radius: 8px;
+          flex-shrink: 0;
+        }
+
+        /* ── Installed state ── */
+        .btn-installed {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
           width: 100%;
-          background: #f0faf4;
-          color: #1A5C38;
-          border: 1.5px solid #c3dece;
-          border-radius: 12px;
-          padding: 14px;
+          background: #f0fdf4;
+          border: 2px solid #86efac;
+          color: #16a34a;
+          border-radius: 14px;
+          padding: 16px;
           font-size: 15px;
+          font-weight: 700;
+          font-family: inherit;
+          margin-bottom: 12px;
+        }
+
+        /* ── Login button ── */
+        .btn-login {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          background: #fff;
+          color: #1a5c38;
+          border: 1.5px solid #d4eedd;
+          border-radius: 14px;
+          padding: 15px;
+          font-size: 14px;
           font-weight: 600;
           cursor: pointer;
           text-decoration: none;
           margin-bottom: 20px;
           font-family: inherit;
-          transition: border-color 0.2s;
+          transition: border-color 0.18s, background 0.18s;
         }
-        .btn-login:hover { border-color: #1A5C38; }
+        .btn-login:hover { border-color: #22c55e; background: #f0fdf4; }
 
         .divider {
           display: flex;
           align-items: center;
           gap: 10px;
           margin-bottom: 16px;
-          color: #ccc;
-          font-size: 12px;
+          color: #ddd;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.5px;
         }
-        .divider::before, .divider::after {
-          content: '';
-          flex: 1;
-          height: 1px;
-          background: #eee;
-        }
+        .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #f0f0f0; }
 
         .btn-guest {
           background: none;
           border: none;
-          color: #aaa;
+          color: #b0bab4;
           font-size: 13px;
           cursor: pointer;
           font-family: inherit;
-          padding: 4px;
+          padding: 4px 8px;
           text-decoration: underline;
+          text-underline-offset: 3px;
           display: block;
           width: 100%;
+          transition: color 0.15s;
         }
-        .btn-guest:hover { color: #666; }
+        .btn-guest:hover { color: #6b7280; }
 
-        /* iOS bottom-sheet guide */
-        .overlay-bg {
-          position: fixed;
-          inset: 0;
-          background: rgba(0,0,0,0.4);
-          z-index: 99;
+        /* ── iOS one-tap banner ── */
+        .ios-banner {
+          margin-bottom: 12px;
+          background: #fffbeb;
+          border: 1.5px solid #fcd34d;
+          border-radius: 14px;
+          padding: 14px 16px;
+          text-align: left;
         }
-        .ios-guide {
-          position: fixed;
-          bottom: 0; left: 0; right: 0;
-          background: #fff;
-          border-radius: 20px 20px 0 0;
-          padding: 24px 20px 40px;
-          box-shadow: 0 -4px 30px rgba(0,0,0,0.15);
-          z-index: 100;
-          animation: slideUp 0.3s ease;
-        }
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
-        }
-        .ios-guide-handle {
-          width: 40px; height: 4px;
-          background: #e0e0e0;
-          border-radius: 2px;
-          margin: 0 auto 20px;
-        }
-        .ios-guide h3 {
-          font-size: 17px;
+        .ios-banner-title {
+          font-size: 13px;
           font-weight: 700;
-          color: #1a1a1a;
-          margin-bottom: 20px;
-          text-align: center;
-        }
-        .ios-step {
+          color: #92400e;
+          margin-bottom: 10px;
           display: flex;
           align-items: center;
-          gap: 14px;
-          padding: 12px 0;
-          border-bottom: 1px solid #f5f5f5;
+          gap: 6px;
         }
-        .ios-step:last-child { border-bottom: none; }
-        .ios-step-icon {
-          width: 40px; height: 40px;
-          background: #f0faf4;
-          border-radius: 10px;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 20px;
+        .ios-steps {
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+        }
+        .ios-step-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 12px;
+          color: #78350f;
+          line-height: 1.4;
+        }
+        .ios-step-num {
+          width: 18px;
+          height: 18px;
+          background: #fcd34d;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          font-weight: 800;
+          color: #78350f;
           flex-shrink: 0;
         }
-        .ios-step-text { font-size: 14px; color: #333; line-height: 1.4; text-align: left; }
-        .ios-step-text strong { color: #1a1a1a; }
-        .btn-got-it {
-          width: 100%;
-          background: #1A5C38;
-          color: #fff;
-          border: none;
-          border-radius: 12px;
-          padding: 15px;
-          font-size: 15px;
-          font-weight: 700;
-          cursor: pointer;
-          margin-top: 20px;
-          font-family: inherit;
+
+        /* ── Spinner ── */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+          width: 18px; height: 18px;
+          border: 2.5px solid rgba(255,255,255,0.4);
+          border-top-color: #fff;
+          border-radius: 50%;
+          animation: spin 0.7s linear infinite;
+        }
+
+        /* ── Progress bar during install ── */
+        @keyframes progress { from { width: 0% } to { width: 90% } }
+        .progress-bar-wrap {
+          height: 3px;
+          background: #dcfce7;
+          border-radius: 99px;
+          overflow: hidden;
+          margin-bottom: 8px;
+        }
+        .progress-bar {
+          height: 100%;
+          background: linear-gradient(90deg, #22c55e, #16a34a);
+          border-radius: 99px;
+          animation: progress 3s ease-out forwards;
+        }
+        .progress-label {
+          font-size: 11px;
+          color: #16a34a;
+          font-weight: 600;
+          margin-bottom: 10px;
+          text-align: center;
+        }
+
+        /* ── Download arrow SVG icon ── */
+        .dl-arrow {
+          width: 16px;
+          height: 16px;
+          stroke: #fff;
+          fill: none;
+          stroke-width: 2.5;
+          stroke-linecap: round;
+          stroke-linejoin: round;
         }
       `}</style>
 
       <div className="card">
-        {/* App Icon */}
         <div className="app-icon">🌍</div>
-
         <h1 className="app-name">Afrizone</h1>
         <p className="app-tagline">Pan-African Marketplace<br />Shop · Sell · Discover</p>
 
@@ -248,32 +374,71 @@ export default function DownloadPage() {
         </div>
 
         <div className="features">
-          <div className="feature">
-            <span className="feature-icon">🛍️</span>
-            <span className="feature-label">Shop</span>
-          </div>
-          <div className="feature">
-            <span className="feature-icon">🚚</span>
-            <span className="feature-label">Delivery</span>
-          </div>
-          <div className="feature">
-            <span className="feature-icon">🔒</span>
-            <span className="feature-label">Secure</span>
-          </div>
-          <div className="feature">
-            <span className="feature-icon">📦</span>
-            <span className="feature-label">Track</span>
-          </div>
+          <div className="feature"><span className="feature-icon">🛍️</span><span className="feature-label">Shop</span></div>
+          <div className="feature"><span className="feature-icon">🚚</span><span className="feature-label">Fast Delivery</span></div>
+          <div className="feature"><span className="feature-icon">🔒</span><span className="feature-label">Secure Pay</span></div>
+          <div className="feature"><span className="feature-icon">📦</span><span className="feature-label">Live Track</span></div>
         </div>
 
-        {/* Primary CTA */}
-        {tab === "android" ? (
-          <a href="/afrizone.apk" download className="btn-install">
-            ↓ &nbsp;Install Free — Android
-          </a>
+        {/* ── Installing progress ── */}
+        {installing && (
+          <>
+            <div className="progress-bar-wrap"><div className="progress-bar" /></div>
+            <div className="progress-label">Installing Afrizone…</div>
+          </>
+        )}
+
+        {/* ── iOS: inline steps (no bottom sheet) ── */}
+        {platform === "ios" && !installed && (
+          <div className="ios-banner">
+            <div className="ios-banner-title">
+              <span>📲</span> Add to Home Screen
+            </div>
+            <div className="ios-steps">
+              <div className="ios-step-row"><div className="ios-step-num">1</div>Open in <strong>&nbsp;Safari&nbsp;</strong> if not already</div>
+              <div className="ios-step-row"><div className="ios-step-num">2</div>Tap&nbsp;<strong>⬆ Share</strong>&nbsp;at the bottom</div>
+              <div className="ios-step-row"><div className="ios-step-num">3</div>Tap&nbsp;<strong>"Add to Home Screen"</strong>&nbsp;→ Add</div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Primary CTA ── */}
+        {installed ? (
+          <div className="btn-installed">
+            <span>✅</span> Afrizone Installed
+          </div>
+        ) : platform === "android" ? (
+          <button
+            className="btn-install"
+            onClick={handleAndroidInstall}
+            disabled={installing}
+          >
+            <span className="dl-icon">
+              {installing ? (
+                <span className="spinner" />
+              ) : (
+                <svg className="dl-arrow" viewBox="0 0 24 24">
+                  <path d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16" />
+                </svg>
+              )}
+            </span>
+            {installing ? "Installing…" : "Install Free — Android"}
+          </button>
         ) : (
-          <button className="btn-install" onClick={() => setShowIOSGuide(true)}>
-            ↓ &nbsp;Install Free — iPhone
+          // iOS — the button opens Share sheet hint inline above; nothing to tap here
+          // But we still show it as visual affordance — tapping scrolls them to the steps
+          <button
+            className="btn-install"
+            onClick={() => {
+              document.querySelector(".ios-banner")?.scrollIntoView({ behavior: "smooth" });
+            }}
+          >
+            <span className="dl-icon">
+              <svg className="dl-arrow" viewBox="0 0 24 24">
+                <path d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16" />
+              </svg>
+            </span>
+            Install Free — iPhone
           </button>
         )}
 
@@ -287,34 +452,6 @@ export default function DownloadPage() {
           Continue as Guest
         </button>
       </div>
-
-      {/* iOS bottom-sheet — slides up when tapped */}
-      {showIOSGuide && (
-        <>
-          <div className="overlay-bg" onClick={() => setShowIOSGuide(false)} />
-          <div className="ios-guide">
-            <div className="ios-guide-handle" />
-            <h3>Add to Home Screen</h3>
-            <div className="ios-step">
-              <div className="ios-step-icon">🌐</div>
-              <p className="ios-step-text">Open this page in <strong>Safari</strong> (not Chrome)</p>
-            </div>
-            <div className="ios-step">
-              <div className="ios-step-icon">⬆️</div>
-              <p className="ios-step-text">Tap the <strong>Share</strong> button at the bottom</p>
-            </div>
-            <div className="ios-step">
-              <div className="ios-step-icon">➕</div>
-              <p className="ios-step-text">Tap <strong>"Add to Home Screen"</strong> → <strong>Add</strong></p>
-            </div>
-            <div className="ios-step">
-              <div className="ios-step-icon">🎉</div>
-              <p className="ios-step-text">Open <strong>Afrizone</strong> from your home screen</p>
-            </div>
-            <button className="btn-got-it" onClick={() => setShowIOSGuide(false)}>Got it</button>
-          </div>
-        </>
-      )}
     </>
   );
 }
