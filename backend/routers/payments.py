@@ -81,37 +81,75 @@ def create_checkout(
 
     # Return existing payment intent if already created
     if order.stripe_payment_intent_id:
-        pi = stripe.PaymentIntent.retrieve(order.stripe_payment_intent_id)
-        return {"client_secret": pi.client_secret, "payment_intent_id": pi.id}
+        try:
+            pi = stripe.PaymentIntent.retrieve(order.stripe_payment_intent_id)
+            return {"client_secret": pi.client_secret, "payment_intent_id": pi.id}
+        except Exception as e:
+            print(f"[Checkout] Failed to retrieve existing PaymentIntent: {e}")
+            # Fall through to create a new one
 
     store = db.query(models.Store).filter(models.Store.id == order.store_id).first()
-    amount_cents = int(order.total * 100)
-    platform_fee_cents = int(order.platform_fee * 100)
+    if not store:
+        raise HTTPException(status_code=404, detail="Store not found for this order")
+
+    # ── Null-safe amount calculation ───────────────────────────
+    order_total = order.total or 0
+    order_platform_fee = order.platform_fee or 0
+
+    # Recalculate from subtotal + shipping if total is 0 or missing
+    if order_total <= 0:
+        subtotal = order.subtotal or sum(
+            (i.unit_price or 0) * (i.quantity or 1) for i in (order.items or [])
+        )
+        shipping = order.shipping_cost or 0
+        order_total = subtotal + shipping
+        print(f"[Checkout] order.total was missing — recalculated: ${order_total:.2f}")
+
+    if order_total <= 0:
+        raise HTTPException(status_code=400, detail="Order total is $0 — cannot process payment")
+
+    # Recalculate platform fee if missing
+    if order_platform_fee <= 0:
+        order_platform_fee = round(order_total * (PLATFORM_FEE_PERCENT / 100), 2)
+        print(f"[Checkout] order.platform_fee was missing — recalculated: ${order_platform_fee:.2f}")
+
+    amount_cents = int(order_total * 100)
+    platform_fee_cents = int(order_platform_fee * 100)
+
+    print(f"[Checkout] order_id={order.id} total=${order_total:.2f} fee=${order_platform_fee:.2f} "
+          f"store={store.id} stripe_acct={store.stripe_account_id} "
+          f"onboarded={store.stripe_onboarding_complete}")
 
     kwargs = dict(
         amount=amount_cents,
         currency="usd",
-        metadata={"order_id": order.id, "buyer_id": current_user.id, "store_id": store.id},
+        metadata={
+            "order_id": order.id,
+            "buyer_id": current_user.id,
+            "store_id": store.id,
+        },
         automatic_payment_methods={"enabled": True},
-        # Stripe Tax: automatically calculates + collects sales tax (US states)
-        # Requires Stripe Tax to be enabled in your Stripe Dashboard
-        # automatic_tax={"enabled": True},  # Uncomment after enabling Stripe Tax in Dashboard
     )
 
     # Use Connect transfer only if seller has completed Stripe onboarding
     if store.stripe_account_id and store.stripe_onboarding_complete:
         kwargs["application_fee_amount"] = platform_fee_cents
         kwargs["transfer_data"] = {"destination": store.stripe_account_id}
+        print(f"[Checkout] Using Connect transfer → {store.stripe_account_id}")
     else:
-        # Seller not connected: hold full payment in Afrizone account
-        # Funds will be manually transferred once seller completes onboarding
-        # platform_fee still recorded, seller_amount held for future payout
         kwargs["metadata"]["payout_status"] = "held_pending_seller_connect"
+        print(f"[Checkout] Seller not connected — holding full payment in Afrizone account")
 
-    payment_intent = stripe.PaymentIntent.create(**kwargs)
+    try:
+        payment_intent = stripe.PaymentIntent.create(**kwargs)
+    except stripe.error.StripeError as e:
+        print(f"[Checkout] Stripe error: {e}")
+        raise HTTPException(status_code=502, detail=f"Stripe error: {e.user_message or str(e)}")
+
     order.stripe_payment_intent_id = payment_intent.id
     db.commit()
 
+    print(f"[Checkout] PaymentIntent created: {payment_intent.id}")
     return {"client_secret": payment_intent.client_secret, "payment_intent_id": payment_intent.id}
 
 
@@ -147,12 +185,10 @@ async def stripe_webhook(
                 )
                 db.add(payout)
                 db.commit()
-                # Email buyer confirmation + seller notification after payment confirmed
                 try:
                     from utils.email import send_order_confirmation, send_new_order_to_seller
                     email_items = [{"name": i.product.name, "quantity": i.quantity, "price": i.unit_price} for i in order.items]
                     buyer = db.query(models.User).filter(models.User.id == order.buyer_id).first()
-                    # Buyer confirmation
                     if buyer:
                         send_order_confirmation(
                             buyer_email=buyer.email,
@@ -164,7 +200,6 @@ async def stripe_webhook(
                             total=order.total,
                             store_name=store.name if store else "Afrizone",
                         )
-                    # Seller notification
                     seller_email = store.owner.email if store and store.owner else None
                     if seller_email:
                         send_new_order_to_seller(
@@ -176,7 +211,6 @@ async def stripe_webhook(
                             seller_amount=order.seller_amount,
                             buyer_name=buyer.full_name if buyer else "Customer",
                         )
-                    # Push notification to seller
                     try:
                         from routers.push_notifications import send_push_to_user
                         if store and store.owner_id:
@@ -189,7 +223,6 @@ async def stripe_webhook(
                             )
                     except Exception as pe:
                         print(f"Push error: {pe}")
-
                 except Exception as e:
                     print(f"Email error: {e}")
 
