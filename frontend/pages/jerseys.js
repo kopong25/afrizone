@@ -331,19 +331,18 @@ export default function JerseysPage() {
                   <div key={team.country} className="kit-card rounded-3xl overflow-hidden bg-gray-900 border border-white/10">
                     <div className="relative h-72 overflow-hidden">
 
-                      {/* Ghana: show real jersey image prominently */}
-                      {team.country === "Ghana" ? (
+                      {/* Teams with real Cloudinary jersey images — show clearly without color wash */}
+                      {team.affiliateUrl ? (
                         <>
-                          <div className="absolute inset-0 bg-gradient-to-br from-[#006B3F] to-[#003d1f]" />
+                          <div className="absolute inset-0 bg-gray-900" />
                           <img
                             src={team.image}
-                            alt="Ghana Black Stars Puma World Cup 2026 Jersey"
+                            alt={`${team.country} World Cup 2026 Jersey`}
                             className="ghana-img absolute inset-0"
                           />
                           <div className="img-overlay absolute inset-0"/>
-                          {/* Puma branding badge */}
                           <div className="absolute top-4 left-4 puma-badge text-yellow-400 text-xs font-black px-3 py-1 rounded-lg tracking-widest">
-                            PUMA
+                            {team.kit_maker.toUpperCase()}
                           </div>
                         </>
                       ) : (
