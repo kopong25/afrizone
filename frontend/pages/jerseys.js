@@ -17,16 +17,16 @@ const AFRICAN_TEAMS = [
 ];
 
 const WORLD_TEAMS = [
-  { country: "Brazil", flag: "🇧🇷", accent: "#009C3B", price: "$94.99", hot: true },
-  { country: "Argentina", flag: "🇦🇷", accent: "#74ACDF", price: "$94.99", hot: true },
-  { country: "France", flag: "🇫🇷", accent: "#002395", price: "$94.99", hot: true },
-  { country: "England", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", accent: "#CF081F", price: "$89.99", hot: true },
+  { country: "Brazil", flag: "🇧🇷", accent: "#009C3B", price: "$94.99", hot: true, affiliateUrl: "https://fanatics.93n6tx.net/BRAZILnt" },
+  { country: "Argentina", flag: "🇦🇷", accent: "#74ACDF", price: "$94.99", hot: true, affiliateUrl: "https://fanatics.93n6tx.net/ARGENTINAnt" },
+  { country: "France", flag: "🇫🇷", accent: "#002395", price: "$94.99", hot: true, affiliateUrl: "https://fanatics.93n6tx.net/FRANCE" },
+  { country: "England", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", accent: "#CF081F", price: "$89.99", hot: true, affiliateUrl: "https://fanatics.93n6tx.net/ENGLAND" },
   { country: "Spain", flag: "🇪🇸", accent: "#AA151B", price: "$89.99", hot: false },
-  { country: "Germany", flag: "🇩🇪", accent: "#000000", price: "$89.99", hot: false },
-  { country: "Portugal", flag: "🇵🇹", accent: "#006600", price: "$89.99", hot: true },
-  { country: "Netherlands", flag: "🇳🇱", accent: "#FF6600", price: "$89.99", hot: false },
-  { country: "USA", flag: "🇺🇸", accent: "#002868", price: "$84.99", hot: true },
-  { country: "Mexico", flag: "🇲🇽", accent: "#006847", price: "$84.99", hot: false },
+  { country: "Germany", flag: "🇩🇪", accent: "#000000", price: "$89.99", hot: false, affiliateUrl: "https://fanatics.93n6tx.net/GERMANY" },
+  { country: "Portugal", flag: "🇵🇹", accent: "#006600", price: "$89.99", hot: true, affiliateUrl: "https://fanatics.93n6tx.net/PORTUGAL" },
+  { country: "Netherlands", flag: "🇳🇱", accent: "#FF6600", price: "$89.99", hot: false, affiliateUrl: "https://fanatics.93n6tx.net/NETHALANDS" },
+  { country: "USA", flag: "🇺🇸", accent: "#002868", price: "$84.99", hot: true, affiliateUrl: "https://fanatics.93n6tx.net/USA" },
+  { country: "Mexico", flag: "🇲🇽", accent: "#006847", price: "$84.99", hot: false, affiliateUrl: "https://fanatics.93n6tx.net/MEXICO" },
   { country: "Canada", flag: "🇨🇦", accent: "#FF0000", price: "$84.99", hot: false },
   { country: "Japan", flag: "🇯🇵", accent: "#BC002D", price: "$84.99", hot: false },
   { country: "Colombia", flag: "🇨🇴", accent: "#FCD116", price: "$84.99", hot: false },
@@ -507,7 +507,7 @@ export default function JerseysPage() {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                   {filteredWorld.map(t=>(
-                    <a key={t.country} href={FANATICS_URL} target="_blank" rel="noopener noreferrer"
+                    <a key={t.country} href={t.affiliateUrl || FANATICS_URL} target="_blank" rel="noopener noreferrer"
                       className="world-row glass rounded-2xl p-4 flex items-center gap-3 group">
                       <span className="text-3xl">{t.flag}</span>
                       <div className="min-w-0">
