@@ -39,6 +39,47 @@ MAX_DELIVERY_MILES = 20
 SANDBOX_BASE_FEE   = 3.50   # dollars
 SANDBOX_PER_MILE   = 0.90   # dollars per mile
 
+# ── Zone Pricing Table ─────────────────────────────────────────────────────────
+DELIVERY_ZONES = [
+    {
+        "zone":      "zone_1",
+        "label":     "Nearby",
+        "min_miles": 0,
+        "max_miles": 3,
+        "charge":    5.99,
+        "uber_est":  3.50,
+        "profit":    2.49,
+    },
+    {
+        "zone":      "zone_2",
+        "label":     "Local",
+        "min_miles": 3,
+        "max_miles": 7,
+        "charge":    8.99,
+        "uber_est":  5.50,
+        "profit":    3.49,
+    },
+    {
+        "zone":      "zone_3",
+        "label":     "Extended",
+        "min_miles": 7,
+        "max_miles": 12,
+        "charge":    12.99,
+        "uber_est":  8.50,
+        "profit":    4.49,
+    },
+    {
+        "zone":      "zone_4",
+        "label":     "Far",
+        "min_miles": 12,
+        "max_miles": 20,
+        "charge":    16.99,
+        "uber_est":  12.00,
+        "profit":    4.99,
+    },
+]
+
+
 def estimate_uber_cost(distance_miles: float) -> float:
     """Estimate Uber Direct cost for sandbox mode."""
     return round(SANDBOX_BASE_FEE + (SANDBOX_PER_MILE * distance_miles), 2)
@@ -65,6 +106,22 @@ def get_zone_label(miles: float) -> str:
     if miles <= 7:   return "Local"
     if miles <= 12:  return "Extended"
     return "Far"
+
+
+def get_zone_for_distance(distance_miles: float) -> dict | None:
+    """
+    Return the matching zone dict for a given distance, or None if out of range.
+    Used to determine delivery pricing tier.
+    """
+    if distance_miles > MAX_DELIVERY_MILES:
+        return None
+    for zone in DELIVERY_ZONES:
+        if zone["min_miles"] <= distance_miles < zone["max_miles"]:
+            return zone
+    # Edge case: exactly at max boundary
+    if distance_miles == MAX_DELIVERY_MILES:
+        return DELIVERY_ZONES[-1]
+    return None
 
 
 async def get_uber_fee(store, customer_lat: float, customer_lng: float, customer_address: str = "") -> float:
@@ -188,13 +245,10 @@ async def get_delivery_quote(
     if getattr(store, "delivery_type", None) not in ["local_delivery", "both"]:
         raise HTTPException(status_code=400, detail="This store does not offer local delivery")
 
-    # Use store address coords if available — fallback to city-center mock for sandbox
-    # In production sellers set their lat/lng on store profile
     store_lat = getattr(store, 'latitude', None)
     store_lng = getattr(store, 'longitude', None)
 
     if not store_lat or not store_lng:
-        # Sandbox mode: use placeholder distance for testing
         if UBER_SANDBOX:
             distance_miles = 4.2  # Fixed sandbox distance
         else:
@@ -213,7 +267,6 @@ async def get_delivery_quote(
             "distance_miles": round(distance_miles, 1),
         }
 
-    # If Uber Direct is configured, get live quote; otherwise return zone estimate
     uber_quote_id = None
     estimated_minutes = 45  # default estimate
 
@@ -345,7 +398,6 @@ async def dispatch_uber_driver(
             delivery_id = data.get("id")
             tracking_url = data.get("tracking_url")
 
-            # Update order with Uber tracking
             order.status = models.OrderStatus.shipped
             order.tracking_number = delivery_id
             order.tracking_url = tracking_url
@@ -385,7 +437,6 @@ async def get_delivery_status(
     if not order.tracking_number or not order.tracking_number.startswith("UBER"):
         return {"status": order.status, "uber_delivery": False}
 
-    # Sandbox response
     if UBER_SANDBOX or order.tracking_number.startswith("UBER-SANDBOX"):
         return {
             "status": "en_route_to_dropoff",
@@ -395,7 +446,6 @@ async def get_delivery_status(
             "eta_minutes": 12,
         }
 
-    # Live status from Uber
     try:
         token = await get_uber_token()
         delivery_id = order.tracking_number
@@ -434,7 +484,6 @@ async def uber_webhook(
 
     print(f"[Uber Webhook] {event_type} — delivery {delivery_id}")
 
-    # Find order by tracking number
     order = db.query(models.Order).filter(
         models.Order.tracking_number == delivery_id
     ).first()
@@ -467,17 +516,16 @@ async def get_delivery_options(
 ):
     """
     Core routing logic — called from checkout when customer enters their address.
-    
+
     Logic:
     - Distance >= 15 miles → USPS Priority Mail only ($6.99, 1-3 days)
     - Distance < 15 miles + grocery/fashion/beauty store → USPS Standard ($4.99, 2-3 days)
     - Distance < 15 miles + restaurant store → Uber Express ($9.99, ~45min)
     - Distance < 15 miles + both delivery types → show both options
-    
+
     Payload: { store_id, customer_lat, customer_lng, customer_address }
     """
     store_id      = payload.get("store_id")
-    # Safely handle None values — customer may not have GPS enabled
     _lat = payload.get("customer_lat")
     _lng = payload.get("customer_lng")
     customer_lat  = float(_lat) if _lat is not None else 0.0
@@ -489,7 +537,6 @@ async def get_delivery_options(
 
     store = db.query(models.Store).filter(models.Store.id == store_id).first()
     if not store:
-        # Store not found — return safe USPS fallback instead of 404
         return {
             "distance_miles": None,
             "store_vendor_type": None,
@@ -503,7 +550,6 @@ async def get_delivery_options(
     if getattr(store, "latitude", None) and getattr(store, "longitude", None) and customer_lat and customer_lng:
         distance_miles = haversine_miles(getattr(store, "latitude", 0), getattr(store, "longitude", 0), customer_lat, customer_lng)
     elif UBER_SANDBOX:
-        # Sandbox: use mock distance so checkout can be tested without real coords
         distance_miles = 4.2
     else:
         distance_miles = None
@@ -539,7 +585,6 @@ async def get_delivery_options(
     zone = get_zone_for_distance(distance_miles)
 
     if is_restaurant and offers_local:
-        # Restaurant + local delivery → Uber Express, price = Uber cost + $2 margin
         uber_cost = await get_uber_fee(store, customer_lat, customer_lng, payload.get("customer_address", ""))
         uber_price = customer_price(uber_cost)
         zone_label = get_zone_label(distance_miles)
@@ -558,7 +603,6 @@ async def get_delivery_options(
         })
 
     if not is_restaurant and (offers_shipping or getattr(store, "delivery_type", None) == "both"):
-        # Non-restaurant within 15 miles → USPS Standard
         options.append({
             "id":           "usps_standard",
             "label":        "USPS Standard Shipping",
@@ -571,7 +615,6 @@ async def get_delivery_options(
         })
 
     if getattr(store, "delivery_type", None) == "both" and not is_restaurant:
-        # Grocery/other offering both — also show local delivery as an option
         uber_cost2 = await get_uber_fee(store, customer_lat, customer_lng, payload.get("customer_address", ""))
         uber_price2 = customer_price(uber_cost2)
         options.append({
