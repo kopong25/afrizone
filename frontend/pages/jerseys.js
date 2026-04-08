@@ -5,7 +5,7 @@ import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 
 const AFRICAN_TEAMS = [
-  { country: "Ghana", flag: "🇬🇭", nickname: "Black Stars", kit_maker: "Puma", accent: "#FCD116", bg: "from-[#006B3F] to-[#003d1f]", image: "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=600&h=700&fit=crop", price: "$89.99", description: "5th World Cup. The Black Stars shine gold.", hot: true },
+  { country: "Ghana", flag: "🇬🇭", nickname: "Black Stars", kit_maker: "Puma", accent: "#FCD116", bg: "from-[#006B3F] to-[#003d1f]", image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1775685575/Ghana_Jersey_ttshee.jpg", price: "$89.99", description: "5th World Cup. The Black Stars shine gold.", hot: true, affiliateUrl: "https://fanatics.93n6tx.net/blackstars" },
   { country: "Morocco", flag: "🇲🇦", nickname: "Atlas Lions", kit_maker: "Puma", accent: "#C1272D", bg: "from-[#C1272D] to-[#7a0000]", image: "https://images.unsplash.com/photo-1543326727-cf6c39e8f84c?w=600&h=700&fit=crop", price: "$89.99", description: "Qatar 2022 semi-finalists. Africa's pride.", hot: true },
   { country: "Senegal", flag: "🇸🇳", nickname: "Lions of Teranga", kit_maker: "Puma", accent: "#FDEF42", bg: "from-[#00853F] to-[#004d24]", image: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600&h=700&fit=crop", price: "$89.99", description: "AFCON Champions. Mane's nation.", hot: true },
   { country: "Egypt", flag: "🇪🇬", nickname: "Pharaohs", kit_maker: "Adidas", accent: "#CE1126", bg: "from-[#CE1126] to-[#800000]", image: "https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?w=600&h=700&fit=crop", price: "$84.99", description: "Salah leads the Pharaohs. 7x AFCON winners.", hot: true },
@@ -225,6 +225,18 @@ export default function JerseysPage() {
           transition: transform 0.4s cubic-bezier(.34,1.56,.64,1);
         }
         .kit-card:hover .club-img { transform: scale(1.08) translateY(-6px); }
+        .ghana-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: center top;
+          transition: transform 0.4s cubic-bezier(.34,1.56,.64,1);
+        }
+        .kit-card:hover .ghana-img { transform: scale(1.06); }
+        .puma-badge {
+          background: linear-gradient(135deg, #000 0%, #222 100%);
+          border: 1px solid rgba(252,209,22,0.4);
+        }
       `}</style>
 
       <Navbar />
@@ -318,11 +330,35 @@ export default function JerseysPage() {
                 {AFRICAN_TEAMS.map(team=>(
                   <div key={team.country} className="kit-card rounded-3xl overflow-hidden bg-gray-900 border border-white/10">
                     <div className="relative h-72 overflow-hidden">
-                      <div className={`absolute inset-0 bg-gradient-to-br ${team.bg} opacity-80`}/>
-                      <img src={team.image} alt={`${team.country} World Cup 2026 Jersey`} className="w-full h-full object-cover mix-blend-overlay"/>
-                      <div className="img-overlay absolute inset-0"/>
-                      {team.hot && <div className="hot-badge absolute top-4 right-4 bg-red-500 text-white text-xs font-black px-3 py-1 rounded-full">HOT</div>}
-                      <div className="absolute top-4 left-4 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded-lg">{team.kit_maker}</div>
+
+                      {/* Ghana: show real jersey image prominently */}
+                      {team.country === "Ghana" ? (
+                        <>
+                          <div className="absolute inset-0 bg-gradient-to-br from-[#006B3F] to-[#003d1f]" />
+                          <img
+                            src={team.image}
+                            alt="Ghana Black Stars Puma World Cup 2026 Jersey"
+                            className="ghana-img absolute inset-0"
+                          />
+                          <div className="img-overlay absolute inset-0"/>
+                          {/* Puma branding badge */}
+                          <div className="absolute top-4 left-4 puma-badge text-yellow-400 text-xs font-black px-3 py-1 rounded-lg tracking-widest">
+                            PUMA
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className={`absolute inset-0 bg-gradient-to-br ${team.bg} opacity-80`}/>
+                          <img src={team.image} alt={`${team.country} World Cup 2026 Jersey`} className="w-full h-full object-cover mix-blend-overlay"/>
+                          <div className="img-overlay absolute inset-0"/>
+                          <div className="absolute top-4 left-4 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded-lg">{team.kit_maker}</div>
+                        </>
+                      )}
+
+                      {team.hot && (
+                        <div className="hot-badge absolute top-4 right-4 bg-red-500 text-white text-xs font-black px-3 py-1 rounded-full">HOT</div>
+                      )}
+
                       <div className="absolute bottom-0 left-0 right-0 p-5">
                         <div className="flex items-center gap-3">
                           <span className="text-4xl">{team.flag}</span>
@@ -333,6 +369,7 @@ export default function JerseysPage() {
                         </div>
                       </div>
                     </div>
+
                     <div className="p-5">
                       <p className="text-gray-400 text-sm mb-4">{team.description}</p>
                       <div className="flex items-center justify-between">
@@ -340,9 +377,13 @@ export default function JerseysPage() {
                           <p className="text-xs text-gray-500 uppercase tracking-wider">From</p>
                           <p className="text-2xl font-black text-white">{team.price}</p>
                         </div>
-                        <a href={FANATICS_URL} target="_blank" rel="noopener noreferrer"
-                          className="buy-btn text-black font-black px-6 py-3 rounded-xl text-sm">
-                          Buy Kit
+                        <a
+                          href={team.affiliateUrl || FANATICS_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="buy-btn text-black font-black px-6 py-3 rounded-xl text-sm"
+                        >
+                          {team.country === "Ghana" ? "Buy Black Stars Kit" : "Buy Kit"}
                         </a>
                       </div>
                     </div>
@@ -447,7 +488,7 @@ export default function JerseysPage() {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                   {AFRICAN_TEAMS.map(t=>(
-                    <a key={t.country} href={FANATICS_URL} target="_blank" rel="noopener noreferrer"
+                    <a key={t.country} href={t.affiliateUrl || FANATICS_URL} target="_blank" rel="noopener noreferrer"
                       className="world-row glass rounded-2xl p-4 flex items-center gap-3 group">
                       <span className="text-3xl">{t.flag}</span>
                       <div className="min-w-0">
