@@ -1,4 +1,5 @@
 import { Html, Head, Main, NextScript } from "next/document";
+
 export default function Document() {
   return (
     <Html lang="en">
@@ -9,9 +10,10 @@ export default function Document() {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
 
-        {/* ── Favicon — inline SVG fallback so browser never hangs waiting for a file ── */}
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231A5C38'/><text y='.9em' font-size='80' x='10'>🌍</text></svg>" />
-        <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231A5C38'/><text y='.9em' font-size='80' x='10'>🌍</text></svg>" />
+        {/* ── Favicon ── */}
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" href="/logo.png" />
+        <link rel="shortcut icon" href="/favicon.ico" />
 
         {/* ── PWA ── */}
         <link rel="manifest" href="/manifest.json" />
@@ -23,8 +25,8 @@ export default function Document() {
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="format-detection" content="telephone=no" />
 
-        {/* ── Apple touch icons — only if files actually exist in /public/icons/ ── */}
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        {/* ── Apple touch icons ── */}
+        <link rel="apple-touch-icon" href="/logo.png" />
         <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
 
@@ -35,6 +37,7 @@ export default function Document() {
         <meta property="og:description" content="Shop authentic African products from stores across the diaspora." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://afrizoneshop.com" />
+        <meta property="og:image" content="/logo.png" />
         <meta name="twitter:card" content="summary_large_image" />
 
         {/* ── Impact.com affiliate verification ── */}
