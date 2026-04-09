@@ -7,7 +7,6 @@ const withPWA = require("next-pwa")({
 
   // Stop Workbox from doing background HEAD checks on navigation routes
   cacheOnFrontEndNav: false,     // ← prevents HEAD polls on every page visit
-  aggressiveFrontEndNavCaching: false,
 
   runtimeCaching: [
     // ── 1. Your own pages — NetworkFirst, short timeout, no HEAD polling ──
