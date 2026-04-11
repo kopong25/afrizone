@@ -10,11 +10,14 @@ import { productsAPI, ordersAPI, reviewsAPI, wishlistAPI, variantsAPI } from "..
 import { useAuth, fbq } from "../_app";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { FiShoppingCart, FiMapPin, FiPackage, FiShare2, FiHeart, FiCheck } from "react-icons/fi";
+import { FiShoppingCart, FiMapPin, FiPackage, FiShare2, FiHeart, FiCheck, FiEdit3 } from "react-icons/fi";
+
+// Tags that enable jersey customization
+const JERSEY_TAGS = ["jersey","jerseys","kit","football kit","soccer jersey","customizable","custom jersey","sportswear"];
 
 export default function ProductDetail() {
   const router = useRouter();
-  const { id: slug } = router.query; // file is [id].js so Next.js uses "id" param
+  const { id: slug } = router.query;
   const { user } = useAuth();
   const [product, setProduct] = useState(null);
   const [reviews, setReviews] = useState([]);
@@ -28,15 +31,19 @@ export default function ProductDetail() {
   const [wishlisted, setWishlisted] = useState(false);
   const [selectedVariants, setSelectedVariants] = useState({});
 
+  // ── Jersey Customization State ──────────────────────────────
+  const [customizeJersey, setCustomizeJersey] = useState(false);
+  const [jerseyName, setJerseyName] = useState("");
+  const [jerseyNumber, setJerseyNumber] = useState("");
+  const [customizationFee, setCustomizationFee] = useState(0);
+
   useEffect(() => {
     if (!slug) return;
-    // Timeout fallback in case SW hangs the request
     const timeout = setTimeout(() => setLoading(false), 8000);
     productsAPI.get(slug).then((prodRes) => {
       const p = prodRes.data;
       setProduct(p);
       trackProductView(p);
-      // Facebook Pixel: ViewContent
       fbq("track", "ViewContent", {
         content_ids: [String(p.id)],
         content_name: p.name,
@@ -45,12 +52,21 @@ export default function ProductDetail() {
         currency: "USD",
       });
       reviewsAPI.getForProduct(p.id).then((r) => setReviews(Array.isArray(r.data) ? r.data : [])).catch(() => {});
-      variantsAPI.getForProduct(p.id).then((r) => setVariants(Array.isArray(r.data) ? r.data : [])).catch(() => {});
+      variantsAPI.getForProduct(p.id).then((r) => {
+        const vArr = Array.isArray(r.data) ? r.data : [];
+        setVariants(vArr);
+        // Check for customization fee variant
+        const custFee = vArr.find(v => v.name?.toLowerCase() === "customization");
+        if (custFee) setCustomizationFee(custFee.price_modifier || 0);
+      }).catch(() => {});
       if (user) {
         wishlistAPI.getIds().then((r) => setWishlisted((r.data || []).includes(p.id))).catch(() => {});
       }
     }).catch(() => { setError(true); }).finally(() => { clearTimeout(timeout); setLoading(false); });
   }, [slug, user]);
+
+  // Detect if this product supports jersey customization
+  const isJerseyProduct = product?.tags?.some(t => JERSEY_TAGS.includes(t.toLowerCase())) ?? false;
 
   const toggleWishlist = async () => {
     if (!user) { router.push("/login"); return; }
@@ -63,8 +79,7 @@ export default function ProductDetail() {
 
   const addToCart = async () => {
     if (!user) { router.push("/login"); return; }
-    // Require variant selection if variants exist
-    const requiredGroups = Object.keys(variantGroups);
+    const requiredGroups = Object.keys(variantGroups).filter(g => g.toLowerCase() !== "customization");
     if (requiredGroups.length > 0) {
       const missing = requiredGroups.filter(g => !selectedVariants[g]);
       if (missing.length > 0) {
@@ -72,18 +87,33 @@ export default function ProductDetail() {
         return;
       }
     }
+    // Validate customization if enabled
+    if (customizeJersey && isJerseyProduct) {
+      if (!jerseyName.trim() && !jerseyNumber.trim()) {
+        toast.error("Please enter a name or number for customization, or uncheck it");
+        return;
+      }
+    }
     setAddingToCart(true);
     try {
-      // Get the first selected variant id (if any) for cart storage
-      const firstVariant = Object.values(selectedVariants)[0];
-      const variantLabel = Object.entries(selectedVariants)
-        .map(([name, v]) => `${name}: ${v.value}`)
-        .join(", ");
+      const firstVariant = Object.values(selectedVariants).find(v => v?.name?.toLowerCase() !== "customization");
+      const variantParts = Object.entries(selectedVariants)
+        .filter(([name]) => name.toLowerCase() !== "customization")
+        .map(([name, v]) => `${name}: ${v.value}`);
+
+      // Build customization note
+      const customNote = customizeJersey && isJerseyProduct && (jerseyName || jerseyNumber)
+        ? `Custom: ${jerseyName ? `Name="${jerseyName.toUpperCase()}"` : ""}${jerseyName && jerseyNumber ? " " : ""}${jerseyNumber ? `#${jerseyNumber}` : ""}`
+        : null;
+
+      const allParts = [...variantParts, ...(customNote ? [customNote] : [])];
+      const variantLabel = allParts.join(", ") || null;
+
       await ordersAPI.addToCart({
         product_id: product.id,
         quantity,
         variant_id: firstVariant?.id || null,
-        variant_label: variantLabel || null,
+        variant_label: variantLabel,
       });
       setAddedToCart(true);
       fbq("track", "AddToCart", {
@@ -92,23 +122,23 @@ export default function ProductDetail() {
         value: finalPrice,
         currency: "USD",
       });
-      toast.success(`Added to cart!${variantLabel ? ` (${variantLabel})` : ""}`);
+      toast.success(`Added to cart!${customNote ? ` (${customNote})` : variantLabel ? ` (${variantLabel})` : ""}`);
       setTimeout(() => setAddedToCart(false), 3000);
     } catch (err) {
       toast.error(err.response?.data?.detail || "Failed to add to cart");
     } finally { setAddingToCart(false); }
   };
 
-  // Group variants by name (e.g. "Size": [S, M, L], "Color": [Red, Blue])
   const variantGroups = variants.reduce((acc, v) => {
+    if (v.name?.toLowerCase() === "customization") return acc; // skip customization variant from display
     if (!acc[v.name]) acc[v.name] = [];
     acc[v.name].push(v);
     return acc;
   }, {});
 
-  // Calculate price with variant modifiers
   const variantModifier = Object.values(selectedVariants).reduce((sum, v) => sum + (v?.price_modifier || 0), 0);
-  const finalPrice = product ? Number(product.price) + variantModifier : 0;
+  const customizationCharge = customizeJersey && isJerseyProduct ? customizationFee : 0;
+  const finalPrice = product ? Number(product.price) + variantModifier + customizationCharge : 0;
 
   if (loading) return (
     <>
@@ -133,9 +163,7 @@ export default function ProductDetail() {
         <div className="text-6xl mb-4">😕</div>
         <h2 className="text-2xl font-black text-gray-900 mb-2">Product not found</h2>
         <p className="text-gray-500 mb-6">This product may have been removed or the link is incorrect.</p>
-        <Link href="/" className="bg-green-900 hover:bg-green-800 text-white font-bold px-8 py-3 rounded-xl transition-colors inline-block">
-          Back to Shop
-        </Link>
+        <Link href="/" className="bg-green-900 hover:bg-green-800 text-white font-bold px-8 py-3 rounded-xl transition-colors inline-block">Back to Shop</Link>
       </div>
     </>
   );
@@ -167,6 +195,11 @@ export default function ProductDetail() {
               )}
               {discount > 0 && (
                 <div className="absolute top-4 left-4 bg-red-500 text-white text-sm font-black px-3 py-1 rounded-full">-{discount}%</div>
+              )}
+              {isJerseyProduct && (
+                <div className="absolute top-4 right-4 bg-green-900 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                  <FiEdit3 size={11} /> Custom Available
+                </div>
               )}
             </div>
             {images.length > 1 && (
@@ -204,7 +237,8 @@ export default function ProductDetail() {
               {product.compare_price && <span className="text-xl text-gray-300 line-through">${Number(product.compare_price).toFixed(2)}</span>}
               {discount > 0 && <span className="bg-red-100 text-red-700 text-sm font-bold px-2.5 py-0.5 rounded-full">Save {discount}%</span>}
             </div>
-            {variantModifier !== 0 && <p className="text-xs text-gray-400 mb-1">Base price: ${Number(product.price).toFixed(2)} {variantModifier > 0 ? `+$${variantModifier.toFixed(2)}` : `-$${Math.abs(variantModifier).toFixed(2)}`} for selected options</p>}
+            {variantModifier !== 0 && <p className="text-xs text-gray-400 mb-1">Base: ${Number(product.price).toFixed(2)} {variantModifier > 0 ? `+$${variantModifier.toFixed(2)}` : `-$${Math.abs(variantModifier).toFixed(2)}`}</p>}
+            {customizationCharge > 0 && <p className="text-xs text-green-700 font-semibold mb-1">+${customizationCharge.toFixed(2)} customization fee included</p>}
             <p className="text-sm text-gray-400 mb-5">
               {product.stock > 0 ? <span className="text-green-600 font-medium">✓ In stock</span> : <span className="text-red-500 font-medium">Out of stock</span>}
             </p>
@@ -251,6 +285,102 @@ export default function ProductDetail() {
               </div>
             ))}
 
+            {/* ── JERSEY CUSTOMIZATION BLOCK ── */}
+            {isJerseyProduct && (
+              <div className={`rounded-2xl mb-5 overflow-hidden border-2 transition-all ${customizeJersey ? "border-green-700" : "border-gray-200"}`}>
+                {/* Toggle header */}
+                <button
+                  onClick={() => setCustomizeJersey(!customizeJersey)}
+                  className={`w-full flex items-center justify-between p-4 transition-colors ${customizeJersey ? "bg-green-50" : "bg-gray-50 hover:bg-gray-100"}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${customizeJersey ? "bg-green-700 border-green-700" : "border-gray-300"}`}>
+                      {customizeJersey && <FiCheck size={12} className="text-white" strokeWidth={3} />}
+                    </div>
+                    <div className="text-left">
+                      <p className="font-black text-gray-900 text-sm flex items-center gap-2">
+                        <FiEdit3 size={14} className="text-green-700" />
+                        Customize Your Jersey
+                        {customizationFee > 0 && <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">+${customizationFee.toFixed(2)}</span>}
+                        {customizationFee === 0 && <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">FREE</span>}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">Add your name and/or number to this jersey</p>
+                    </div>
+                  </div>
+                  <span className={`text-gray-400 transition-transform ${customizeJersey ? "rotate-180" : ""}`}>▾</span>
+                </button>
+
+                {/* Customization form */}
+                {customizeJersey && (
+                  <div className="p-4 bg-white border-t border-gray-100">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      {/* Player Name */}
+                      <div className="col-span-2 md:col-span-1">
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1.5">
+                          Player Name <span className="text-gray-400 font-normal normal-case">(max 16 chars)</span>
+                        </label>
+                        <input
+                          value={jerseyName}
+                          onChange={e => setJerseyName(e.target.value.toUpperCase().replace(/[^A-Z\s]/g, "").slice(0, 16))}
+                          placeholder="E.G. MENSAH"
+                          className="w-full border-2 rounded-xl px-3 py-2.5 font-black text-center tracking-widest focus:outline-none focus:border-green-700 transition-colors placeholder-gray-300"
+                          style={{fontFamily:"monospace", fontSize:"16px", letterSpacing:"4px"}}
+                        />
+                        <p className="text-xs text-gray-400 mt-1 text-right">{jerseyName.length}/16</p>
+                      </div>
+
+                      {/* Jersey Number */}
+                      <div className="col-span-2 md:col-span-1">
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1.5">
+                          Jersey Number <span className="text-gray-400 font-normal normal-case">(1–99)</span>
+                        </label>
+                        <input
+                          type="number" min="1" max="99"
+                          value={jerseyNumber}
+                          onChange={e => {
+                            const val = e.target.value.replace(/\D/g, "").slice(0, 2);
+                            if (!val || (parseInt(val) >= 1 && parseInt(val) <= 99)) setJerseyNumber(val);
+                          }}
+                          placeholder="10"
+                          className="w-full border-2 rounded-xl px-3 py-2.5 font-black text-center focus:outline-none focus:border-green-700 transition-colors placeholder-gray-300"
+                          style={{fontSize:"28px"}}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Live Preview */}
+                    {(jerseyName || jerseyNumber) && (
+                      <div className="rounded-xl p-4 text-center mb-4 bg-green-900">
+                        <p className="text-xs text-green-400 uppercase tracking-widest mb-2">Back of Jersey Preview</p>
+                        {jerseyName && (
+                          <p className="text-white font-black tracking-widest text-xl leading-none mb-1"
+                            style={{letterSpacing:"6px", fontFamily:"Arial Black,sans-serif"}}>
+                            {jerseyName}
+                          </p>
+                        )}
+                        {jerseyNumber && (
+                          <p className="text-white font-black leading-none"
+                            style={{fontSize:"clamp(40px,8vw,72px)", fontFamily:"Arial Black,sans-serif"}}>
+                            {jerseyNumber}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Seller note */}
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+                      <p className="text-xs text-yellow-800 font-semibold flex items-center gap-1.5 mb-1">
+                        ℹ️ Customization Info
+                      </p>
+                      <p className="text-xs text-yellow-700">
+                        Your customization request will be included with your order. The seller will contact you to confirm details before processing.
+                        {customizationFee > 0 ? ` Customization fee: $${customizationFee.toFixed(2)}` : " Customization is free for this product."}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Quantity + Add to cart */}
             <div className="flex gap-3 mb-4">
               <div className="flex items-center border rounded-xl overflow-hidden">
@@ -292,13 +422,8 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {/* Recommendations */}
         <ProductRecommendations product={product} />
-
-        {/* Recently Viewed */}
         <RecentlyViewed currentProductId={product.id} />
-
-        {/* Reviews */}
         <div id="reviews">
           <ReviewSection productId={product.id} initialReviews={reviews} />
         </div>

@@ -59,121 +59,165 @@ const WORLD_TEAMS = [
 ];
 
 const CLUB_STARS = [
-  {
-    club: "Liverpool FC",
-    star: "Mohamed Salah",
-    country: "Egypt",
-    flag: "🇪🇬",
-    kit_maker: "Nike",
-    accent: "#C8102E",
-    price: "$89.99",
-    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327029/mosalah_zf0vzt.png",
-    affiliateUrl: "https://fanatics.93n6tx.net/AFmosalah",
-    description: "Egypt's King. Wear Salah's iconic red — #11 on your back.",
-    hot: true,
-  },
-  {
-    club: "Real Madrid",
-    star: "Vinicius Jr.",
-    country: "Brazil",
-    flag: "🇧🇷",
-    kit_maker: "Adidas",
-    accent: "#FEBE10",
-    price: "$94.99",
-    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327028/Nini_Jr_v0yxy1.png",
-    affiliateUrl: "https://fanatics.93n6tx.net/AFvinijr",
-    description: "Champions League royalty. Pure white. Vini magic.",
-    hot: true,
-  },
-  {
-    club: "Inter Miami",
-    star: "Lionel Messi",
-    country: "Argentina",
-    flag: "🇦🇷",
-    kit_maker: "Adidas",
-    accent: "#F7B5CD",
-    price: "$99.99",
-    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327028/messi_kogqno.png",
-    affiliateUrl: "https://fanatics.93n6tx.net/AFmessi",
-    description: "GOAT in the USA. Pink is the new legend.",
-    hot: true,
-  },
-  {
-    club: "Manchester City",
-    star: "Riyad Mahrez",
-    country: "Algeria",
-    flag: "🇩🇿",
-    kit_maker: "Puma",
-    accent: "#6CABDD",
-    price: "$89.99",
-    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327029/Marez_qr6dai.png",
-    affiliateUrl: "https://fanatics.93n6tx.net/AFmancityFC",
-    description: "Sky blue dominance. Algeria's finest.",
-    hot: false,
-  },
-  {
-    club: "Arsenal FC",
-    star: "Thomas Partey",
-    country: "Ghana",
-    flag: "🇬🇭",
-    kit_maker: "Adidas",
-    accent: "#EF0107",
-    price: "$89.99",
-    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327028/ARSENAL_cwm1zz.png",
-    affiliateUrl: "https://fanatics.93n6tx.net/ArsenalFC",
-    description: "Ghana's Gunner. North London red.",
-    hot: true,
-  },
-  {
-    club: "Bayern Munich",
-    star: "Sadio Mane",
-    country: "Senegal",
-    flag: "🇸🇳",
-    kit_maker: "Adidas",
-    accent: "#DC052D",
-    price: "$94.99",
-    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327028/FC_BAYAN_a4bqlx.png",
-    affiliateUrl: "https://fanatics.93n6tx.net/AFbayanfc",
-    description: "Bundesliga with a Senegalese heart.",
-    hot: false,
-  },
-  {
-    club: "Chelsea FC",
-    star: "Nicolas Jackson",
-    country: "Senegal",
-    flag: "🇸🇳",
-    kit_maker: "Nike",
-    accent: "#034694",
-    price: "$89.99",
-    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327028/Chelsea_kl5dmp.png",
-    affiliateUrl: "https://fanatics.93n6tx.net/AFchealseaNico",
-    description: "Senegal's rising star in blue.",
-    hot: false,
-  },
-  {
-    club: "Paris Saint-Germain",
-    star: "Achraf Hakimi",
-    country: "Morocco",
-    flag: "🇲🇦",
-    kit_maker: "Nike",
-    accent: "#004170",
-    price: "$94.99",
-    image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327028/paris_san_gemain_onujv1.png",
-    affiliateUrl: "https://fanatics.93n6tx.net/AFgemain",
-    description: "Morocco's heartbeat in Paris.",
-    hot: true,
-  },
+  { club: "Liverpool FC", star: "Mohamed Salah", country: "Egypt", flag: "🇪🇬", kit_maker: "Nike", accent: "#C8102E", price: "$89.99", image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327029/mosalah_zf0vzt.png", affiliateUrl: "https://fanatics.93n6tx.net/AFmosalah", description: "Egypt's King. Wear Salah's iconic red — #11 on your back.", hot: true },
+  { club: "Real Madrid", star: "Vinicius Jr.", country: "Brazil", flag: "🇧🇷", kit_maker: "Adidas", accent: "#FEBE10", price: "$94.99", image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327028/Nini_Jr_v0yxy1.png", affiliateUrl: "https://fanatics.93n6tx.net/AFvinijr", description: "Champions League royalty. Pure white. Vini magic.", hot: true },
+  { club: "Inter Miami", star: "Lionel Messi", country: "Argentina", flag: "🇦🇷", kit_maker: "Adidas", accent: "#F7B5CD", price: "$99.99", image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327028/messi_kogqno.png", affiliateUrl: "https://fanatics.93n6tx.net/AFmessi", description: "GOAT in the USA. Pink is the new legend.", hot: true },
+  { club: "Manchester City", star: "Riyad Mahrez", country: "Algeria", flag: "🇩🇿", kit_maker: "Puma", accent: "#6CABDD", price: "$89.99", image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327029/Marez_qr6dai.png", affiliateUrl: "https://fanatics.93n6tx.net/AFmancityFC", description: "Sky blue dominance. Algeria's finest.", hot: false },
+  { club: "Arsenal FC", star: "Thomas Partey", country: "Ghana", flag: "🇬🇭", kit_maker: "Adidas", accent: "#EF0107", price: "$89.99", image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327028/ARSENAL_cwm1zz.png", affiliateUrl: "https://fanatics.93n6tx.net/ArsenalFC", description: "Ghana's Gunner. North London red.", hot: true },
+  { club: "Bayern Munich", star: "Sadio Mane", country: "Senegal", flag: "🇸🇳", kit_maker: "Adidas", accent: "#DC052D", price: "$94.99", image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327028/FC_BAYAN_a4bqlx.png", affiliateUrl: "https://fanatics.93n6tx.net/AFbayanfc", description: "Bundesliga with a Senegalese heart.", hot: false },
+  { club: "Chelsea FC", star: "Nicolas Jackson", country: "Senegal", flag: "🇸🇳", kit_maker: "Nike", accent: "#034694", price: "$89.99", image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327028/Chelsea_kl5dmp.png", affiliateUrl: "https://fanatics.93n6tx.net/AFchealseaNico", description: "Senegal's rising star in blue.", hot: false },
+  { club: "Paris Saint-Germain", star: "Achraf Hakimi", country: "Morocco", flag: "🇲🇦", kit_maker: "Nike", accent: "#004170", price: "$94.99", image: "https://res.cloudinary.com/dta7pubd5/image/upload/v1774327028/paris_san_gemain_onujv1.png", affiliateUrl: "https://fanatics.93n6tx.net/AFgemain", description: "Morocco's heartbeat in Paris.", hot: true },
 ];
 
 const FANATICS_URL = "https://www.fanatics.com";
 
+// ── Jersey Customization Modal ─────────────────────────────────────────────
+function JerseyCustomizerModal({ team, onClose, onConfirm }) {
+  const [playerName, setPlayerName] = useState("");
+  const [jerseyNumber, setJerseyNumber] = useState("");
+  const [customize, setCustomize] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.88)"}}>
+      <div className="bg-gray-900 border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl" style={{maxHeight:"90vh", overflowY:"auto"}}>
+
+        {/* Header */}
+        <div className="relative h-28 flex items-center justify-center overflow-hidden"
+          style={{background:`linear-gradient(135deg,${team.accent}33,#111)`}}>
+          <div className="text-center z-10">
+            <span className="text-6xl drop-shadow-lg">{team.flag}</span>
+          </div>
+          <div className="absolute inset-0 opacity-10" style={{
+            backgroundImage:"repeating-linear-gradient(-55deg,transparent,transparent 10px,rgba(255,255,255,0.1) 10px,rgba(255,255,255,0.1) 20px)"
+          }}/>
+          <button onClick={onClose}
+            className="absolute top-4 right-4 text-white/50 hover:text-white text-xl font-black w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors">
+            ✕
+          </button>
+        </div>
+
+        <div className="p-6">
+          <h3 className="bebas text-3xl text-white mb-0.5">
+            {team.country} <span style={{color:"#FCD116"}}>JERSEY</span>
+          </h3>
+          <p className="text-gray-400 text-xs mb-5">{team.price} · Fulfilled by official licensed retailer</p>
+
+          {/* Customization toggle */}
+          <div className={`rounded-2xl p-4 mb-4 cursor-pointer transition-all ${customize ? "border border-yellow-400/40" : "border border-white/10"}`}
+            style={{background: customize ? "rgba(252,209,22,0.06)" : "rgba(255,255,255,0.04)"}}
+            onClick={() => setCustomize(!customize)}>
+            <div className="flex items-start gap-3">
+              <div className={`w-5 h-5 mt-0.5 rounded flex items-center justify-center flex-shrink-0 transition-all ${customize ? "bg-yellow-400" : "border-2 border-white/30"}`}>
+                {customize && <span className="text-black text-xs font-black">✓</span>}
+              </div>
+              <div>
+                <p className="text-white font-bold text-sm">Customize with Name & Number</p>
+                <p className="text-gray-500 text-xs mt-0.5">Add your name and preferred number — complete at retailer checkout</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Customization fields */}
+          {customize && (
+            <div className="space-y-4 mb-5">
+              {/* Name input */}
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-2">
+                  Player Name <span className="text-gray-600 font-normal normal-case">(max 16 characters)</span>
+                </label>
+                <input
+                  value={playerName}
+                  onChange={e => setPlayerName(e.target.value.toUpperCase().replace(/[^A-Z\s]/g,"").slice(0, 16))}
+                  placeholder="E.G. MENSAH"
+                  className="w-full bg-black/40 border border-white/20 rounded-xl px-4 py-3 text-white font-black text-center tracking-widest focus:outline-none focus:border-yellow-400 transition-colors placeholder-white/20"
+                  style={{fontFamily:"Bebas Neue,sans-serif", fontSize:"22px", letterSpacing:"6px"}}
+                />
+                <p className="text-xs text-gray-600 mt-1 text-right">{playerName.length}/16</p>
+              </div>
+
+              {/* Number input */}
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-2">
+                  Jersey Number <span className="text-gray-600 font-normal normal-case">(1–99)</span>
+                </label>
+                <input
+                  type="number" min="1" max="99"
+                  value={jerseyNumber}
+                  onChange={e => {
+                    const val = e.target.value.replace(/\D/g,"").slice(0, 2);
+                    if (!val || (parseInt(val) >= 1 && parseInt(val) <= 99)) setJerseyNumber(val);
+                  }}
+                  placeholder="10"
+                  className="w-full bg-black/40 border border-white/20 rounded-xl px-4 py-3 text-white font-black text-center focus:outline-none focus:border-yellow-400 transition-colors placeholder-white/20"
+                  style={{fontFamily:"Bebas Neue,sans-serif", fontSize:"36px"}}
+                />
+              </div>
+
+              {/* Live preview */}
+              {(playerName || jerseyNumber) && (
+                <div className="rounded-2xl p-5 text-center transition-all"
+                  style={{background:`linear-gradient(135deg,${team.accent}18,#0a0a0a)`, border:`1px solid ${team.accent}44`}}>
+                  <p className="text-xs text-gray-600 uppercase tracking-widest mb-3">Jersey Preview</p>
+                  {playerName && (
+                    <p className="text-white tracking-widest leading-none mb-1"
+                      style={{fontFamily:"Bebas Neue,sans-serif", fontSize:"clamp(20px,5vw,32px)", letterSpacing:"8px"}}>
+                      {playerName}
+                    </p>
+                  )}
+                  {jerseyNumber && (
+                    <p className="font-black leading-none"
+                      style={{fontFamily:"Bebas Neue,sans-serif", fontSize:"clamp(48px,12vw,80px)", color:team.accent, lineHeight:1}}>
+                      {jerseyNumber}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Info box */}
+              <div className="rounded-xl p-3 flex gap-2" style={{background:"rgba(252,209,22,0.08)", border:"1px solid rgba(252,209,22,0.2)"}}>
+                <span className="text-yellow-400 flex-shrink-0">ℹ️</span>
+                <p className="text-yellow-400/80 text-xs">
+                  <strong>How it works:</strong> Note your name and number, then select "Customize" at the retailer's checkout page to add personalization. Extra customization fees apply at retailer.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex gap-3 mt-2">
+            <button onClick={onClose}
+              className="flex-1 border border-white/15 text-gray-400 font-bold py-3 rounded-xl hover:bg-white/5 transition-colors text-sm">
+              Go Back
+            </button>
+            <a href={team.affiliateUrl || FANATICS_URL} target="_blank" rel="noopener noreferrer"
+              onClick={onClose}
+              className="flex-1 buy-btn text-black font-black py-3 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg">
+              {customize && (playerName || jerseyNumber) ? (
+                <>Buy & Customize ⚽</>
+              ) : (
+                <>Buy Standard Kit ⚽</>
+              )}
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function JerseysPage() {
   const [section, setSection] = useState("africa");
   const [worldFilter, setWorldFilter] = useState("all");
+  const [customizerTeam, setCustomizerTeam] = useState(null); // opens modal
 
   const filteredWorld = worldFilter === "hot"
     ? WORLD_TEAMS.filter(t => t.hot)
     : WORLD_TEAMS;
+
+  const handleBuyKit = (team, e) => {
+    e.preventDefault();
+    setCustomizerTeam(team);
+  };
 
   return (
     <>
@@ -188,18 +232,8 @@ export default function JerseysPage() {
         @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;700;900&family=Inter:wght@400;600;700&display=swap');
         .bebas { font-family: 'Bebas Neue', sans-serif; letter-spacing: 2px; }
         .barlow { font-family: 'Barlow Condensed', sans-serif; }
-        .hero-bg {
-          background: linear-gradient(135deg, #050505 0%, #0d1117 40%, #0f1f0f 70%, #1a0a00 100%);
-          position: relative; overflow: hidden;
-        }
-        .hero-bg::before {
-          content: '';
-          position: absolute; inset: 0;
-          background:
-            radial-gradient(ellipse at 15% 50%, rgba(252,209,22,0.12) 0%, transparent 55%),
-            radial-gradient(ellipse at 85% 20%, rgba(0,107,63,0.15) 0%, transparent 50%),
-            radial-gradient(ellipse at 50% 90%, rgba(206,17,38,0.1) 0%, transparent 50%);
-        }
+        .hero-bg { background: linear-gradient(135deg, #050505 0%, #0d1117 40%, #0f1f0f 70%, #1a0a00 100%); position: relative; overflow: hidden; }
+        .hero-bg::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 15% 50%, rgba(252,209,22,0.12) 0%, transparent 55%), radial-gradient(ellipse at 85% 20%, rgba(0,107,63,0.15) 0%, transparent 50%), radial-gradient(ellipse at 50% 90%, rgba(206,17,38,0.1) 0%, transparent 50%); }
         .kit-card { transition: transform 0.3s cubic-bezier(.34,1.56,.64,1), box-shadow 0.3s ease; }
         .kit-card:hover { transform: translateY(-10px) scale(1.02); box-shadow: 0 32px 64px rgba(0,0,0,0.5); }
         .buy-btn { background: linear-gradient(135deg,#FCD116,#f5a623); transition: all 0.2s ease; }
@@ -216,53 +250,39 @@ export default function JerseysPage() {
         .section-pill { border: 2px solid rgba(255,255,255,0.1); }
         .section-pill.active { border-color: #FCD116; background: rgba(252,209,22,0.1); }
         .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
-        .club-img {
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-          object-position: center bottom;
-          padding: 12px 8px 0;
-          transition: transform 0.4s cubic-bezier(.34,1.56,.64,1);
-        }
+        .club-img { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; padding: 12px 8px 0; transition: transform 0.4s cubic-bezier(.34,1.56,.64,1); }
         .kit-card:hover .club-img { transform: scale(1.08) translateY(-6px); }
-        .ghana-img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          object-position: center top;
-          transition: transform 0.4s cubic-bezier(.34,1.56,.64,1);
-        }
+        .ghana-img { width: 100%; height: 100%; object-fit: cover; object-position: center top; transition: transform 0.4s cubic-bezier(.34,1.56,.64,1); }
         .kit-card:hover .ghana-img { transform: scale(1.06); }
-        .puma-badge {
-          background: linear-gradient(135deg, #000 0%, #222 100%);
-          border: 1px solid rgba(252,209,22,0.4);
-        }
+        .puma-badge { background: linear-gradient(135deg, #000 0%, #222 100%); border: 1px solid rgba(252,209,22,0.4); }
+        .customize-badge { background: linear-gradient(135deg,rgba(252,209,22,0.15),rgba(252,209,22,0.05)); border: 1px solid rgba(252,209,22,0.3); }
       `}</style>
 
       <Navbar />
 
+      {/* Customizer Modal */}
+      {customizerTeam && (
+        <JerseyCustomizerModal
+          team={customizerTeam}
+          onClose={() => setCustomizerTeam(null)}
+          onConfirm={() => setCustomizerTeam(null)}
+        />
+      )}
+
+      {/* HERO */}
       <div className="hero-bg min-h-screen flex flex-col items-center justify-center text-white text-center px-4 py-24 relative">
         <div className="stripe absolute inset-0" />
         <div className="relative z-10 max-w-5xl mx-auto">
           <div className="inline-flex items-center gap-2 bg-yellow-400 text-black text-xs font-black px-5 py-2 rounded-full mb-8 tracking-widest uppercase shadow-lg">
             FIFA WORLD CUP 2026 · USA · CANADA · MEXICO
           </div>
-
           <h1 className="bebas text-8xl md:text-[10rem] leading-none mb-2">
-            <span style={{color:'#FCD116'}}>THE</span>
-            <br/>
-            <span className="text-white">WORLD</span>
-            <br/>
+            <span style={{color:'#FCD116'}}>THE</span><br/>
+            <span className="text-white">WORLD</span><br/>
             <span style={{WebkitTextStroke: '2px #FCD116', color: 'transparent'}}>PLAYS</span>
           </h1>
-
-          <p className="text-xl md:text-2xl text-gray-300 mb-2 barlow font-bold tracking-wider">
-            AFRICA LEADS · THE WORLD FOLLOWS
-          </p>
-          <p className="text-gray-500 mb-10 max-w-lg mx-auto text-sm">
-            Official kits for all 48 World Cup nations, 9 African teams, and your favourite African star's club jersey. One destination.
-          </p>
-
+          <p className="text-xl md:text-2xl text-gray-300 mb-2 barlow font-bold tracking-wider">AFRICA LEADS · THE WORLD FOLLOWS</p>
+          <p className="text-gray-500 mb-10 max-w-lg mx-auto text-sm">Official kits for all 48 World Cup nations, 9 African teams, and your favourite African star's club jersey. One destination.</p>
           <div className="grid grid-cols-3 gap-4 max-w-sm mx-auto mb-10">
             {[["9","African Teams"],["48","Nations Total"],["8+","Club Stars"]].map(([n,l])=>(
               <div key={l} className="glass rounded-2xl py-5">
@@ -271,30 +291,17 @@ export default function JerseysPage() {
               </div>
             ))}
           </div>
-
           <div className="flex flex-wrap justify-center gap-2 mb-10">
             {AFRICAN_TEAMS.map(t=>(
-              <span key={t.country} title={t.country}
-                className="text-3xl hover:scale-150 transition-transform duration-200 cursor-default">{t.flag}</span>
+              <span key={t.country} title={t.country} className="text-3xl hover:scale-150 transition-transform duration-200 cursor-default">{t.flag}</span>
             ))}
           </div>
-
           <div className="flex flex-wrap gap-3 justify-center">
-            <button onClick={()=>{setSection("africa"); document.getElementById("kits")?.scrollIntoView({behavior:"smooth"});}}
-              className="buy-btn text-black font-black text-base px-8 py-3.5 rounded-2xl shadow-xl">
-              African Kits
-            </button>
-            <button onClick={()=>{setSection("world"); document.getElementById("kits")?.scrollIntoView({behavior:"smooth"});}}
-              className="glass text-white font-bold text-base px-8 py-3.5 rounded-2xl hover:bg-white/10 transition-colors">
-              All 48 Nations
-            </button>
-            <button onClick={()=>{setSection("clubs"); document.getElementById("kits")?.scrollIntoView({behavior:"smooth"});}}
-              className="glass text-white font-bold text-base px-8 py-3.5 rounded-2xl hover:bg-white/10 transition-colors">
-              Club Kits
-            </button>
+            <button onClick={()=>{setSection("africa"); document.getElementById("kits")?.scrollIntoView({behavior:"smooth"});}} className="buy-btn text-black font-black text-base px-8 py-3.5 rounded-2xl shadow-xl">African Kits</button>
+            <button onClick={()=>{setSection("world"); document.getElementById("kits")?.scrollIntoView({behavior:"smooth"});}} className="glass text-white font-bold text-base px-8 py-3.5 rounded-2xl hover:bg-white/10 transition-colors">All 48 Nations</button>
+            <button onClick={()=>{setSection("clubs"); document.getElementById("kits")?.scrollIntoView({behavior:"smooth"});}} className="glass text-white font-bold text-base px-8 py-3.5 rounded-2xl hover:bg-white/10 transition-colors">Club Kits</button>
           </div>
         </div>
-
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
           <div className="w-6 h-10 border-2 border-white/20 rounded-full flex items-start justify-center pt-2">
             <div className="w-1 h-3 bg-yellow-400 rounded-full"/>
@@ -304,13 +311,8 @@ export default function JerseysPage() {
 
       <div id="kits" className="bg-gray-950 py-20 px-4">
         <div className="max-w-7xl mx-auto">
-
           <div className="flex flex-wrap justify-center gap-3 mb-12">
-            {[
-              ["africa","African Nations (9)"],
-              ["clubs","Club Kits - African Stars"],
-              ["world","All 48 World Cup Teams"],
-            ].map(([val,label])=>(
+            {[["africa","African Nations (9)"],["clubs","Club Kits - African Stars"],["world","All 48 World Cup Teams"]].map(([val,label])=>(
               <button key={val} onClick={()=>setSection(val)}
                 className={`section-pill px-6 py-3 rounded-2xl font-bold text-sm transition-all ${section===val?"active text-yellow-400":"text-gray-400 hover:text-white"}`}>
                 {label}
@@ -320,30 +322,28 @@ export default function JerseysPage() {
 
           {section === "africa" && (
             <>
-              <div className="text-center mb-10">
-                <h2 className="bebas text-6xl md:text-8xl text-white">
-                  AFRICA <span style={{color:'#FCD116'}}>RISES</span>
-                </h2>
+              <div className="text-center mb-4">
+                <h2 className="bebas text-6xl md:text-8xl text-white">AFRICA <span style={{color:'#FCD116'}}>RISES</span></h2>
                 <p className="text-gray-400 mt-2">9 nations. One continent. Own their story.</p>
+              </div>
+              {/* Customization promo banner */}
+              <div className="customize-badge rounded-2xl px-5 py-3 mb-8 flex items-center gap-3 max-w-2xl mx-auto">
+                <span className="text-2xl">✍️</span>
+                <div>
+                  <p className="text-yellow-400 font-black text-sm">Jersey Customization Available</p>
+                  <p className="text-yellow-400/60 text-xs">Click any kit to add your name & number before purchasing</p>
+                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {AFRICAN_TEAMS.map(team=>(
                   <div key={team.country} className="kit-card rounded-3xl overflow-hidden bg-gray-900 border border-white/10">
                     <div className="relative h-72 overflow-hidden">
-
-                      {/* Teams with real Cloudinary jersey images — show clearly without color wash */}
                       {team.affiliateUrl ? (
                         <>
                           <div className="absolute inset-0 bg-gray-900" />
-                          <img
-                            src={team.image}
-                            alt={`${team.country} World Cup 2026 Jersey`}
-                            className="ghana-img absolute inset-0"
-                          />
+                          <img src={team.image} alt={`${team.country} World Cup 2026 Jersey`} className="ghana-img absolute inset-0" />
                           <div className="img-overlay absolute inset-0"/>
-                          <div className="absolute top-4 left-4 puma-badge text-yellow-400 text-xs font-black px-3 py-1 rounded-lg tracking-widest">
-                            {team.kit_maker.toUpperCase()}
-                          </div>
+                          <div className="absolute top-4 left-4 puma-badge text-yellow-400 text-xs font-black px-3 py-1 rounded-lg tracking-widest">{team.kit_maker.toUpperCase()}</div>
                         </>
                       ) : (
                         <>
@@ -353,11 +353,11 @@ export default function JerseysPage() {
                           <div className="absolute top-4 left-4 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded-lg">{team.kit_maker}</div>
                         </>
                       )}
-
-                      {team.hot && (
-                        <div className="hot-badge absolute top-4 right-4 bg-red-500 text-white text-xs font-black px-3 py-1 rounded-full">HOT</div>
-                      )}
-
+                      {team.hot && <div className="hot-badge absolute top-4 right-4 bg-red-500 text-white text-xs font-black px-3 py-1 rounded-full">HOT</div>}
+                      {/* Customization tag */}
+                      <div className="absolute bottom-16 right-4">
+                        <div className="customize-badge text-yellow-400 text-xs font-bold px-2 py-1 rounded-lg">✍️ Customizable</div>
+                      </div>
                       <div className="absolute bottom-0 left-0 right-0 p-5">
                         <div className="flex items-center gap-3">
                           <span className="text-4xl">{team.flag}</span>
@@ -368,22 +368,18 @@ export default function JerseysPage() {
                         </div>
                       </div>
                     </div>
-
                     <div className="p-5">
                       <p className="text-gray-400 text-sm mb-4">{team.description}</p>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <div>
                           <p className="text-xs text-gray-500 uppercase tracking-wider">From</p>
                           <p className="text-2xl font-black text-white">{team.price}</p>
                         </div>
-                        <a
-                          href={team.affiliateUrl || FANATICS_URL}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="buy-btn text-black font-black px-6 py-3 rounded-xl text-sm"
-                        >
+                        <button onClick={e => handleBuyKit(team, e)}
+                          className="buy-btn text-black font-black px-5 py-3 rounded-xl text-sm flex items-center gap-1.5">
+                          <span>✍️</span>
                           {team.country === "Ghana" ? "Buy Black Stars Kit" : "Buy Kit"}
-                        </a>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -394,39 +390,25 @@ export default function JerseysPage() {
 
           {section === "clubs" && (
             <>
-              <div className="text-center mb-10">
-                <h2 className="bebas text-6xl md:text-8xl text-white">
-                  AFRICAN <span style={{color:'#FCD116'}}>STARS</span>
-                </h2>
+              <div className="text-center mb-4">
+                <h2 className="bebas text-6xl md:text-8xl text-white">AFRICAN <span style={{color:'#FCD116'}}>STARS</span></h2>
                 <p className="text-gray-400 mt-2">Your hero's club kit. Year-round. Worldwide.</p>
+              </div>
+              <div className="customize-badge rounded-2xl px-5 py-3 mb-8 flex items-center gap-3 max-w-2xl mx-auto">
+                <span className="text-2xl">✍️</span>
+                <div>
+                  <p className="text-yellow-400 font-black text-sm">Wear Your Star's Number</p>
+                  <p className="text-yellow-400/60 text-xs">Click any kit to customize with your preferred name & number</p>
+                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                 {CLUB_STARS.map(s=>(
                   <div key={s.club} className="kit-card rounded-3xl overflow-hidden bg-gray-900 border border-white/10 flex flex-col">
-                    <div
-                      className="relative overflow-hidden"
-                      style={{
-                        height: '260px',
-                        background: `linear-gradient(160deg, ${s.accent}33 0%, #111 100%)`,
-                      }}
-                    >
-                      <div
-                        className="absolute inset-0 opacity-20"
-                        style={{background: `radial-gradient(ellipse at 50% 80%, ${s.accent} 0%, transparent 70%)`}}
-                      />
-                      {s.hot && (
-                        <div className="hot-badge absolute top-3 right-3 z-10 bg-red-500 text-white text-xs font-black px-2 py-0.5 rounded-full shadow-lg">
-                          HOT
-                        </div>
-                      )}
-                      <div className="absolute top-3 left-3 z-10 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded-lg">
-                        {s.kit_maker}
-                      </div>
-                      <img
-                        src={s.image}
-                        alt={`${s.star} ${s.club} jersey`}
-                        className="club-img relative z-[1]"
-                      />
+                    <div className="relative overflow-hidden" style={{height:'260px', background:`linear-gradient(160deg, ${s.accent}33 0%, #111 100%)`}}>
+                      <div className="absolute inset-0 opacity-20" style={{background:`radial-gradient(ellipse at 50% 80%, ${s.accent} 0%, transparent 70%)`}}/>
+                      {s.hot && <div className="hot-badge absolute top-3 right-3 z-10 bg-red-500 text-white text-xs font-black px-2 py-0.5 rounded-full shadow-lg">HOT</div>}
+                      <div className="absolute top-3 left-3 z-10 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded-lg">{s.kit_maker}</div>
+                      <img src={s.image} alt={`${s.star} ${s.club} jersey`} className="club-img relative z-[1]" />
                     </div>
                     <div className="p-4 flex flex-col flex-1">
                       <div className="flex items-center gap-2 mb-2">
@@ -437,27 +419,19 @@ export default function JerseysPage() {
                         </div>
                       </div>
                       <p className="text-gray-400 text-xs mb-4 flex-1">{s.description}</p>
-                      <div className="flex items-center justify-between mt-auto">
+                      <div className="flex items-center justify-between mt-auto gap-2">
                         <div>
                           <p className="text-xs text-gray-500 uppercase tracking-wider">From</p>
                           <p className="text-xl font-black text-white">{s.price}</p>
                         </div>
-                        <a
-                          href={s.affiliateUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="buy-btn text-black font-black px-5 py-2.5 rounded-xl text-xs shadow-lg"
-                        >
-                          Buy Now
-                        </a>
+                        <button onClick={e => handleBuyKit(s, e)}
+                          className="buy-btn text-black font-black px-4 py-2.5 rounded-xl text-xs shadow-lg flex items-center gap-1">
+                          <span>✍️</span> Buy Now
+                        </button>
                       </div>
                     </div>
                   </div>
                 ))}
-              </div>
-              <div className="mt-10 glass rounded-2xl p-5 text-center">
-                <p className="text-yellow-400 font-bold mb-1">Pro Tip</p>
-                <p className="text-gray-400 text-sm">Club jerseys sell year-round - not just every 4 years. These are your biggest revenue opportunity.</p>
               </div>
             </>
           )}
@@ -465,20 +439,15 @@ export default function JerseysPage() {
           {section === "world" && (
             <>
               <div className="text-center mb-10">
-                <h2 className="bebas text-6xl md:text-8xl text-white">
-                  ALL <span style={{color:'#FCD116'}}>48</span> NATIONS
-                </h2>
+                <h2 className="bebas text-6xl md:text-8xl text-white">ALL <span style={{color:'#FCD116'}}>48</span> NATIONS</h2>
                 <p className="text-gray-400 mt-2">Every World Cup 2026 team. One place.</p>
                 <div className="flex justify-center gap-3 mt-5">
                   {[["all","All Teams"],["hot","Most Popular"]].map(([v,l])=>(
                     <button key={v} onClick={()=>setWorldFilter(v)}
-                      className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${worldFilter===v?"tab-active":"tab-inactive"}`}>
-                      {l}
-                    </button>
+                      className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${worldFilter===v?"tab-active":"tab-inactive"}`}>{l}</button>
                   ))}
                 </div>
               </div>
-
               <div className="mb-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="h-px flex-1 bg-yellow-400/30"/>
@@ -487,18 +456,18 @@ export default function JerseysPage() {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                   {AFRICAN_TEAMS.map(t=>(
-                    <a key={t.country} href={t.affiliateUrl || FANATICS_URL} target="_blank" rel="noopener noreferrer"
-                      className="world-row glass rounded-2xl p-4 flex items-center gap-3 group">
+                    <button key={t.country} onClick={e => handleBuyKit(t, e)}
+                      className="world-row glass rounded-2xl p-4 flex items-center gap-3 group text-left w-full">
                       <span className="text-3xl">{t.flag}</span>
                       <div className="min-w-0">
                         <p className="font-bold text-white text-sm truncate group-hover:text-yellow-400 transition-colors">{t.country}</p>
                         <p className="text-xs text-gray-500">{t.price}</p>
+                        <p className="text-xs text-yellow-400/60">✍️ customize</p>
                       </div>
-                    </a>
+                    </button>
                   ))}
                 </div>
               </div>
-
               <div>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="h-px flex-1 bg-white/10"/>
@@ -528,6 +497,7 @@ export default function JerseysPage() {
         </div>
       </div>
 
+      {/* Ticket section */}
       <div className="bg-gray-950 py-16 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-10">
@@ -535,12 +505,9 @@ export default function JerseysPage() {
             <h2 className="bebas text-5xl md:text-7xl text-white">YOUR <span style={{color:'#FCD116'}}>TICKET</span> TO THE GAME</h2>
             <p className="text-gray-400 mt-2 text-sm">Final Match · 19 July 2026 · New York / New Jersey</p>
           </div>
-
           <div className="relative max-w-2xl mx-auto group">
-            <div className="absolute -inset-1 rounded-3xl opacity-50 blur-xl group-hover:opacity-80 transition-opacity"
-              style={{background:'linear-gradient(135deg,#FCD116,#006B3F,#C1272D)'}}/>
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl"
-              style={{background:'linear-gradient(135deg,#1a1a1a 0%,#2a2a2a 100%)'}}>
+            <div className="absolute -inset-1 rounded-3xl opacity-50 blur-xl group-hover:opacity-80 transition-opacity" style={{background:'linear-gradient(135deg,#FCD116,#006B3F,#C1272D)'}}/>
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl" style={{background:'linear-gradient(135deg,#1a1a1a 0%,#2a2a2a 100%)'}}>
               <div className="h-2 w-full" style={{background:'linear-gradient(90deg,#FCD116,#006B3F,#C1272D,#FCD116)'}}/>
               <div className="flex">
                 <div className="flex-1 p-8">
@@ -556,12 +523,7 @@ export default function JerseysPage() {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4 mb-6">
-                    {[
-                      ["DATE","19 JULY 2026"],
-                      ["VENUE","MetLife Stadium"],
-                      ["EVENT","FIFA World Cup Final"],
-                      ["NATIONS","48 Teams · 9 African"],
-                    ].map(([label, value]) => (
+                    {[["DATE","19 JULY 2026"],["VENUE","MetLife Stadium"],["EVENT","FIFA World Cup Final"],["NATIONS","48 Teams · 9 African"]].map(([label,value])=>(
                       <div key={label}>
                         <p className="text-gray-600 text-xs uppercase tracking-widest font-bold">{label}</p>
                         <p className="text-white font-bold text-sm mt-0.5">{value}</p>
@@ -569,19 +531,15 @@ export default function JerseysPage() {
                     ))}
                   </div>
                   <div className="flex items-center gap-2 mb-6">
-                    <p className="text-gray-600 text-xs uppercase tracking-wider">Africa Represented:</p>
-                    <div className="flex gap-1 text-lg">
-                      {AFRICAN_TEAMS.map(t=>(
-                        <span key={t.country}>{t.flag}</span>
-                      ))}
-                    </div>
+                    <p className="text-gray-600 text-xs uppercase tracking-wider">Africa:</p>
+                    <div className="flex gap-1 text-lg">{AFRICAN_TEAMS.map(t=><span key={t.country}>{t.flag}</span>)}</div>
                   </div>
-                  <a href="#kits" onClick={e=>{e.preventDefault(); document.getElementById("kits")?.scrollIntoView({behavior:"smooth"})}}
+                  <button onClick={e => { e.preventDefault(); document.getElementById("kits")?.scrollIntoView({behavior:"smooth"}); }}
                     className="buy-btn inline-flex items-center gap-2 text-black font-black px-8 py-3 rounded-2xl text-sm">
                     Get Your Nation's Kit
-                  </a>
+                  </button>
                 </div>
-                <div className="w-px my-4" style={{backgroundImage:'repeating-linear-gradient(to bottom,#444 0px,#444 8px,transparent 8px,transparent 14px)', width:'2px'}}/>
+                <div className="w-px my-4" style={{backgroundImage:'repeating-linear-gradient(to bottom,#444 0px,#444 8px,transparent 8px,transparent 14px)',width:'2px'}}/>
                 <div className="w-28 p-4 flex flex-col items-center justify-between" style={{background:'rgba(252,209,22,0.05)'}}>
                   <div className="text-center">
                     <p className="bebas text-yellow-400 text-2xl leading-none">26</p>
@@ -601,11 +559,8 @@ export default function JerseysPage() {
               <div className="h-1 w-full" style={{background:'linear-gradient(90deg,#C1272D,#006B3F,#FCD116,#C1272D)'}}/>
             </div>
           </div>
-
           <div className="text-center mt-8">
-            <p className="text-gray-500 text-sm">
-              <span className="text-white font-bold">118 days</span> until the World Cup Final · July 19, 2026
-            </p>
+            <p className="text-gray-500 text-sm"><span className="text-white font-bold">118 days</span> until the World Cup Final · July 19, 2026</p>
             <p className="text-gray-600 text-xs mt-1">Jerseys are selling fast. Do not miss out on your nation's kit.</p>
           </div>
         </div>
@@ -617,7 +572,7 @@ export default function JerseysPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {[
               {icon:"✅",title:"100% Official",desc:"All kits licensed by FIFA and national federations. Authentic guaranteed."},
-              {icon:"🌍",title:"Support Africa",desc:"Commission helps fund youth football programs across the continent."},
+              {icon:"✍️",title:"Customizable",desc:"Add your name and number before purchasing. Stand out from the crowd."},
               {icon:"🚚",title:"Ships Worldwide",desc:"USA, Canada, UK, Europe - wherever your community is."},
             ].map(f=>(
               <div key={f.title} className="glass rounded-2xl p-6">
