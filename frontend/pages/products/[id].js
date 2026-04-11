@@ -66,7 +66,10 @@ export default function ProductDetail() {
   }, [slug, user]);
 
   // Detect if this product supports jersey customization
-  const isJerseyProduct = product?.tags?.some(t => JERSEY_TAGS.includes(t.toLowerCase())) ?? false;
+  const isJerseyProduct = product?.tags?.some(t => {
+  const tagStr = typeof t === "string" ? t : t?.name ?? "";
+  return JERSEY_TAGS.includes(tagStr.toLowerCase().trim());
+}) ?? false;
 
   const toggleWishlist = async () => {
     if (!user) { router.push("/login"); return; }
@@ -399,9 +402,14 @@ export default function ProductDetail() {
             {/* Tags */}
             {product.tags?.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
-                {product.tags.map((tag) => (
-                  <Link key={tag} href={`/?q=${tag}`} className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full transition-colors">#{tag}</Link>
-                ))}
+                {product.tags.map((tag) => {
+  const tagStr = typeof tag === "string" ? tag : tag?.name ?? "";
+  return (
+    <Link key={tagStr} href={`/?q=${tagStr}`} className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full transition-colors">
+      #{tagStr}
+    </Link>
+  );
+})}
               </div>
             )}
 
