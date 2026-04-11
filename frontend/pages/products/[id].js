@@ -12,7 +12,6 @@ import toast from "react-hot-toast";
 import Link from "next/link";
 import { FiShoppingCart, FiMapPin, FiPackage, FiShare2, FiHeart, FiCheck, FiEdit3 } from "react-icons/fi";
 
-// Tags that enable jersey customization
 const JERSEY_TAGS = ["jersey","jerseys","kit","football kit","soccer jersey","customizable","custom jersey","sportswear"];
 
 export default function ProductDetail() {
@@ -55,7 +54,6 @@ export default function ProductDetail() {
       variantsAPI.getForProduct(p.id).then((r) => {
         const vArr = Array.isArray(r.data) ? r.data : [];
         setVariants(vArr);
-        // FEE: prefer product.customization_fee, fall back to variant named "customization"
         if (p.customization_fee != null && Number(p.customization_fee) > 0) {
           setCustomizationFee(Number(p.customization_fee));
         } else {
@@ -69,11 +67,13 @@ export default function ProductDetail() {
     }).catch(() => { setError(true); }).finally(() => { clearTimeout(timeout); setLoading(false); });
   }, [slug, user]);
 
-  // Detect if this product supports jersey customization — handles both string and object tags
   const isJerseyProduct = product?.tags?.some(t => {
     const tagStr = typeof t === "string" ? t : t?.name ?? "";
     return JERSEY_TAGS.includes(tagStr.toLowerCase().trim());
   }) ?? false;
+
+  // Show jersey back preview in main image when customizing and name/number entered
+  const showJerseyPreview = customizeJersey && isJerseyProduct && (jerseyName || jerseyNumber);
 
   const toggleWishlist = async () => {
     if (!user) { router.push("/login"); return; }
@@ -94,7 +94,6 @@ export default function ProductDetail() {
         return;
       }
     }
-    // Validate customization if enabled
     if (customizeJersey && isJerseyProduct) {
       if (!jerseyName.trim() && !jerseyNumber.trim()) {
         toast.error("Please enter a name or number for customization, or uncheck it");
@@ -107,15 +106,11 @@ export default function ProductDetail() {
       const variantParts = Object.entries(selectedVariants)
         .filter(([name]) => name.toLowerCase() !== "customization")
         .map(([name, v]) => `${name}: ${v.value}`);
-
-      // Build customization note
       const customNote = customizeJersey && isJerseyProduct && (jerseyName || jerseyNumber)
         ? `Custom: ${jerseyName ? `Name="${jerseyName.toUpperCase()}"` : ""}${jerseyName && jerseyNumber ? " " : ""}${jerseyNumber ? `#${jerseyNumber}` : ""}`
         : null;
-
       const allParts = [...variantParts, ...(customNote ? [customNote] : [])];
       const variantLabel = allParts.join(", ") || null;
-
       await ordersAPI.addToCart({
         product_id: product.id,
         quantity,
@@ -195,21 +190,56 @@ export default function ProductDetail() {
           {/* Images */}
           <div>
             <div className="aspect-square bg-gray-100 rounded-2xl overflow-hidden mb-3 relative">
-              {images[selectedImage] ? (
-                <img src={images[selectedImage]} alt={product.name} className="w-full h-full object-cover" />
+
+              {/* Jersey back preview replaces main image when customizing */}
+              {showJerseyPreview ? (
+                <div className="w-full h-full bg-green-900 flex flex-col items-center justify-center relative">
+                  <p className="absolute top-4 text-green-400 text-xs uppercase tracking-widest font-bold">Back of Jersey</p>
+                  {jerseyName && (
+                    <p
+                      className="text-white font-black tracking-widest leading-none mb-2 px-4 text-center"
+                      style={{ letterSpacing: "8px", fontFamily: "Arial Black, sans-serif", fontSize: "clamp(20px, 5vw, 42px)" }}
+                    >
+                      {jerseyName}
+                    </p>
+                  )}
+                  {jerseyNumber && (
+                    <p
+                      className="text-white font-black leading-none"
+                      style={{ fontSize: "clamp(80px, 18vw, 160px)", fontFamily: "Arial Black, sans-serif", lineHeight: 1 }}
+                    >
+                      {jerseyNumber}
+                    </p>
+                  )}
+                  <p className="absolute bottom-4 text-green-500 text-xs font-medium">Preview only — actual print may vary</p>
+                </div>
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-8xl">🛒</div>
+                <>
+                  {images[selectedImage] ? (
+                    <img src={images[selectedImage]} alt={product.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-8xl">🛒</div>
+                  )}
+                </>
               )}
-              {discount > 0 && (
+
+              {discount > 0 && !showJerseyPreview && (
                 <div className="absolute top-4 left-4 bg-red-500 text-white text-sm font-black px-3 py-1 rounded-full">-{discount}%</div>
               )}
-              {isJerseyProduct && (
+              {isJerseyProduct && !showJerseyPreview && (
                 <div className="absolute top-4 right-4 bg-green-900 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                  <FiEdit3 size={11} /> Custom Available
+                  <FiEdit3 size={11} /> Customizable
+                </div>
+              )}
+              {showJerseyPreview && (
+                <div className="absolute top-4 right-4 bg-white bg-opacity-20 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                  <FiEdit3 size={11} /> Live Preview
                 </div>
               )}
             </div>
-            {images.length > 1 && (
+
+            {/* Thumbnail strip — hidden when preview is showing */}
+            {images.length > 1 && !showJerseyPreview && (
               <div className="flex gap-2 overflow-x-auto">
                 {images.map((img, i) => (
                   <button key={i} onClick={() => setSelectedImage(i)}
@@ -218,6 +248,13 @@ export default function ProductDetail() {
                   </button>
                 ))}
               </div>
+            )}
+
+            {/* When previewing, show a "back to photos" hint */}
+            {showJerseyPreview && images.length > 0 && (
+              <p className="text-xs text-center text-gray-400 mt-2">
+                ← Clear name/number above to see product photos
+              </p>
             )}
           </div>
 
@@ -332,7 +369,7 @@ export default function ProductDetail() {
                           onChange={e => setJerseyName(e.target.value.toUpperCase().replace(/[^A-Z\s]/g, "").slice(0, 16))}
                           placeholder="E.G. MENSAH"
                           className="w-full border-2 rounded-xl px-3 py-2.5 font-black text-center tracking-widest focus:outline-none focus:border-green-700 transition-colors placeholder-gray-300"
-                          style={{fontFamily:"monospace", fontSize:"16px", letterSpacing:"4px"}}
+                          style={{ fontFamily: "monospace", fontSize: "16px", letterSpacing: "4px" }}
                         />
                         <p className="text-xs text-gray-400 mt-1 text-right">{jerseyName.length}/16</p>
                       </div>
@@ -351,27 +388,17 @@ export default function ProductDetail() {
                           }}
                           placeholder="10"
                           className="w-full border-2 rounded-xl px-3 py-2.5 font-black text-center focus:outline-none focus:border-green-700 transition-colors placeholder-gray-300"
-                          style={{fontSize:"28px"}}
+                          style={{ fontSize: "28px" }}
                         />
                       </div>
                     </div>
 
-                    {/* Live Preview */}
+                    {/* Hint to look at main image */}
                     {(jerseyName || jerseyNumber) && (
-                      <div className="rounded-xl p-4 text-center mb-4 bg-green-900">
-                        <p className="text-xs text-green-400 uppercase tracking-widest mb-2">Back of Jersey Preview</p>
-                        {jerseyName && (
-                          <p className="text-white font-black tracking-widest text-xl leading-none mb-1"
-                            style={{letterSpacing:"6px", fontFamily:"Arial Black,sans-serif"}}>
-                            {jerseyName}
-                          </p>
-                        )}
-                        {jerseyNumber && (
-                          <p className="text-white font-black leading-none"
-                            style={{fontSize:"clamp(40px,8vw,72px)", fontFamily:"Arial Black,sans-serif"}}>
-                            {jerseyNumber}
-                          </p>
-                        )}
+                      <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-4 text-center">
+                        <p className="text-xs text-green-800 font-semibold flex items-center justify-center gap-1.5">
+                          👆 See your jersey preview in the image above
+                        </p>
                       </div>
                     )}
 

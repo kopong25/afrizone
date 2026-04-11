@@ -17,7 +17,6 @@ export default function ProductCard({ product, wishlisted, onWishlist }) {
     ? Math.round(((product.compare_price - product.price) / product.compare_price) * 100)
     : 0;
 
-  // Check if this product supports jersey customization
   const isJerseyProduct = product?.tags?.some(t => {
     const tagStr = typeof t === "string" ? t : t?.name ?? "";
     return JERSEY_TAGS.includes(tagStr.toLowerCase().trim());
@@ -51,8 +50,16 @@ export default function ProductCard({ product, wishlisted, onWishlist }) {
           <div className="w-full h-full flex items-center justify-center text-5xl">🛒</div>
         )}
 
-        {/* Badges */}
-        <div className="absolute top-2 left-2 flex flex-col gap-1">
+        {/* Customizable banner across the top of the image */}
+        {isJerseyProduct && (
+          <div className="absolute top-0 left-0 right-0 flex items-center justify-center gap-1.5 bg-green-900 bg-opacity-90 py-1.5 z-10">
+            <FiEdit3 size={11} className="text-green-300" />
+            <span className="text-white text-xs font-bold tracking-wider uppercase">Customizable</span>
+          </div>
+        )}
+
+        {/* Badges top-left — pushed down if jersey banner is showing */}
+        <div className={`absolute left-2 flex flex-col gap-1 ${isJerseyProduct ? "top-9" : "top-2"}`}>
           {discount > 0 && (
             <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
               -{discount}%
@@ -68,30 +75,25 @@ export default function ProductCard({ product, wishlisted, onWishlist }) {
               Out of Stock
             </span>
           )}
-          {isJerseyProduct && (
-            <span className="bg-green-900 text-white text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-              <FiEdit3 size={9} /> Custom
-            </span>
-          )}
         </div>
 
         {/* Wishlist button */}
         {onWishlist && (
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onWishlist(); }}
-            className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:scale-110 transition-transform opacity-0 group-hover:opacity-100"
+            className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:scale-110 transition-transform opacity-0 group-hover:opacity-100 z-20"
             aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
           >
             <FiHeart size={14} className={wishlisted ? "fill-red-500 text-red-500" : "text-gray-400"} />
           </button>
         )}
 
-        {/* Quick add — jersey products go to product page to customize, others quick add */}
+        {/* Bottom action button */}
         {isJerseyProduct ? (
           <Link
             href={`/products/${product.slug}`}
             onClick={(e) => e.stopPropagation()}
-            className="absolute bottom-2 left-2 right-2 bg-green-900 hover:bg-green-800 text-white text-xs font-semibold py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-1.5"
+            className="absolute bottom-2 left-2 right-2 bg-green-900 hover:bg-green-800 text-white text-xs font-semibold py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-1.5 z-10"
           >
             <FiEdit3 size={12} />
             Customize & Buy
@@ -109,17 +111,12 @@ export default function ProductCard({ product, wishlisted, onWishlist }) {
       </div>
 
       <div className="p-3">
-        {/* Store name */}
         {product.store?.name && (
           <p className="text-xs text-gray-400 mb-0.5 truncate">{product.store.name}</p>
         )}
-
-        {/* Product name */}
         <h3 className="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug mb-1">
           {product.name}
         </h3>
-
-        {/* Rating */}
         {product.review_count > 0 && (
           <div className="flex items-center gap-1 mb-1.5">
             <div className="flex">
@@ -130,16 +127,12 @@ export default function ProductCard({ product, wishlisted, onWishlist }) {
             <span className="text-xs text-gray-400">({product.review_count})</span>
           </div>
         )}
-
-        {/* Price */}
         <div className="flex items-baseline gap-2">
           <span className="text-base font-black text-green-900">${product.price.toFixed(2)}</span>
           {product.compare_price && (
             <span className="text-xs text-gray-400 line-through">${product.compare_price.toFixed(2)}</span>
           )}
         </div>
-
-        {/* Origin */}
         {product.country_of_origin && (
           <p className="text-xs text-gray-400 mt-1">🌍 {product.country_of_origin}</p>
         )}
