@@ -55,9 +55,13 @@ export default function ProductDetail() {
       variantsAPI.getForProduct(p.id).then((r) => {
         const vArr = Array.isArray(r.data) ? r.data : [];
         setVariants(vArr);
-        // Check for customization fee variant
-        const custFee = vArr.find(v => v.name?.toLowerCase() === "customization");
-        if (custFee) setCustomizationFee(custFee.price_modifier || 0);
+        // FEE: prefer product.customization_fee, fall back to variant named "customization"
+        if (p.customization_fee != null && Number(p.customization_fee) > 0) {
+          setCustomizationFee(Number(p.customization_fee));
+        } else {
+          const custFeeVariant = vArr.find(v => v.name?.toLowerCase() === "customization");
+          if (custFeeVariant) setCustomizationFee(custFeeVariant.price_modifier || 0);
+        }
       }).catch(() => {});
       if (user) {
         wishlistAPI.getIds().then((r) => setWishlisted((r.data || []).includes(p.id))).catch(() => {});
@@ -65,11 +69,11 @@ export default function ProductDetail() {
     }).catch(() => { setError(true); }).finally(() => { clearTimeout(timeout); setLoading(false); });
   }, [slug, user]);
 
-  // Detect if this product supports jersey customization
+  // Detect if this product supports jersey customization — handles both string and object tags
   const isJerseyProduct = product?.tags?.some(t => {
-  const tagStr = typeof t === "string" ? t : t?.name ?? "";
-  return JERSEY_TAGS.includes(tagStr.toLowerCase().trim());
-}) ?? false;
+    const tagStr = typeof t === "string" ? t : t?.name ?? "";
+    return JERSEY_TAGS.includes(tagStr.toLowerCase().trim());
+  }) ?? false;
 
   const toggleWishlist = async () => {
     if (!user) { router.push("/login"); return; }
@@ -133,7 +137,7 @@ export default function ProductDetail() {
   };
 
   const variantGroups = variants.reduce((acc, v) => {
-    if (v.name?.toLowerCase() === "customization") return acc; // skip customization variant from display
+    if (v.name?.toLowerCase() === "customization") return acc;
     if (!acc[v.name]) acc[v.name] = [];
     acc[v.name].push(v);
     return acc;
@@ -303,8 +307,10 @@ export default function ProductDetail() {
                       <p className="font-black text-gray-900 text-sm flex items-center gap-2">
                         <FiEdit3 size={14} className="text-green-700" />
                         Customize Your Jersey
-                        {customizationFee > 0 && <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">+${customizationFee.toFixed(2)}</span>}
-                        {customizationFee === 0 && <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">FREE</span>}
+                        {customizationFee > 0
+                          ? <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">+${Number(customizationFee).toFixed(2)}</span>
+                          : <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">FREE</span>
+                        }
                       </p>
                       <p className="text-xs text-gray-500 mt-0.5">Add your name and/or number to this jersey</p>
                     </div>
@@ -376,7 +382,7 @@ export default function ProductDetail() {
                       </p>
                       <p className="text-xs text-yellow-700">
                         Your customization request will be included with your order. The seller will contact you to confirm details before processing.
-                        {customizationFee > 0 ? ` Customization fee: $${customizationFee.toFixed(2)}` : " Customization is free for this product."}
+                        {customizationFee > 0 ? ` Customization fee: $${Number(customizationFee).toFixed(2)}` : " Customization is free for this product."}
                       </p>
                     </div>
                   </div>
@@ -403,13 +409,13 @@ export default function ProductDetail() {
             {product.tags?.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {product.tags.map((tag) => {
-  const tagStr = typeof tag === "string" ? tag : tag?.name ?? "";
-  return (
-    <Link key={tagStr} href={`/?q=${tagStr}`} className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full transition-colors">
-      #{tagStr}
-    </Link>
-  );
-})}
+                  const tagStr = typeof tag === "string" ? tag : tag?.name ?? "";
+                  return (
+                    <Link key={tagStr} href={`/?q=${tagStr}`} className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full transition-colors">
+                      #{tagStr}
+                    </Link>
+                  );
+                })}
               </div>
             )}
 

@@ -4,7 +4,9 @@ import { useRouter } from "next/router";
 import { ordersAPI } from "../../lib/api";
 import { useAuth } from "../../pages/_app";
 import toast from "react-hot-toast";
-import { FiHeart, FiShoppingCart, FiStar } from "react-icons/fi";
+import { FiHeart, FiShoppingCart, FiStar, FiEdit3 } from "react-icons/fi";
+
+const JERSEY_TAGS = ["jersey","jerseys","kit","football kit","soccer jersey","customizable","custom jersey","sportswear"];
 
 export default function ProductCard({ product, wishlisted, onWishlist }) {
   const { user } = useAuth();
@@ -14,6 +16,12 @@ export default function ProductCard({ product, wishlisted, onWishlist }) {
   const discount = product.compare_price
     ? Math.round(((product.compare_price - product.price) / product.compare_price) * 100)
     : 0;
+
+  // Check if this product supports jersey customization
+  const isJerseyProduct = product?.tags?.some(t => {
+    const tagStr = typeof t === "string" ? t : t?.name ?? "";
+    return JERSEY_TAGS.includes(tagStr.toLowerCase().trim());
+  }) ?? false;
 
   const addToCart = async (e) => {
     e.preventDefault();
@@ -60,6 +68,11 @@ export default function ProductCard({ product, wishlisted, onWishlist }) {
               Out of Stock
             </span>
           )}
+          {isJerseyProduct && (
+            <span className="bg-green-900 text-white text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+              <FiEdit3 size={9} /> Custom
+            </span>
+          )}
         </div>
 
         {/* Wishlist button */}
@@ -73,15 +86,26 @@ export default function ProductCard({ product, wishlisted, onWishlist }) {
           </button>
         )}
 
-        {/* Quick add to cart */}
-        <button
-          onClick={addToCart}
-          disabled={adding || product.stock === 0}
-          className="absolute bottom-2 left-2 right-2 bg-green-900 hover:bg-green-800 text-white text-xs font-semibold py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
-        >
-          <FiShoppingCart size={12} />
-          {adding ? "Adding..." : "Quick Add"}
-        </button>
+        {/* Quick add — jersey products go to product page to customize, others quick add */}
+        {isJerseyProduct ? (
+          <Link
+            href={`/products/${product.slug}`}
+            onClick={(e) => e.stopPropagation()}
+            className="absolute bottom-2 left-2 right-2 bg-green-900 hover:bg-green-800 text-white text-xs font-semibold py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-1.5"
+          >
+            <FiEdit3 size={12} />
+            Customize & Buy
+          </Link>
+        ) : (
+          <button
+            onClick={addToCart}
+            disabled={adding || product.stock === 0}
+            className="absolute bottom-2 left-2 right-2 bg-green-900 hover:bg-green-800 text-white text-xs font-semibold py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+          >
+            <FiShoppingCart size={12} />
+            {adding ? "Adding..." : "Quick Add"}
+          </button>
+        )}
       </div>
 
       <div className="p-3">
