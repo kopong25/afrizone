@@ -14,6 +14,142 @@ import { FiShoppingCart, FiMapPin, FiPackage, FiShare2, FiHeart, FiCheck, FiEdit
 
 const JERSEY_TAGS = ["jersey","jerseys","kit","football kit","soccer jersey","customizable","custom jersey","sportswear"];
 
+// ── Jersey SVG Preview Component ─────────────────────────────
+function JerseyPreview({ name, number }) {
+  return (
+    <div className="w-full h-full bg-gray-900 flex flex-col items-center justify-center relative">
+      <p className="absolute top-3 text-gray-400 text-xs uppercase tracking-widest font-bold z-10">Back of Jersey</p>
+
+      <svg viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg" className="w-full h-full max-h-full" style={{maxWidth:"320px"}}>
+        {/* Shadow/depth */}
+        <defs>
+          <linearGradient id="jerseyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#1a5c38" />
+            <stop offset="50%" stopColor="#166534" />
+            <stop offset="100%" stopColor="#14532d" />
+          </linearGradient>
+          <linearGradient id="sleeveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#15803d" />
+            <stop offset="100%" stopColor="#166534" />
+          </linearGradient>
+          <linearGradient id="collarGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#0f4023" />
+            <stop offset="100%" stopColor="#166534" />
+          </linearGradient>
+          <filter id="shadow">
+            <feDropShadow dx="2" dy="4" stdDeviation="4" floodOpacity="0.4" />
+          </filter>
+        </defs>
+
+        {/* Jersey body */}
+        <path
+          d="M 75 55
+             L 40 75
+             L 20 130
+             L 55 140
+             L 55 290
+             L 245 290
+             L 245 140
+             L 280 130
+             L 260 75
+             L 225 55
+             C 215 80 195 95 150 95
+             C 105 95 85 80 75 55 Z"
+          fill="url(#jerseyGrad)"
+          filter="url(#shadow)"
+        />
+
+        {/* Left sleeve highlight */}
+        <path
+          d="M 75 55 L 40 75 L 20 130 L 55 140 L 55 100 C 65 85 72 70 75 55 Z"
+          fill="url(#sleeveGrad)"
+          opacity="0.6"
+        />
+
+        {/* Right sleeve highlight */}
+        <path
+          d="M 225 55 L 260 75 L 280 130 L 245 140 L 245 100 C 235 85 228 70 225 55 Z"
+          fill="url(#sleeveGrad)"
+          opacity="0.6"
+        />
+
+        {/* Collar */}
+        <path
+          d="M 105 58 C 110 85 130 98 150 98 C 170 98 190 85 195 58 C 185 52 170 48 150 48 C 130 48 115 52 105 58 Z"
+          fill="url(#collarGrad)"
+        />
+
+        {/* Collar inner line */}
+        <path
+          d="M 115 62 C 120 82 135 93 150 93 C 165 93 180 82 185 62"
+          fill="none"
+          stroke="#0f4023"
+          strokeWidth="1.5"
+          opacity="0.5"
+        />
+
+        {/* Shoulder seam lines */}
+        <line x1="75" y1="55" x2="55" y2="140" stroke="white" strokeWidth="0.8" opacity="0.15" />
+        <line x1="225" y1="55" x2="245" y2="140" stroke="white" strokeWidth="0.8" opacity="0.15" />
+
+        {/* Side seam lines */}
+        <line x1="55" y1="140" x2="55" y2="290" stroke="white" strokeWidth="0.8" opacity="0.15" />
+        <line x1="245" y1="140" x2="245" y2="290" stroke="white" strokeWidth="0.8" opacity="0.15" />
+
+        {/* Hem line */}
+        <line x1="55" y1="280" x2="245" y2="280" stroke="white" strokeWidth="1" opacity="0.2" />
+
+        {/* White stripe accents on sleeves */}
+        <path d="M 32 95 L 25 118 L 30 119 L 37 97 Z" fill="white" opacity="0.25" />
+        <path d="M 268 95 L 275 118 L 270 119 L 263 97 Z" fill="white" opacity="0.25" />
+
+        {/* Player Name */}
+        {name && (
+          <text
+            x="150"
+            y="175"
+            textAnchor="middle"
+            fill="white"
+            fontFamily="Arial Black, Impact, sans-serif"
+            fontWeight="900"
+            fontSize={name.length > 10 ? "18" : name.length > 7 ? "22" : "26"}
+            letterSpacing="6"
+            style={{ textShadow: "0 2px 4px rgba(0,0,0,0.5)" }}
+          >
+            {name}
+          </text>
+        )}
+
+        {/* Jersey Number */}
+        {number && (
+          <text
+            x="150"
+            y={name ? "255" : "235"}
+            textAnchor="middle"
+            fill="white"
+            fontFamily="Arial Black, Impact, sans-serif"
+            fontWeight="900"
+            fontSize={name ? "72" : "90"}
+            style={{ textShadow: "0 3px 6px rgba(0,0,0,0.5)" }}
+          >
+            {number}
+          </text>
+        )}
+
+        {/* If only number, no name — center it more */}
+        {!name && !number && (
+          <text x="150" y="200" textAnchor="middle" fill="white" opacity="0.3"
+            fontFamily="Arial, sans-serif" fontSize="14">
+            Enter name / number
+          </text>
+        )}
+      </svg>
+
+      <p className="absolute bottom-3 text-gray-500 text-xs font-medium">Preview only — actual print may vary</p>
+    </div>
+  );
+}
+
 export default function ProductDetail() {
   const router = useRouter();
   const { id: slug } = router.query;
@@ -30,7 +166,6 @@ export default function ProductDetail() {
   const [wishlisted, setWishlisted] = useState(false);
   const [selectedVariants, setSelectedVariants] = useState({});
 
-  // ── Jersey Customization State ──────────────────────────────
   const [customizeJersey, setCustomizeJersey] = useState(false);
   const [jerseyName, setJerseyName] = useState("");
   const [jerseyNumber, setJerseyNumber] = useState("");
@@ -72,8 +207,7 @@ export default function ProductDetail() {
     return JERSEY_TAGS.includes(tagStr.toLowerCase().trim());
   }) ?? false;
 
-  // Show jersey back preview in main image when customizing and name/number entered
-  const showJerseyPreview = customizeJersey && isJerseyProduct && (jerseyName || jerseyNumber);
+  const showJerseyPreview = customizeJersey && isJerseyProduct;
 
   const toggleWishlist = async () => {
     if (!user) { router.push("/login"); return; }
@@ -89,10 +223,7 @@ export default function ProductDetail() {
     const requiredGroups = Object.keys(variantGroups).filter(g => g.toLowerCase() !== "customization");
     if (requiredGroups.length > 0) {
       const missing = requiredGroups.filter(g => !selectedVariants[g]);
-      if (missing.length > 0) {
-        toast.error(`Please select: ${missing.join(", ")}`);
-        return;
-      }
+      if (missing.length > 0) { toast.error(`Please select: ${missing.join(", ")}`); return; }
     }
     if (customizeJersey && isJerseyProduct) {
       if (!jerseyName.trim() && !jerseyNumber.trim()) {
@@ -178,7 +309,6 @@ export default function ProductDetail() {
     <>
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Breadcrumb */}
         <nav className="text-sm text-gray-400 mb-6 flex items-center gap-2 flex-wrap">
           <Link href="/" className="hover:text-green-900">Home</Link>
           <span>/</span>
@@ -190,29 +320,8 @@ export default function ProductDetail() {
           {/* Images */}
           <div>
             <div className="aspect-square bg-gray-100 rounded-2xl overflow-hidden mb-3 relative">
-
-              {/* Jersey back preview replaces main image when customizing */}
               {showJerseyPreview ? (
-                <div className="w-full h-full bg-green-900 flex flex-col items-center justify-center relative">
-                  <p className="absolute top-4 text-green-400 text-xs uppercase tracking-widest font-bold">Back of Jersey</p>
-                  {jerseyName && (
-                    <p
-                      className="text-white font-black tracking-widest leading-none mb-2 px-4 text-center"
-                      style={{ letterSpacing: "8px", fontFamily: "Arial Black, sans-serif", fontSize: "clamp(20px, 5vw, 42px)" }}
-                    >
-                      {jerseyName}
-                    </p>
-                  )}
-                  {jerseyNumber && (
-                    <p
-                      className="text-white font-black leading-none"
-                      style={{ fontSize: "clamp(80px, 18vw, 160px)", fontFamily: "Arial Black, sans-serif", lineHeight: 1 }}
-                    >
-                      {jerseyNumber}
-                    </p>
-                  )}
-                  <p className="absolute bottom-4 text-green-500 text-xs font-medium">Preview only — actual print may vary</p>
-                </div>
+                <JerseyPreview name={jerseyName} number={jerseyNumber} />
               ) : (
                 <>
                   {images[selectedImage] ? (
@@ -220,25 +329,23 @@ export default function ProductDetail() {
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-8xl">🛒</div>
                   )}
+                  {discount > 0 && (
+                    <div className="absolute top-4 left-4 bg-red-500 text-white text-sm font-black px-3 py-1 rounded-full">-{discount}%</div>
+                  )}
+                  {isJerseyProduct && (
+                    <div className="absolute top-4 right-4 bg-green-900 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                      <FiEdit3 size={11} /> Customizable
+                    </div>
+                  )}
                 </>
               )}
-
-              {discount > 0 && !showJerseyPreview && (
-                <div className="absolute top-4 left-4 bg-red-500 text-white text-sm font-black px-3 py-1 rounded-full">-{discount}%</div>
-              )}
-              {isJerseyProduct && !showJerseyPreview && (
-                <div className="absolute top-4 right-4 bg-green-900 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                  <FiEdit3 size={11} /> Customizable
-                </div>
-              )}
               {showJerseyPreview && (
-                <div className="absolute top-4 right-4 bg-white bg-opacity-20 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                <div className="absolute top-3 right-3 bg-white bg-opacity-20 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
                   <FiEdit3 size={11} /> Live Preview
                 </div>
               )}
             </div>
 
-            {/* Thumbnail strip — hidden when preview is showing */}
             {images.length > 1 && !showJerseyPreview && (
               <div className="flex gap-2 overflow-x-auto">
                 {images.map((img, i) => (
@@ -249,12 +356,8 @@ export default function ProductDetail() {
                 ))}
               </div>
             )}
-
-            {/* When previewing, show a "back to photos" hint */}
-            {showJerseyPreview && images.length > 0 && (
-              <p className="text-xs text-center text-gray-400 mt-2">
-                ← Clear name/number above to see product photos
-              </p>
+            {showJerseyPreview && (
+              <p className="text-xs text-center text-gray-400 mt-2">← Uncheck customization above to see product photos</p>
             )}
           </div>
 
@@ -275,7 +378,6 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* Price */}
             <div className="flex items-baseline gap-3 mb-1">
               <span className="text-4xl font-black text-green-900">${finalPrice.toFixed(2)}</span>
               {product.compare_price && <span className="text-xl text-gray-300 line-through">${Number(product.compare_price).toFixed(2)}</span>}
@@ -287,7 +389,6 @@ export default function ProductDetail() {
               {product.stock > 0 ? <span className="text-green-600 font-medium">✓ In stock</span> : <span className="text-red-500 font-medium">Out of stock</span>}
             </p>
 
-            {/* Store */}
             {product.store && (
               <Link href={`/stores/${product.store.slug}`}
                 className="flex items-center gap-3 bg-gray-50 hover:bg-gray-100 rounded-xl p-3 mb-5 transition-colors border">
@@ -303,7 +404,6 @@ export default function ProductDetail() {
               </Link>
             )}
 
-            {/* Product Variants */}
             {Object.entries(variantGroups).map(([groupName, groupVariants]) => (
               <div key={groupName} className="mb-4">
                 <label className="text-sm font-bold text-gray-700 block mb-2">
@@ -332,7 +432,6 @@ export default function ProductDetail() {
             {/* ── JERSEY CUSTOMIZATION BLOCK ── */}
             {isJerseyProduct && (
               <div className={`rounded-2xl mb-5 overflow-hidden border-2 transition-all ${customizeJersey ? "border-green-700" : "border-gray-200"}`}>
-                {/* Toggle header */}
                 <button
                   onClick={() => setCustomizeJersey(!customizeJersey)}
                   className={`w-full flex items-center justify-between p-4 transition-colors ${customizeJersey ? "bg-green-50" : "bg-gray-50 hover:bg-gray-100"}`}>
@@ -355,11 +454,9 @@ export default function ProductDetail() {
                   <span className={`text-gray-400 transition-transform ${customizeJersey ? "rotate-180" : ""}`}>▾</span>
                 </button>
 
-                {/* Customization form */}
                 {customizeJersey && (
                   <div className="p-4 bg-white border-t border-gray-100">
                     <div className="grid grid-cols-2 gap-4 mb-4">
-                      {/* Player Name */}
                       <div className="col-span-2 md:col-span-1">
                         <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1.5">
                           Player Name <span className="text-gray-400 font-normal normal-case">(max 16 chars)</span>
@@ -373,8 +470,6 @@ export default function ProductDetail() {
                         />
                         <p className="text-xs text-gray-400 mt-1 text-right">{jerseyName.length}/16</p>
                       </div>
-
-                      {/* Jersey Number */}
                       <div className="col-span-2 md:col-span-1">
                         <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1.5">
                           Jersey Number <span className="text-gray-400 font-normal normal-case">(1–99)</span>
@@ -393,7 +488,6 @@ export default function ProductDetail() {
                       </div>
                     </div>
 
-                    {/* Hint to look at main image */}
                     {(jerseyName || jerseyNumber) && (
                       <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-4 text-center">
                         <p className="text-xs text-green-800 font-semibold flex items-center justify-center gap-1.5">
@@ -402,7 +496,6 @@ export default function ProductDetail() {
                       </div>
                     )}
 
-                    {/* Seller note */}
                     <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
                       <p className="text-xs text-yellow-800 font-semibold flex items-center gap-1.5 mb-1">
                         ℹ️ Customization Info
@@ -417,7 +510,6 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* Quantity + Add to cart */}
             <div className="flex gap-3 mb-4">
               <div className="flex items-center border rounded-xl overflow-hidden">
                 <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="px-4 py-3 hover:bg-gray-100 font-bold text-lg">−</button>
@@ -432,7 +524,6 @@ export default function ProductDetail() {
 
             {addedToCart && <Link href="/cart" className="block text-center text-sm text-green-700 font-semibold hover:underline mb-4">View Cart & Checkout →</Link>}
 
-            {/* Tags */}
             {product.tags?.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {product.tags.map((tag) => {
