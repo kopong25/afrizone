@@ -14,139 +14,180 @@ import { FiShoppingCart, FiMapPin, FiPackage, FiShare2, FiHeart, FiCheck, FiEdit
 
 const JERSEY_TAGS = ["jersey","jerseys","kit","football kit","soccer jersey","customizable","custom jersey","sportswear"];
 
-// ── Back-of-Jersey SVG Preview ───────────────────────────────
+// ── Realistic Back-of-Jersey SVG Preview ─────────────────────
 function JerseyPreview({ name, number }) {
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center relative" style={{ background: "#f3f4f6" }}>
-      <p className="absolute top-3 text-gray-500 text-xs uppercase tracking-widest font-bold z-10">Back of Jersey</p>
+    <div className="w-full h-full flex flex-col items-center justify-center relative"
+      style={{ background: "linear-gradient(135deg, #e8e8e8 0%, #d4d4d4 100%)" }}>
 
-      <svg viewBox="0 0 300 330" xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-full"
-        style={{ maxWidth: "300px", maxHeight: "300px" }}>
+      <p className="absolute top-3 left-0 right-0 text-center text-gray-600 text-xs uppercase tracking-widest font-bold z-10">
+        Back of Jersey
+      </p>
+
+      <svg viewBox="0 0 340 380" xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-full" style={{ maxWidth: "320px", maxHeight: "320px" }}>
         <defs>
-          {/* White jersey body gradient */}
-          <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="60%" stopColor="#f9fafb" />
-            <stop offset="100%" stopColor="#f3f4f6" />
+          <linearGradient id="bodyMain" x1="0%" y1="0%" x2="5%" y2="100%">
+            <stop offset="0%" stopColor="#f5f5f0" />
+            <stop offset="50%" stopColor="#efefea" />
+            <stop offset="100%" stopColor="#e8e8e3" />
           </linearGradient>
-          {/* Sleeve gradient */}
-          <linearGradient id="sleeveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#f3f4f6" />
-            <stop offset="100%" stopColor="#ffffff" />
+          <linearGradient id="leftPanel" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#b91c1c" />
+            <stop offset="100%" stopColor="#dc2626" />
           </linearGradient>
-          {/* Drop shadow */}
-          <filter id="jerseyShad" x="-10%" y="-5%" width="120%" height="120%">
-            <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#00000022" />
+          <linearGradient id="rightPanel" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#dc2626" />
+            <stop offset="100%" stopColor="#b91c1c" />
+          </linearGradient>
+          <linearGradient id="leftSleeve" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#f0f0eb" />
+            <stop offset="100%" stopColor="#e4e4df" />
+          </linearGradient>
+          <linearGradient id="rightSleeve" x1="100%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#f0f0eb" />
+            <stop offset="100%" stopColor="#e4e4df" />
+          </linearGradient>
+          <filter id="jerseyDrop">
+            <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#00000030" />
           </filter>
+          <filter id="textShadow">
+            <feDropShadow dx="0" dy="1" stdDeviation="1" floodColor="#00000040" />
+          </filter>
+          <clipPath id="jerseyClip">
+            <path d="M 88 42 L 52 68 L 22 148 L 68 162 L 68 340 L 272 340 L 272 162 L 318 148 L 288 68 L 252 42 Q 232 58 170 58 Q 108 58 88 42 Z" />
+          </clipPath>
         </defs>
 
-        {/* ── BACK of jersey — no collar, flat neckline ── */}
+        {/* ── JERSEY SHAPE ── */}
 
-        {/* Main body */}
+        {/* Main white body */}
         <path
-          d="M 80 50
-             L 45 72
-             L 18 135
-             L 58 148
-             L 58 300
-             L 242 300
-             L 242 148
-             L 282 135
-             L 255 72
-             L 220 50
-             Q 200 52 150 52
-             Q 100 52 80 50 Z"
-          fill="url(#bodyGrad)"
-          stroke="#e5e7eb"
-          strokeWidth="1.5"
-          filter="url(#jerseyShad)"
+          d="M 88 42 L 52 68 L 22 148 L 68 162 L 68 340 L 272 340 L 272 162 L 318 148 L 288 68 L 252 42 Q 232 58 170 58 Q 108 58 88 42 Z"
+          fill="url(#bodyMain)"
+          filter="url(#jerseyDrop)"
         />
 
-        {/* Back neckline — small curved scoop at top center */}
+        {/* Left red side panel */}
         <path
-          d="M 108 50 Q 150 68 192 50"
-          fill="#f9fafb"
-          stroke="#e5e7eb"
-          strokeWidth="1.5"
+          d="M 68 162 L 68 340 L 108 340 L 108 175 Z"
+          fill="url(#leftPanel)"
         />
 
-        {/* Left sleeve panel — slightly darker tint */}
+        {/* Right red side panel */}
         <path
-          d="M 80 50 L 45 72 L 18 135 L 58 148 L 58 110 Q 68 80 80 50 Z"
-          fill="#f1f5f9"
-          stroke="#e5e7eb"
-          strokeWidth="1"
+          d="M 272 162 L 272 340 L 232 340 L 232 175 Z"
+          fill="url(#rightPanel)"
         />
 
-        {/* Right sleeve panel */}
+        {/* Left sleeve */}
         <path
-          d="M 220 50 L 255 72 L 282 135 L 242 148 L 242 110 Q 232 80 220 50 Z"
-          fill="#f1f5f9"
-          stroke="#e5e7eb"
-          strokeWidth="1"
+          d="M 88 42 L 52 68 L 22 148 L 68 162 L 68 110 Q 76 78 88 42 Z"
+          fill="url(#leftSleeve)"
+          stroke="#d4d4ce"
+          strokeWidth="0.5"
         />
 
-        {/* Shoulder seam line left */}
-        <line x1="80" y1="50" x2="58" y2="148" stroke="#d1d5db" strokeWidth="1" />
-        {/* Shoulder seam line right */}
-        <line x1="220" y1="50" x2="242" y2="148" stroke="#d1d5db" strokeWidth="1" />
+        {/* Right sleeve */}
+        <path
+          d="M 252 42 L 288 68 L 318 148 L 272 162 L 272 110 Q 264 78 252 42 Z"
+          fill="url(#rightSleeve)"
+          stroke="#d4d4ce"
+          strokeWidth="0.5"
+        />
 
-        {/* Side seam left */}
-        <line x1="58" y1="148" x2="58" y2="300" stroke="#e5e7eb" strokeWidth="1" />
-        {/* Side seam right */}
-        <line x1="242" y1="148" x2="242" y2="300" stroke="#e5e7eb" strokeWidth="1" />
+        {/* Left sleeve — green stripe */}
+        <path
+          d="M 28 128 L 24 142 L 68 156 L 68 143 Z"
+          fill="#166534"
+        />
+        {/* Left sleeve — red stripe */}
+        <path
+          d="M 24 142 L 22 148 L 68 162 L 68 156 Z"
+          fill="#dc2626"
+        />
 
-        {/* Hem */}
-        <line x1="58" y1="290" x2="242" y2="290" stroke="#e5e7eb" strokeWidth="1.5" />
+        {/* Right sleeve — green stripe */}
+        <path
+          d="M 312 128 L 316 142 L 272 156 L 272 143 Z"
+          fill="#166534"
+        />
+        {/* Right sleeve — red stripe */}
+        <path
+          d="M 316 142 L 318 148 L 272 162 L 272 156 Z"
+          fill="#dc2626"
+        />
 
-        {/* Sleeve cuffs */}
-        <line x1="18" y1="132" x2="58" y2="145" stroke="#d1d5db" strokeWidth="2" />
-        <line x1="282" y1="132" x2="242" y2="145" stroke="#d1d5db" strokeWidth="2" />
+        {/* Back neckline — small scoop, no collar */}
+        <path
+          d="M 118 44 Q 170 72 222 44"
+          fill="none"
+          stroke="#c8c8c3"
+          strokeWidth="2"
+        />
 
-        {/* ── NAME on back ── */}
+        {/* Subtle body seam lines */}
+        <line x1="88" y1="42" x2="68" y2="162" stroke="#d8d8d3" strokeWidth="0.8" />
+        <line x1="252" y1="42" x2="272" y2="162" stroke="#d8d8d3" strokeWidth="0.8" />
+        <line x1="68" y1="162" x2="68" y2="340" stroke="#d8d8d3" strokeWidth="0.8" />
+        <line x1="272" y1="162" x2="272" y2="340" stroke="#d8d8d3" strokeWidth="0.8" />
+
+        {/* Hem line */}
+        <line x1="68" y1="330" x2="272" y2="330" stroke="#d0d0cb" strokeWidth="1.2" />
+
+        {/* ── NAME printed on back ── */}
         {name && (
           <text
-            x="150"
-            y="168"
+            x="170"
+            y="210"
             textAnchor="middle"
-            fill="#111827"
+            fill="#1a1a1a"
             fontFamily="Arial Black, Impact, sans-serif"
             fontWeight="900"
-            fontSize={name.length > 10 ? "16" : name.length > 7 ? "20" : "24"}
+            fontSize={name.length > 11 ? "17" : name.length > 8 ? "21" : "26"}
             letterSpacing="5"
+            filter="url(#textShadow)"
           >
             {name}
           </text>
         )}
 
-        {/* ── NUMBER on back ── */}
+        {/* ── NUMBER printed on back ── */}
         {number && (
           <text
-            x="150"
-            y={name ? "262" : "250"}
+            x="170"
+            y={name ? "308" : "295"}
             textAnchor="middle"
-            fill="#111827"
+            fill="#1a1a1a"
             fontFamily="Arial Black, Impact, sans-serif"
             fontWeight="900"
-            fontSize={name ? "88" : "100"}
+            fontSize={name ? "96" : "108"}
+            filter="url(#textShadow)"
           >
             {number}
           </text>
         )}
 
-        {/* Placeholder when nothing entered */}
+        {/* Placeholder when nothing entered yet */}
         {!name && !number && (
           <>
-            <rect x="100" y="145" width="100" height="18" rx="4" fill="#e5e7eb" opacity="0.7" />
-            <rect x="115" y="185" width="70" height="60" rx="6" fill="#e5e7eb" opacity="0.5" />
-            <text x="150" y="158" textAnchor="middle" fill="#9ca3af" fontSize="11" fontFamily="Arial, sans-serif">YOUR NAME</text>
-            <text x="150" y="225" textAnchor="middle" fill="#9ca3af" fontSize="13" fontFamily="Arial, sans-serif">#00</text>
+            <rect x="120" y="185" width="100" height="20" rx="5" fill="#d4d4ce" opacity="0.8" />
+            <rect x="130" y="220" width="80" height="68" rx="6" fill="#d4d4ce" opacity="0.6" />
+            <text x="170" y="200" textAnchor="middle" fill="#aaaaaa" fontSize="12"
+              fontFamily="Arial, sans-serif" fontWeight="bold" letterSpacing="3">
+              YOUR NAME
+            </text>
+            <text x="170" y="268" textAnchor="middle" fill="#aaaaaa" fontSize="14"
+              fontFamily="Arial, sans-serif" fontWeight="bold">
+              # 00
+            </text>
           </>
         )}
       </svg>
 
-      <p className="absolute bottom-3 text-gray-400 text-xs font-medium">Preview only — actual print may vary</p>
+      <p className="absolute bottom-2 left-0 right-0 text-center text-gray-500 text-xs">
+        Preview only — actual print may vary
+      </p>
     </div>
   );
 }
@@ -318,7 +359,7 @@ export default function ProductDetail() {
         </nav>
 
         <div className="grid md:grid-cols-2 gap-10 mb-6">
-          {/* Images / Preview */}
+          {/* Images / Jersey Preview */}
           <div>
             <div className="aspect-square bg-gray-100 rounded-2xl overflow-hidden mb-3 relative">
               {showJerseyPreview ? (
