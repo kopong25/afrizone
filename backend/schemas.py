@@ -227,12 +227,14 @@ class ProductListOut(BaseModel):
     country_of_origin: Optional[str]
     avg_rating: float
     review_count: int
+    stock: int
+    is_featured: bool
+    tags: List[str] = []
     store_id: int
     store: Optional[StoreMinimal] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
-
 
 # ─────────────────────────────────────────────
 # CART SCHEMAS
