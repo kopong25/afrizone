@@ -14,138 +14,139 @@ import { FiShoppingCart, FiMapPin, FiPackage, FiShare2, FiHeart, FiCheck, FiEdit
 
 const JERSEY_TAGS = ["jersey","jerseys","kit","football kit","soccer jersey","customizable","custom jersey","sportswear"];
 
-// ── Jersey SVG Preview Component ─────────────────────────────
+// ── Back-of-Jersey SVG Preview ───────────────────────────────
 function JerseyPreview({ name, number }) {
   return (
-    <div className="w-full h-full bg-gray-900 flex flex-col items-center justify-center relative">
-      <p className="absolute top-3 text-gray-400 text-xs uppercase tracking-widest font-bold z-10">Back of Jersey</p>
+    <div className="w-full h-full flex flex-col items-center justify-center relative" style={{ background: "#f3f4f6" }}>
+      <p className="absolute top-3 text-gray-500 text-xs uppercase tracking-widest font-bold z-10">Back of Jersey</p>
 
-      <svg viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg" className="w-full h-full max-h-full" style={{maxWidth:"320px"}}>
-        {/* Shadow/depth */}
+      <svg viewBox="0 0 300 330" xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-full"
+        style={{ maxWidth: "300px", maxHeight: "300px" }}>
         <defs>
-          <linearGradient id="jerseyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#1a5c38" />
-            <stop offset="50%" stopColor="#166534" />
-            <stop offset="100%" stopColor="#14532d" />
+          {/* White jersey body gradient */}
+          <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="60%" stopColor="#f9fafb" />
+            <stop offset="100%" stopColor="#f3f4f6" />
           </linearGradient>
+          {/* Sleeve gradient */}
           <linearGradient id="sleeveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#15803d" />
-            <stop offset="100%" stopColor="#166534" />
+            <stop offset="0%" stopColor="#f3f4f6" />
+            <stop offset="100%" stopColor="#ffffff" />
           </linearGradient>
-          <linearGradient id="collarGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#0f4023" />
-            <stop offset="100%" stopColor="#166534" />
-          </linearGradient>
-          <filter id="shadow">
-            <feDropShadow dx="2" dy="4" stdDeviation="4" floodOpacity="0.4" />
+          {/* Drop shadow */}
+          <filter id="jerseyShad" x="-10%" y="-5%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#00000022" />
           </filter>
         </defs>
 
-        {/* Jersey body */}
-        <path
-          d="M 75 55
-             L 40 75
-             L 20 130
-             L 55 140
-             L 55 290
-             L 245 290
-             L 245 140
-             L 280 130
-             L 260 75
-             L 225 55
-             C 215 80 195 95 150 95
-             C 105 95 85 80 75 55 Z"
-          fill="url(#jerseyGrad)"
-          filter="url(#shadow)"
-        />
+        {/* ── BACK of jersey — no collar, flat neckline ── */}
 
-        {/* Left sleeve highlight */}
+        {/* Main body */}
         <path
-          d="M 75 55 L 40 75 L 20 130 L 55 140 L 55 100 C 65 85 72 70 75 55 Z"
-          fill="url(#sleeveGrad)"
-          opacity="0.6"
-        />
-
-        {/* Right sleeve highlight */}
-        <path
-          d="M 225 55 L 260 75 L 280 130 L 245 140 L 245 100 C 235 85 228 70 225 55 Z"
-          fill="url(#sleeveGrad)"
-          opacity="0.6"
-        />
-
-        {/* Collar */}
-        <path
-          d="M 105 58 C 110 85 130 98 150 98 C 170 98 190 85 195 58 C 185 52 170 48 150 48 C 130 48 115 52 105 58 Z"
-          fill="url(#collarGrad)"
-        />
-
-        {/* Collar inner line */}
-        <path
-          d="M 115 62 C 120 82 135 93 150 93 C 165 93 180 82 185 62"
-          fill="none"
-          stroke="#0f4023"
+          d="M 80 50
+             L 45 72
+             L 18 135
+             L 58 148
+             L 58 300
+             L 242 300
+             L 242 148
+             L 282 135
+             L 255 72
+             L 220 50
+             Q 200 52 150 52
+             Q 100 52 80 50 Z"
+          fill="url(#bodyGrad)"
+          stroke="#e5e7eb"
           strokeWidth="1.5"
-          opacity="0.5"
+          filter="url(#jerseyShad)"
         />
 
-        {/* Shoulder seam lines */}
-        <line x1="75" y1="55" x2="55" y2="140" stroke="white" strokeWidth="0.8" opacity="0.15" />
-        <line x1="225" y1="55" x2="245" y2="140" stroke="white" strokeWidth="0.8" opacity="0.15" />
+        {/* Back neckline — small curved scoop at top center */}
+        <path
+          d="M 108 50 Q 150 68 192 50"
+          fill="#f9fafb"
+          stroke="#e5e7eb"
+          strokeWidth="1.5"
+        />
 
-        {/* Side seam lines */}
-        <line x1="55" y1="140" x2="55" y2="290" stroke="white" strokeWidth="0.8" opacity="0.15" />
-        <line x1="245" y1="140" x2="245" y2="290" stroke="white" strokeWidth="0.8" opacity="0.15" />
+        {/* Left sleeve panel — slightly darker tint */}
+        <path
+          d="M 80 50 L 45 72 L 18 135 L 58 148 L 58 110 Q 68 80 80 50 Z"
+          fill="#f1f5f9"
+          stroke="#e5e7eb"
+          strokeWidth="1"
+        />
 
-        {/* Hem line */}
-        <line x1="55" y1="280" x2="245" y2="280" stroke="white" strokeWidth="1" opacity="0.2" />
+        {/* Right sleeve panel */}
+        <path
+          d="M 220 50 L 255 72 L 282 135 L 242 148 L 242 110 Q 232 80 220 50 Z"
+          fill="#f1f5f9"
+          stroke="#e5e7eb"
+          strokeWidth="1"
+        />
 
-        {/* White stripe accents on sleeves */}
-        <path d="M 32 95 L 25 118 L 30 119 L 37 97 Z" fill="white" opacity="0.25" />
-        <path d="M 268 95 L 275 118 L 270 119 L 263 97 Z" fill="white" opacity="0.25" />
+        {/* Shoulder seam line left */}
+        <line x1="80" y1="50" x2="58" y2="148" stroke="#d1d5db" strokeWidth="1" />
+        {/* Shoulder seam line right */}
+        <line x1="220" y1="50" x2="242" y2="148" stroke="#d1d5db" strokeWidth="1" />
 
-        {/* Player Name */}
+        {/* Side seam left */}
+        <line x1="58" y1="148" x2="58" y2="300" stroke="#e5e7eb" strokeWidth="1" />
+        {/* Side seam right */}
+        <line x1="242" y1="148" x2="242" y2="300" stroke="#e5e7eb" strokeWidth="1" />
+
+        {/* Hem */}
+        <line x1="58" y1="290" x2="242" y2="290" stroke="#e5e7eb" strokeWidth="1.5" />
+
+        {/* Sleeve cuffs */}
+        <line x1="18" y1="132" x2="58" y2="145" stroke="#d1d5db" strokeWidth="2" />
+        <line x1="282" y1="132" x2="242" y2="145" stroke="#d1d5db" strokeWidth="2" />
+
+        {/* ── NAME on back ── */}
         {name && (
           <text
             x="150"
-            y="175"
+            y="168"
             textAnchor="middle"
-            fill="white"
+            fill="#111827"
             fontFamily="Arial Black, Impact, sans-serif"
             fontWeight="900"
-            fontSize={name.length > 10 ? "18" : name.length > 7 ? "22" : "26"}
-            letterSpacing="6"
-            style={{ textShadow: "0 2px 4px rgba(0,0,0,0.5)" }}
+            fontSize={name.length > 10 ? "16" : name.length > 7 ? "20" : "24"}
+            letterSpacing="5"
           >
             {name}
           </text>
         )}
 
-        {/* Jersey Number */}
+        {/* ── NUMBER on back ── */}
         {number && (
           <text
             x="150"
-            y={name ? "255" : "235"}
+            y={name ? "262" : "250"}
             textAnchor="middle"
-            fill="white"
+            fill="#111827"
             fontFamily="Arial Black, Impact, sans-serif"
             fontWeight="900"
-            fontSize={name ? "72" : "90"}
-            style={{ textShadow: "0 3px 6px rgba(0,0,0,0.5)" }}
+            fontSize={name ? "88" : "100"}
           >
             {number}
           </text>
         )}
 
-        {/* If only number, no name — center it more */}
+        {/* Placeholder when nothing entered */}
         {!name && !number && (
-          <text x="150" y="200" textAnchor="middle" fill="white" opacity="0.3"
-            fontFamily="Arial, sans-serif" fontSize="14">
-            Enter name / number
-          </text>
+          <>
+            <rect x="100" y="145" width="100" height="18" rx="4" fill="#e5e7eb" opacity="0.7" />
+            <rect x="115" y="185" width="70" height="60" rx="6" fill="#e5e7eb" opacity="0.5" />
+            <text x="150" y="158" textAnchor="middle" fill="#9ca3af" fontSize="11" fontFamily="Arial, sans-serif">YOUR NAME</text>
+            <text x="150" y="225" textAnchor="middle" fill="#9ca3af" fontSize="13" fontFamily="Arial, sans-serif">#00</text>
+          </>
         )}
       </svg>
 
-      <p className="absolute bottom-3 text-gray-500 text-xs font-medium">Preview only — actual print may vary</p>
+      <p className="absolute bottom-3 text-gray-400 text-xs font-medium">Preview only — actual print may vary</p>
     </div>
   );
 }
@@ -317,7 +318,7 @@ export default function ProductDetail() {
         </nav>
 
         <div className="grid md:grid-cols-2 gap-10 mb-6">
-          {/* Images */}
+          {/* Images / Preview */}
           <div>
             <div className="aspect-square bg-gray-100 rounded-2xl overflow-hidden mb-3 relative">
               {showJerseyPreview ? (
@@ -340,7 +341,7 @@ export default function ProductDetail() {
                 </>
               )}
               {showJerseyPreview && (
-                <div className="absolute top-3 right-3 bg-white bg-opacity-20 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                <div className="absolute top-3 right-3 bg-green-900 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
                   <FiEdit3 size={11} /> Live Preview
                 </div>
               )}
@@ -357,7 +358,7 @@ export default function ProductDetail() {
               </div>
             )}
             {showJerseyPreview && (
-              <p className="text-xs text-center text-gray-400 mt-2">← Uncheck customization above to see product photos</p>
+              <p className="text-xs text-center text-gray-400 mt-2">← Uncheck customization to see product photos</p>
             )}
           </div>
 
@@ -491,7 +492,7 @@ export default function ProductDetail() {
                     {(jerseyName || jerseyNumber) && (
                       <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-4 text-center">
                         <p className="text-xs text-green-800 font-semibold flex items-center justify-center gap-1.5">
-                          👆 See your jersey preview in the image above
+                          👆 See your jersey back preview in the image above
                         </p>
                       </div>
                     )}
