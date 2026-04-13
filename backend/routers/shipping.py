@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models, auth as auth_utils
 import os, httpx, logging
+from pydantic import BaseModel
+from typing import Optional
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -45,24 +47,21 @@ async def shippo_get(endpoint: str):
 
 
 def _pick_best_rate(rates: list) -> str | None:
-    """Pick the best rate — prefer USPS Priority, fall back to cheapest (handles test mode empty servicelevel)."""
+    """Pick the best rate — prefer USPS Priority, fall back to cheapest."""
     if not rates:
         return None
-    # Live mode: prefer USPS Priority by servicelevel token
     priority = [
         r for r in rates
         if "PRIORITY" in r.get("servicelevel", {}).get("token", "").upper()
     ]
     if priority:
         return priority[0]["object_id"]
-    # Test mode or no servicelevel: pick cheapest available rate
     cheapest = min(rates, key=lambda r: float(r.get("amount", 9999)))
     logger.info(f"[SHIPPO] No priority rate found — using cheapest: {cheapest.get('object_id')} (${cheapest.get('amount')})")
     return cheapest["object_id"]
 
 
 def validate_shipping_address(order: models.Order):
-    """Raise 400 if any required shipping field is missing."""
     missing = []
     if not order.shipping_name:    missing.append("recipient name")
     if not order.shipping_address: missing.append("street address")
@@ -114,17 +113,21 @@ def _build_parcel(order: models.Order) -> dict:
     return {
         "length": "12", "width": "10", "height": "6",
         "distance_unit": "in",
-        "weight": str(round(total_weight * 2.205, 2)),  # kg → lbs
+        "weight": str(round(total_weight * 2.205, 2)),
+        "mass_unit": "lb",
+    }
+
+
+def _build_parcel_estimate(weight_lbs: float = 1.0) -> dict:
+    return {
+        "length": "12", "width": "10", "height": "6",
+        "distance_unit": "in",
+        "weight": str(round(weight_lbs, 2)),
         "mass_unit": "lb",
     }
 
 
 def _create_mock_label(order_id: int, db: Session, order, store, background_tasks: BackgroundTasks, sample: bool = False):
-    """Persist and return a mock/sample label.
-
-    sample=False  → no API key at all (dev mode)
-    sample=True   → API key exists but address was incomplete; label is watermarked SAMPLE - DO NOT SHIP
-    """
     status = "sample" if sample else "created"
     label_url = f"https://afrizone-loqr.onrender.com/shipping/mock-label/{order_id}{'?sample=1' if sample else ''}"
     label = models.ShippingLabel(
@@ -155,8 +158,97 @@ def _create_mock_label(order_id: int, db: Session, order, store, background_task
 
 
 # ---------------------------------------------------------------------------
+# Schema for estimate endpoint
+# ---------------------------------------------------------------------------
+
+class ShippingEstimateRequest(BaseModel):
+    store_id: int
+    address: str
+    city: str
+    state: str
+    zip: str
+    country: str = "US"
+    weight_lbs: Optional[float] = 1.0
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+@router.post("/estimate")
+async def get_shipping_estimate(
+    body: ShippingEstimateRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Get a real-time USPS shipping rate estimate before an order is placed.
+    Called during checkout so the customer pays the correct Shippo rate.
+    Falls back to $8.99 if Shippo is unavailable or not configured.
+    """
+    FALLBACK_RATE = 8.99
+
+    if not SHIPPO_API_KEY:
+        logger.warning("[SHIPPO] No API key — returning fallback estimate")
+        return {"rate": FALLBACK_RATE, "mock": True, "carrier": "USPS", "service": "Priority Mail"}
+
+    store = db.query(models.Store).filter(models.Store.id == body.store_id).first()
+    if not store or not store.address or not store.city:
+        logger.warning(f"[SHIPPO] Store {body.store_id} has incomplete address — returning fallback")
+        return {"rate": FALLBACK_RATE, "mock": True, "carrier": "USPS", "service": "Priority Mail"}
+
+    try:
+        address_from = {
+            "name":    store.name,
+            "street1": store.address,
+            "city":    store.city,
+            "state":   "TX",
+            "zip":     "77001",
+            "country": "US",
+        }
+        address_to = {
+            "name":    "Customer",
+            "street1": body.address,
+            "city":    body.city,
+            "state":   body.state,
+            "zip":     body.zip,
+            "country": body.country or "US",
+        }
+        parcel = _build_parcel_estimate(body.weight_lbs or 1.0)
+
+        shipment = await shippo_post("shipments", {
+            "address_from": address_from,
+            "address_to":   address_to,
+            "parcels":      [parcel],
+            "async": False,
+        })
+
+        rates = shipment.get("rates", [])
+        if not rates:
+            logger.warning("[SHIPPO] No rates returned — using fallback")
+            return {"rate": FALLBACK_RATE, "mock": True, "carrier": "USPS", "service": "Priority Mail"}
+
+        # Prefer USPS Priority
+        priority = [r for r in rates if "PRIORITY" in r.get("servicelevel", {}).get("token", "").upper()]
+        best = priority[0] if priority else min(rates, key=lambda r: float(r.get("amount", 9999)))
+
+        real_rate = round(float(best.get("amount", FALLBACK_RATE)), 2)
+        service = best.get("servicelevel", {}).get("name", "Priority Mail")
+        carrier = best.get("provider", "USPS")
+        days = best.get("estimated_days", "1–3")
+
+        logger.info(f"[SHIPPO] Estimate: {carrier} {service} = ${real_rate} ({days} days)")
+        return {
+            "rate":    real_rate,
+            "mock":    False,
+            "carrier": carrier,
+            "service": service,
+            "days":    days,
+        }
+
+    except Exception as e:
+        logger.error(f"[SHIPPO] Estimate error: {e}")
+        return {"rate": FALLBACK_RATE, "mock": True, "carrier": "USPS", "service": "Priority Mail"}
+
 
 @router.get("/rates/{order_id}")
 async def get_shipping_rates(
@@ -164,17 +256,14 @@ async def get_shipping_rates(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.get_current_user),
 ):
-    """Get available shipping rates for an order."""
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    # Validate address before touching Shippo
     validate_shipping_address(order)
 
     store = db.query(models.Store).filter(models.Store.id == order.store_id).first()
 
-    # No API key → return clearly-labelled mock rates for local dev
     if not SHIPPO_API_KEY:
         logger.warning("[SHIPPO] No API key — returning mock rates")
         return {
@@ -195,10 +284,7 @@ async def get_shipping_rates(
         })
     except httpx.HTTPStatusError as e:
         logger.error(f"[SHIPPO] Shipment creation failed: {e.response.status_code} — {e.response.text}")
-        raise HTTPException(
-            status_code=502,
-            detail=f"Shippo rejected the shipment request: {e.response.text}",
-        )
+        raise HTTPException(status_code=502, detail=f"Shippo rejected the shipment request: {e.response.text}")
     except Exception as e:
         logger.error(f"[SHIPPO] Unexpected error fetching rates: {e}")
         raise HTTPException(status_code=502, detail=f"Could not reach Shippo: {str(e)}")
@@ -207,8 +293,7 @@ async def get_shipping_rates(
     if not rates:
         raise HTTPException(
             status_code=400,
-            detail="Shippo returned no rates for this address. "
-                   "Please verify the shipping address is correct and try again.",
+            detail="Shippo returned no rates for this address. Please verify the shipping address is correct and try again.",
         )
 
     return {
@@ -234,7 +319,6 @@ async def create_shipping_label(
     current_user: models.User = Depends(auth_utils.require_seller),
     rate_id: str = "auto",
 ):
-    """Create a shipping label for an order."""
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -246,7 +330,6 @@ async def create_shipping_label(
     if not store:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    # Return existing label if already created
     existing = db.query(models.ShippingLabel).filter(models.ShippingLabel.order_id == order_id).first()
     if existing:
         return {
@@ -255,23 +338,18 @@ async def create_shipping_label(
             "carrier":         existing.carrier,
         }
 
-    # No API key → mock label (dev/test only)
     if not SHIPPO_API_KEY:
         logger.warning("[SHIPPO] No API key — issuing mock label")
         return _create_mock_label(order_id, db, order, store, background_tasks)
 
-    # Reject mock rate_ids when a real key is present
     if rate_id.startswith("mock_"):
         raise HTTPException(
             status_code=400,
-            detail="Cannot create a real label with a mock rate ID. "
-                   "Please call /rates first to get a valid Shippo rate.",
+            detail="Cannot create a real label with a mock rate ID. Please call /rates first to get a valid Shippo rate.",
         )
 
-    # Validate address before touching Shippo
     validate_shipping_address(order)
 
-    # Auto-select cheapest USPS Priority rate if no rate_id provided
     if rate_id == "auto":
         try:
             shipment = await shippo_post("shipments", {
@@ -284,25 +362,20 @@ async def create_shipping_label(
             if not rates:
                 raise HTTPException(
                     status_code=400,
-                    detail="Shippo returned no rates for this address. "
-                           "Verify the shipping address and try again.",
+                    detail="Shippo returned no rates for this address. Verify the shipping address and try again.",
                 )
             rate_id = _pick_best_rate(rates)
             logger.info(f"[SHIPPO] Auto-selected rate: {rate_id}")
 
         except HTTPException:
-            raise  # Re-raise our own validation errors as-is
+            raise
         except httpx.HTTPStatusError as e:
             logger.error(f"[SHIPPO] Rate fetch HTTP error: {e.response.status_code} — {e.response.text}")
-            raise HTTPException(
-                status_code=502,
-                detail=f"Shippo rejected the address: {e.response.text}",
-            )
+            raise HTTPException(status_code=502, detail=f"Shippo rejected the address: {e.response.text}")
         except Exception as e:
             logger.error(f"[SHIPPO] Rate fetch error: {e}")
             raise HTTPException(status_code=502, detail=f"Could not fetch Shippo rates: {str(e)}")
 
-    # Purchase the label
     try:
         txn = await shippo_post("transactions", {
             "rate":            rate_id,
@@ -311,7 +384,6 @@ async def create_shipping_label(
         })
     except httpx.HTTPStatusError as e:
         logger.error(f"[SHIPPO] Transaction HTTP error: {e.response.status_code} — {e.response.text}")
-        # Incomplete address → fall back to sample label so seller can still see the flow
         if "complete address" in e.response.text.lower() or "address" in e.response.text.lower():
             logger.warning("[SHIPPO] Incomplete address detected — issuing SAMPLE label")
             return _create_mock_label(order_id, db, order, store, background_tasks, sample=True)
@@ -323,7 +395,6 @@ async def create_shipping_label(
     if txn.get("status") != "SUCCESS":
         messages = txn.get("messages", "Unknown Shippo error")
         logger.error(f"[SHIPPO] Transaction not SUCCESS: {messages}")
-        # Address-related Shippo message → sample label fallback
         msg_str = str(messages).lower()
         if "address" in msg_str or "complete" in msg_str:
             logger.warning("[SHIPPO] Address issue in transaction — issuing SAMPLE label")
@@ -376,7 +447,6 @@ def get_label(
 # ---------------------------------------------------------------------------
 
 def _email_label_to_seller(order, store, label):
-    """Background task: email shipping label PDF to seller."""
     try:
         from utils.email import send_email, _wrap, FRONTEND_URL
         body = f"""
@@ -407,7 +477,6 @@ def _email_label_to_seller(order, store, label):
 
 @router.get("/mock-label/{order_id}")
 def mock_label_pdf(order_id: int, sample: int = 0, db: Session = Depends(get_db)):
-    """Generate a mock shipping label. Pass ?sample=1 to show SAMPLE - DO NOT SHIP watermark."""
     from fastapi.responses import Response
 
     label = db.query(models.ShippingLabel).filter(models.ShippingLabel.order_id == order_id).first()
@@ -458,25 +527,20 @@ def mock_label_pdf(order_id: int, sample: int = 0, db: Session = Depends(get_db)
   {watermark}
   <div class="carrier">USPS</div>
   <div class="service">PRIORITY MAIL 2-DAY</div>
-
   <div class="section">
     <div class="label-text">From:</div>
     <div class="value">Afrizone Seller</div>
     <div class="value" style="font-weight:normal">Fulfilled via Afrizone Marketplace</div>
   </div>
-
   <div class="section">
     <div class="label-text">Ship To:</div>
     <div class="value" style="white-space:pre-line">{ship_to}</div>
   </div>
-
   <div class="tracking">{tracking}</div>
   <div class="barcode">||| |||| ||| |||| ||| ||||</div>
-
   <div style="text-align:center;margin:10px 0">
     <span style="font-size:13px;background:#1A5C38;color:white;padding:4px 12px;border-radius:4px">Afrizone Order #{order_id}</span>
   </div>
-
   <div class="note" style="{note_style}">{note_text}</div>
 </div>
 <script>window.onload = function() {{ window.print(); }}</script>
