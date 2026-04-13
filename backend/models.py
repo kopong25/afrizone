@@ -77,18 +77,18 @@ class User(Base):
 # ─────────────────────────────────────────────
 
 class VendorType(str, enum.Enum):
-    grocery    = "grocery"      # Shelf-stable: fufu, garri, spices → USPS/Shippo
-    restaurant = "restaurant"   # Hot food: jollof rice, suya → local delivery
-    fashion    = "fashion"      # Clothing, fabric → USPS/Shippo
-    beauty     = "beauty"       # Hair, cosmetics → USPS/Shippo
+    grocery    = "grocery"
+    restaurant = "restaurant"
+    fashion    = "fashion"
+    beauty     = "beauty"
     other      = "other"
 
 
 class DeliveryType(str, enum.Enum):
-    shipping       = "shipping"        # Ships nationwide via USPS/Shippo
-    local_delivery = "local_delivery"  # Seller delivers locally (prep for Uber Direct)
-    pickup         = "pickup"          # Customer picks up in person
-    both           = "both"            # Ships + local delivery available
+    shipping       = "shipping"
+    local_delivery = "local_delivery"
+    pickup         = "pickup"
+    both           = "both"
 
 
 class Store(Base):
@@ -103,27 +103,27 @@ class Store(Base):
     banner_url = Column(String, nullable=True)
 
     # Location
-    country = Column(String, nullable=False)          # USA, Canada, UK, etc.
+    country = Column(String, nullable=False)
     city = Column(String, nullable=True)
     address = Column(String, nullable=True)
 
     # Business info
-    business_type = Column(String, nullable=True)     # Grocery, Fashion, etc.
+    business_type = Column(String, nullable=True)
     vendor_type   = Column(Enum(VendorType, native_enum=False), default=VendorType.other)
     delivery_type = Column(Enum(DeliveryType, native_enum=False), default=DeliveryType.shipping)
 
-    # Local delivery settings (for restaurant vendors / Uber Direct prep)
-    latitude  = Column(Float, nullable=True)               # Store GPS lat (for distance calc)
-    longitude = Column(Float, nullable=True)               # Store GPS lng
-    delivery_radius_miles = Column(Integer, nullable=True)   # How far they deliver
-    delivery_note  = Column(String, nullable=True)             # e.g. "Min order $20, free delivery within 5 miles"
-    delivery_fee          = Column(Float, nullable=True)     # Flat delivery fee they charge
-    min_order_amount      = Column(Float, nullable=True)     # Minimum order for delivery
-    prep_time_minutes     = Column(Integer, nullable=True)   # Avg prep time for hot food
-    is_open_now           = Column(Boolean, default=True)    # Restaurant open/closed toggle
-    opening_hours         = Column(String, nullable=True)    # e.g. "Mon-Fri 11am-9pm"
+    # Local delivery settings
+    latitude  = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    delivery_radius_miles = Column(Integer, nullable=True)
+    delivery_note  = Column(String, nullable=True)
+    delivery_fee          = Column(Float, nullable=True)
+    min_order_amount      = Column(Float, nullable=True)
+    prep_time_minutes     = Column(Integer, nullable=True)
+    is_open_now           = Column(Boolean, default=True)
+    opening_hours         = Column(String, nullable=True)
     weekly_hours          = Column(Text, nullable=True)
-    timezone              = Column(String, nullable=True, default="America/Chicago")  # IANA timezone e.g. America/Chicago
+    timezone              = Column(String, nullable=True, default="America/Chicago")
     phone = Column(String, nullable=True)
     website = Column(String, nullable=True)
 
@@ -134,7 +134,7 @@ class Store(Base):
     is_featured = Column(Boolean, default=False)
 
     # Stripe Connect
-    stripe_account_id = Column(String, nullable=True)  # Stripe Express account
+    stripe_account_id = Column(String, nullable=True)
     stripe_onboarding_complete = Column(Boolean, default=False)
 
     # Stats
@@ -163,7 +163,7 @@ class Category(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False)
     slug = Column(String, unique=True, nullable=False)
-    icon = Column(String, nullable=True)          # emoji or icon name
+    icon = Column(String, nullable=True)
     parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
 
     products = relationship("Product", back_populates="category")
@@ -184,7 +184,7 @@ class Product(Base):
     slug = Column(String, unique=True, index=True, nullable=False)
     description = Column(Text, nullable=True)
     price = Column(Float, nullable=False)
-    compare_price = Column(Float, nullable=True)   # Original price for "sale" badge
+    compare_price = Column(Float, nullable=True)
     currency = Column(String, default="USD")
 
     # Inventory
@@ -193,16 +193,19 @@ class Product(Base):
     is_active = Column(Boolean, default=True)
     is_featured = Column(Boolean, default=False)
 
-    # Images — stored as JSON array of URLs
-    images = Column(JSON, default=list)            # ["url1", "url2", ...]
+    # Images
+    images = Column(JSON, default=list)
 
-    # Origin info (cultural context)
-    country_of_origin = Column(String, nullable=True)   # e.g., "Nigeria"
-    tags = Column(JSON, default=list)              # ["jollof", "rice", "west africa"]
+    # Origin info
+    country_of_origin = Column(String, nullable=True)
+    tags = Column(JSON, default=list)
 
     # Shipping
     weight_kg = Column(Float, nullable=True)
     ships_from = Column(String, nullable=True)
+
+    # Jersey customization fee — set by seller, charged when buyer adds name/number
+    customization_fee = Column(Float, default=0.0, nullable=True)
 
     # Stats
     view_count = Column(Integer, default=0)
@@ -252,8 +255,8 @@ class Order(Base):
     # Amounts
     subtotal = Column(Float, nullable=False)
     shipping_cost = Column(Float, default=0.0)
-    platform_fee = Column(Float, nullable=False)   # Afrizone commission
-    seller_amount = Column(Float, nullable=False)  # What seller receives
+    platform_fee = Column(Float, nullable=False)
+    seller_amount = Column(Float, nullable=False)
     total = Column(Float, nullable=False)
     currency = Column(String, default="USD")
 
@@ -274,13 +277,13 @@ class Order(Base):
 
     # Tracking
     tracking_number = Column(String, nullable=True)
-    uber_quote_id   = Column(String, nullable=True)   # Uber Direct quote ID
+    uber_quote_id   = Column(String, nullable=True)
     tracking_url = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
 
     # Delivery
-    delivery_method = Column(String, nullable=True)   # uber_express, usps_priority, etc
-    delivery_fee    = Column(Float,  nullable=True)   # Delivery fee charged to customer
+    delivery_method = Column(String, nullable=True)
+    delivery_fee    = Column(Float,  nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -316,11 +319,11 @@ class Review(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    rating = Column(Integer, nullable=False)        # 1–5
+    rating = Column(Integer, nullable=False)
     title = Column(String, nullable=True)
     body = Column(Text, nullable=True)
     is_verified_purchase = Column(Boolean, default=False)
-    photos = Column(JSON, default=list)             # ["url1", "url2"]
+    photos = Column(JSON, default=list)
     helpful_count = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -376,10 +379,10 @@ class DiscountCode(Base):
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
     code = Column(String, unique=True, nullable=False, index=True)
     description = Column(String, nullable=True)
-    discount_type = Column(String, default="percent")   # percent | fixed
-    discount_value = Column(Float, nullable=False)       # 10 = 10% or $10
+    discount_type = Column(String, default="percent")
+    discount_value = Column(Float, nullable=False)
     min_order_amount = Column(Float, default=0.0)
-    max_uses = Column(Integer, nullable=True)            # None = unlimited
+    max_uses = Column(Integer, nullable=True)
     uses_count = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
     expires_at = Column(DateTime(timezone=True), nullable=True)
@@ -397,9 +400,9 @@ class ProductVariant(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    name = Column(String, nullable=False)       # e.g. "Size" or "Color"
-    value = Column(String, nullable=False)      # e.g. "Large" or "Red"
-    price_modifier = Column(Float, default=0.0) # +/- from base price
+    name = Column(String, nullable=False)
+    value = Column(String, nullable=False)
+    price_modifier = Column(Float, default=0.0)
     stock = Column(Integer, default=0)
     sku = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
@@ -445,10 +448,10 @@ class Subscription(Base):
     __tablename__ = "subscriptions"
     id = Column(Integer, primary_key=True, index=True)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
-    tier = Column(String, default="basic")          # basic | standard | premium
+    tier = Column(String, default="basic")
     stripe_subscription_id = Column(String, nullable=True)
     stripe_customer_id = Column(String, nullable=True)
-    status = Column(String, default="active")       # active | cancelled | past_due
+    status = Column(String, default="active")
     current_period_end = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     store = relationship("Store", backref="subscription", uselist=False)
@@ -464,13 +467,13 @@ class ShippingLabel(Base):
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
     shippo_transaction_id = Column(String, nullable=True)
     tracking_number = Column(String, nullable=True)
-    uber_quote_id   = Column(String, nullable=True)   # Uber Direct quote ID
-    delivery_method = Column(String, nullable=True)   # e.g. uber_express, usps_priority
-    delivery_fee    = Column(Float,  nullable=True)   # Actual delivery fee charged
-    label_url = Column(String, nullable=True)       # PDF download URL
+    uber_quote_id   = Column(String, nullable=True)
+    delivery_method = Column(String, nullable=True)
+    delivery_fee    = Column(Float,  nullable=True)
+    label_url = Column(String, nullable=True)
     carrier = Column(String, default="USPS")
     service = Column(String, default="Priority")
-    rate = Column(Float, nullable=True)             # Cost in USD
+    rate = Column(Float, nullable=True)
     status = Column(String, default="created")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     order = relationship("Order", backref="shipping_label", uselist=False)
@@ -486,8 +489,8 @@ class Referral(Base):
     referrer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     referred_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     code = Column(String, unique=True, nullable=False, index=True)
-    type = Column(String, default="seller")         # seller | buyer
-    status = Column(String, default="pending")      # pending | completed | rewarded
+    type = Column(String, default="seller")
+    status = Column(String, default="pending")
     reward_amount = Column(Float, default=0.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     referrer = relationship("User", foreign_keys=[referrer_id], backref="referrals_made")
@@ -508,8 +511,11 @@ class PasswordResetToken(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     user       = relationship("User", backref="reset_tokens")
 
-# Ads
+
 # ─────────────────────────────────────────────
+# ADS
+# ─────────────────────────────────────────────
+
 class Ad(Base):
     __tablename__ = "ads"
 

@@ -8,10 +8,12 @@ import { useAuth } from "../_app";
 import toast from "react-hot-toast";
 import { FiPlus, FiEdit2, FiTrash2, FiUpload, FiX, FiPackage, FiArrowLeft, FiTag } from "react-icons/fi";
 
+const JERSEY_TAGS = ["jersey","jerseys","kit","football kit","soccer jersey","customizable","custom jersey","sportswear"];
+
 const INITIAL_FORM = {
   name: "", description: "", price: "", compare_price: "",
   stock: "", sku: "", country_of_origin: "", tags: "", existing_images: [],
-  currency: "USD", ships_from: "",
+  currency: "USD", ships_from: "", customization_fee: "",
 };
 
 // Amazon-standard variant presets per product category
@@ -25,20 +27,15 @@ const SIZE_PRESETS = {
 };
 
 const COLOR_PRESETS = [
-  // Natural hair colors
   "Natural Black", "Off Black", "Dark Brown", "Medium Brown", "Light Brown",
   "Blonde", "Platinum Blonde", "Strawberry Blonde", "Honey Blonde",
   "Auburn", "Burgundy", "Dark Red",
-  // Fashion colors
   "Ombre Black to Brown", "Ombre Black to Blonde", "Ombre Brown to Blonde",
   "Salt & Pepper", "Grey", "Silver",
-  // African fashion colors
   "Kente Gold", "Ankara Blue", "Earth Brown", "Safari Green",
-  // Standard
   "Black", "White", "Red", "Blue", "Green", "Navy", "Beige", "Gold", "Pink",
 ];
 
-// Amazon-style hair & wig specific variant attributes
 const HAIR_VARIANT_TYPES = {
   "Hair Length":   { icon: "📏", presets: SIZE_PRESETS["Hair Length"], note: "Measured when straight" },
   "Hair Texture":  { icon: "〰️", presets: ["Straight", "Body Wave", "Loose Wave", "Deep Wave", "Kinky Curly", "Afro Kinky", "Loose Curly", "Water Wave", "Jerry Curl", "Coily"], note: "Natural texture pattern" },
@@ -50,7 +47,6 @@ const HAIR_VARIANT_TYPES = {
   "Hair Grade":    { icon: "⭐", presets: ["8A", "9A", "10A", "12A"], note: "Higher grade = better quality" },
 };
 
-// Standard fashion variants
 const FASHION_VARIANT_TYPES = {
   "Size":   { icon: "📐", presets: SIZE_PRESETS["Clothing"] },
   "Color":  { icon: "🎨", presets: COLOR_PRESETS.slice(0, 20) },
@@ -67,14 +63,12 @@ function VariantManager({ productId, productName }) {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [newVariant, setNewVariant] = useState({ name: "Size", value: "", price_modifier: 0, stock: 0, sku: "" });
-  const [variantType, setVariantType] = useState("Size"); // Size | Color | Custom
+  const [variantType, setVariantType] = useState("Size");
   const [sizeCategory, setSizeCategory] = useState("Clothing");
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkSelected, setBulkSelected] = useState([]);
 
-  useEffect(() => {
-    loadVariants();
-  }, [productId]);
+  useEffect(() => { loadVariants(); }, [productId]);
 
   const loadVariants = async () => {
     try {
@@ -84,7 +78,6 @@ function VariantManager({ productId, productName }) {
     finally { setLoading(false); }
   };
 
-  // Group variants by name for display
   const grouped = variants.reduce((acc, v) => {
     if (!acc[v.name]) acc[v.name] = [];
     acc[v.name].push(v);
@@ -154,7 +147,6 @@ function VariantManager({ productId, productName }) {
         )}
       </div>
 
-      {/* Existing variants grouped */}
       {Object.entries(grouped).length > 0 && (
         <div className="space-y-4 mb-6">
           {Object.entries(grouped).map(([groupName, groupVariants]) => (
@@ -186,12 +178,10 @@ function VariantManager({ productId, productName }) {
         </div>
       )}
 
-      {/* Add variant UI */}
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
         <p className="text-sm font-bold text-blue-900 mb-1">Add Variants</p>
         <p className="text-xs text-gray-500 mb-3">Amazon-style: add sizes, colors, hair length, texture, density and more</p>
 
-        {/* Category tabs */}
         <div className="mb-3">
           <div className="flex gap-2 mb-2 flex-wrap">
             {[
@@ -213,7 +203,6 @@ function VariantManager({ productId, productName }) {
             ))}
           </div>
 
-          {/* Hair variant attributes */}
           {Object.keys(HAIR_VARIANT_TYPES).includes(variantType) && (
             <div className="flex flex-wrap gap-1.5 mt-2">
               {Object.entries(HAIR_VARIANT_TYPES).map(([name, cfg]) => (
@@ -228,7 +217,6 @@ function VariantManager({ productId, productName }) {
             </div>
           )}
 
-          {/* Fashion variant attributes */}
           {Object.keys(FASHION_VARIANT_TYPES).includes(variantType) && (
             <div className="flex flex-wrap gap-1.5 mt-2">
               {Object.entries(FASHION_VARIANT_TYPES).map(([name, cfg]) => (
@@ -243,7 +231,6 @@ function VariantManager({ productId, productName }) {
             </div>
           )}
 
-          {/* Note for selected type */}
           {(HAIR_VARIANT_TYPES[variantType]?.note || FASHION_VARIANT_TYPES[variantType]?.note) && (
             <p className="text-xs text-blue-600 mt-1.5 italic">
               ℹ️ {HAIR_VARIANT_TYPES[variantType]?.note || FASHION_VARIANT_TYPES[variantType]?.note}
@@ -251,7 +238,6 @@ function VariantManager({ productId, productName }) {
           )}
         </div>
 
-        {/* Bulk preset picker */}
         {variantType !== "Custom" && (
           <div className="mb-3">
             <label className="text-xs font-semibold text-gray-600 block mb-2">
@@ -282,21 +268,16 @@ function VariantManager({ productId, productName }) {
           </div>
         )}
 
-        {/* Stock per variant */}
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
-            <label className="text-xs font-semibold text-gray-600 block mb-1">
-              Stock per variant
-            </label>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Stock per variant</label>
             <input type="number" min="0" value={newVariant.stock}
               onChange={e => setNewVariant(v => ({ ...v, stock: e.target.value }))}
               className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="0" />
           </div>
           <div>
-            <label className="text-xs font-semibold text-gray-600 block mb-1">
-              Price modifier (optional)
-            </label>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Price modifier (optional)</label>
             <input type="number" step="0.01" value={newVariant.price_modifier}
               onChange={e => setNewVariant(v => ({ ...v, price_modifier: e.target.value }))}
               className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -304,7 +285,6 @@ function VariantManager({ productId, productName }) {
           </div>
         </div>
 
-        {/* Custom variant name+value */}
         {variantType === "Custom" && (
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
@@ -322,7 +302,6 @@ function VariantManager({ productId, productName }) {
           </div>
         )}
 
-        {/* Add button */}
         {variantType === "Custom" ? (
           <button type="button" onClick={addSingle} disabled={adding}
             className="bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-bold transition-colors">
@@ -352,7 +331,7 @@ export default function SellerProducts() {
   const [uploadingImg, setUploadingImg] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [savedProductId, setSavedProductId] = useState(null); // for showing variant manager
+  const [savedProductId, setSavedProductId] = useState(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/login");
@@ -370,6 +349,13 @@ export default function SellerProducts() {
     } catch { toast.error("Failed to load products"); }
   };
 
+  // Check if current tags include a jersey tag
+  const isJerseyForm = form.tags
+    .toLowerCase()
+    .split(",")
+    .map(t => t.trim())
+    .some(t => JERSEY_TAGS.includes(t));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -380,6 +366,7 @@ export default function SellerProducts() {
         compare_price: form.compare_price ? parseFloat(form.compare_price) : null,
         stock: parseInt(form.stock),
         tags: form.tags ? form.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+        customization_fee: form.customization_fee ? parseFloat(form.customization_fee) : 0,
       };
 
       let product;
@@ -426,6 +413,7 @@ export default function SellerProducts() {
       tags: (product.tags || []).join(", "),
       currency: product.currency, ships_from: product.ships_from || "",
       existing_images: product.images || [],
+      customization_fee: product.customization_fee || "",
     });
     setEditingId(product.id);
     setSavedProductId(product.id);
@@ -533,6 +521,30 @@ export default function SellerProducts() {
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-900"
                     placeholder="ankara, dress, african fashion" />
                 </div>
+
+                {/* ── CUSTOMIZATION FEE — only visible when a jersey tag is added ── */}
+                {isJerseyForm && (
+                  <div className="md:col-span-2">
+                    <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4">
+                      <label className="block text-sm font-bold text-green-900 mb-1">
+                        🎽 Customization Fee (USD)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.customization_fee}
+                        onChange={e => setForm({ ...form, customization_fee: e.target.value })}
+                        className="w-full border-2 border-green-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 bg-white"
+                        placeholder="0.00 = Free customization"
+                      />
+                      <p className="text-xs text-green-700 mt-1.5">
+                        This fee is charged when a buyer customizes the jersey with their name/number.
+                        Leave empty or <strong>0</strong> to offer free customization.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Image upload */}
@@ -615,12 +627,8 @@ export default function SellerProducts() {
               </div>
             </form>
 
-            {/* Variant manager — shown after product is saved */}
             {savedProductId && (
-              <VariantManager
-                productId={savedProductId}
-                productName={form.name}
-              />
+              <VariantManager productId={savedProductId} productName={form.name} />
             )}
           </div>
         )}
@@ -699,7 +707,6 @@ export default function SellerProducts() {
   );
 }
 
-// Small badge showing variant count per product row
 function VariantCount({ productId }) {
   const [count, setCount] = useState(null);
   useEffect(() => {

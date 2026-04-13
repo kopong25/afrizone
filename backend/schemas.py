@@ -134,6 +134,7 @@ class ProductCreate(BaseModel):
     tags: List[str] = []
     weight_kg: Optional[float] = None
     ships_from: Optional[str] = None
+    customization_fee: Optional[float] = 0.0  # Fee charged when buyer customizes jersey
 
     @field_validator("price")
     @classmethod
@@ -153,6 +154,7 @@ class ProductUpdate(BaseModel):
     country_of_origin: Optional[str] = None
     tags: Optional[List[str]] = None
     is_active: Optional[bool] = None
+    customization_fee: Optional[float] = None  # Fee charged when buyer customizes jersey
 
 
 class CategoryOut(BaseModel):
@@ -200,6 +202,7 @@ class ProductOut(BaseModel):
     sale_count: int
     avg_rating: float
     review_count: int
+    customization_fee: Optional[float] = 0.0  # Returned to frontend product page
     store: Optional[StoreOut] = None
     category: Optional[CategoryOut] = None
     vendor_type: Optional[str] = None
@@ -235,6 +238,7 @@ class ProductListOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
 
 # ─────────────────────────────────────────────
 # CART SCHEMAS
