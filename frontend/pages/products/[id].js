@@ -54,12 +54,7 @@ function JerseyPreview({ name, number }) {
           <filter id="textShadow">
             <feDropShadow dx="0" dy="1" stdDeviation="1" floodColor="#00000040" />
           </filter>
-          <clipPath id="jerseyClip">
-            <path d="M 88 42 L 52 68 L 22 148 L 68 162 L 68 340 L 272 340 L 272 162 L 318 148 L 288 68 L 252 42 Q 232 58 170 58 Q 108 58 88 42 Z" />
-          </clipPath>
         </defs>
-
-        {/* ── JERSEY SHAPE ── */}
 
         {/* Main white body */}
         <path
@@ -97,28 +92,16 @@ function JerseyPreview({ name, number }) {
         />
 
         {/* Left sleeve — green stripe */}
-        <path
-          d="M 28 128 L 24 142 L 68 156 L 68 143 Z"
-          fill="#166534"
-        />
+        <path d="M 28 128 L 24 142 L 68 156 L 68 143 Z" fill="#166534" />
         {/* Left sleeve — red stripe */}
-        <path
-          d="M 24 142 L 22 148 L 68 162 L 68 156 Z"
-          fill="#dc2626"
-        />
+        <path d="M 24 142 L 22 148 L 68 162 L 68 156 Z" fill="#dc2626" />
 
         {/* Right sleeve — green stripe */}
-        <path
-          d="M 312 128 L 316 142 L 272 156 L 272 143 Z"
-          fill="#166534"
-        />
+        <path d="M 312 128 L 316 142 L 272 156 L 272 143 Z" fill="#166534" />
         {/* Right sleeve — red stripe */}
-        <path
-          d="M 316 142 L 318 148 L 272 162 L 272 156 Z"
-          fill="#dc2626"
-        />
+        <path d="M 316 142 L 318 148 L 272 162 L 272 156 Z" fill="#dc2626" />
 
-        {/* Back neckline — small scoop, no collar */}
+        {/* Back neckline — small scoop */}
         <path
           d="M 118 44 Q 170 72 222 44"
           fill="none"
@@ -126,25 +109,23 @@ function JerseyPreview({ name, number }) {
           strokeWidth="2"
         />
 
-        {/* Subtle body seam lines */}
+        {/* Seam lines */}
         <line x1="88" y1="42" x2="68" y2="162" stroke="#d8d8d3" strokeWidth="0.8" />
         <line x1="252" y1="42" x2="272" y2="162" stroke="#d8d8d3" strokeWidth="0.8" />
         <line x1="68" y1="162" x2="68" y2="340" stroke="#d8d8d3" strokeWidth="0.8" />
         <line x1="272" y1="162" x2="272" y2="340" stroke="#d8d8d3" strokeWidth="0.8" />
-
-        {/* Hem line */}
         <line x1="68" y1="330" x2="272" y2="330" stroke="#d0d0cb" strokeWidth="1.2" />
 
-        {/* ── NAME printed on back ── */}
+        {/* ── NAME — pushed up close to neckline ── */}
         {name && (
           <text
             x="170"
-            y="210"
+            y="105"
             textAnchor="middle"
             fill="#1a1a1a"
             fontFamily="Arial Black, Impact, sans-serif"
             fontWeight="900"
-            fontSize={name.length > 11 ? "17" : name.length > 8 ? "21" : "26"}
+            fontSize={name.length > 11 ? "17" : name.length > 8 ? "21" : "25"}
             letterSpacing="5"
             filter="url(#textShadow)"
           >
@@ -152,11 +133,11 @@ function JerseyPreview({ name, number }) {
           </text>
         )}
 
-        {/* ── NUMBER printed on back ── */}
+        {/* ── NUMBER — just below the name ── */}
         {number && (
           <text
             x="170"
-            y={name ? "308" : "295"}
+            y={name ? "210" : "190"}
             textAnchor="middle"
             fill="#1a1a1a"
             fontFamily="Arial Black, Impact, sans-serif"
@@ -168,16 +149,16 @@ function JerseyPreview({ name, number }) {
           </text>
         )}
 
-        {/* Placeholder when nothing entered yet */}
+        {/* Placeholder when nothing entered */}
         {!name && !number && (
           <>
-            <rect x="120" y="185" width="100" height="20" rx="5" fill="#d4d4ce" opacity="0.8" />
-            <rect x="130" y="220" width="80" height="68" rx="6" fill="#d4d4ce" opacity="0.6" />
-            <text x="170" y="200" textAnchor="middle" fill="#aaaaaa" fontSize="12"
+            <rect x="120" y="82" width="100" height="20" rx="5" fill="#d4d4ce" opacity="0.8" />
+            <rect x="130" y="115" width="80" height="68" rx="6" fill="#d4d4ce" opacity="0.6" />
+            <text x="170" y="97" textAnchor="middle" fill="#aaaaaa" fontSize="12"
               fontFamily="Arial, sans-serif" fontWeight="bold" letterSpacing="3">
               YOUR NAME
             </text>
-            <text x="170" y="268" textAnchor="middle" fill="#aaaaaa" fontSize="14"
+            <text x="170" y="162" textAnchor="middle" fill="#aaaaaa" fontSize="14"
               fontFamily="Arial, sans-serif" fontWeight="bold">
               # 00
             </text>
@@ -359,7 +340,6 @@ export default function ProductDetail() {
         </nav>
 
         <div className="grid md:grid-cols-2 gap-10 mb-6">
-          {/* Images / Jersey Preview */}
           <div>
             <div className="aspect-square bg-gray-100 rounded-2xl overflow-hidden mb-3 relative">
               {showJerseyPreview ? (
@@ -403,7 +383,6 @@ export default function ProductDetail() {
             )}
           </div>
 
-          {/* Product Info */}
           <div>
             <div className="flex items-start justify-between gap-3 mb-2">
               <h1 className="text-2xl font-black text-gray-900 leading-snug">{product.name}</h1>
@@ -471,7 +450,6 @@ export default function ProductDetail() {
               </div>
             ))}
 
-            {/* ── JERSEY CUSTOMIZATION BLOCK ── */}
             {isJerseyProduct && (
               <div className={`rounded-2xl mb-5 overflow-hidden border-2 transition-all ${customizeJersey ? "border-green-700" : "border-gray-200"}`}>
                 <button
