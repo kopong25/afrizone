@@ -78,13 +78,20 @@ def validate_shipping_address(order: models.Order):
 
 
 def _build_address_from(store: models.Store) -> dict:
+    if not store.address or not store.city:
+        raise HTTPException(
+            status_code=400,
+            detail="Your store address is incomplete. Go to Store Settings and add your full address before creating labels.",
+        )
     return {
         "name":    store.name,
         "street1": store.address,
         "city":    store.city,
-        "state":   "TX",
-        "zip":     "77001",
+        "state":   store.state if hasattr(store, "state") and store.state else "TX",
+        "zip":     store.zip if hasattr(store, "zip") and store.zip else "77001",
         "country": "US",
+        "phone":   store.phone or "",
+        "email":   store.owner.email if store.owner else "",
     }
 
 
