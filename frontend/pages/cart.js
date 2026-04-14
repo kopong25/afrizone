@@ -70,8 +70,9 @@ export default function CartPage() {
     name: "", address: "", city: "", state: "", country: "USA", zip: "",
   });
 
+  const [mounted, setMounted] = useState(false);
   const [uberDebug, setUberDebug] = useState(null);
-  useEffect(() => setMounted(true), []);
+  const [deliveryOptions, setDeliveryOptions] = useState([]);
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   const [loadingDelivery, setLoadingDelivery] = useState(false);
   const [distanceInfo, setDistanceInfo] = useState(null);
@@ -79,6 +80,8 @@ export default function CartPage() {
   // ── Real Shippo rate state ─────────────────────────────────
   const [uspsRate, setUspsRate] = useState(null);
   const [fetchingUspsRate, setFetchingUspsRate] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (authLoading) return;
