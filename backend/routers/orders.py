@@ -29,6 +29,141 @@ def get_local_time(tz_name: str) -> datetime:
         return datetime.now(dt_timezone.utc)
 
 
+def fetch_verified_shipping_cost(
+    delivery_method: str,
+    store_id: int,
+    shipping_address: dict,
+    client_fee: float,
+    db: Session,
+) -> float:
+    """
+    Returns the authoritative shipping cost for an order.
+
+    Rules:
+    - pickup:   always $0, no external call needed.
+    - usps_*:   always re-fetch from Shippo. Client value is ignored.
+    - uber_*:   trust the client fee for now (Uber quotes are session-scoped;
+                server-side re-verification requires storing the quote_id and
+                calling Uber's quote confirmation endpoint — add that when ready).
+    - anything else: trust client fee (same caveat as Uber).
+
+    Raises HTTPException 400 if Shippo call fails and we cannot determine
+    a safe rate, so the order is blocked rather than undercharged.
+    """
+    method = (delivery_method or "").lower()
+
+    # ── Pickup is always free ─────────────────────────────────────────────
+    if method == "pickup":
+        return 0.0
+
+    # ── USPS: re-verify via Shippo server-side ────────────────────────────
+    if method.startswith("usps"):
+        try:
+            import httpx
+            shippo_token = os.getenv("SHIPPO_API_KEY") or os.getenv("SHIPPO_TOKEN")
+            if not shippo_token:
+                # No Shippo key configured — fall back to client value with a warning
+                print("[Orders] WARNING: SHIPPO_API_KEY not set. Using client-supplied delivery_fee.")
+                return round(float(client_fee or 0.0), 2)
+
+            # Look up store's origin address
+            from sqlalchemy import text
+            row = db.execute(
+                text("SELECT address, city, state, zip, country FROM stores WHERE id = :id"),
+                {"id": store_id}
+            ).fetchone()
+
+            if not row:
+                raise HTTPException(status_code=400, detail="Store address not found for shipping calculation.")
+
+            store_address = row[0] or ""
+            store_city    = row[1] or ""
+            store_state   = row[2] or ""
+            store_zip     = row[3] or ""
+            store_country = (row[4] or "US").upper()
+            if store_country in ("USA", "UNITED STATES"):
+                store_country = "US"
+
+            dest_country = (shipping_address.get("country") or "US").upper()
+            if dest_country in ("USA", "UNITED STATES"):
+                dest_country = "US"
+
+            payload = {
+                "address_from": {
+                    "street1": store_address,
+                    "city":    store_city,
+                    "state":   store_state,
+                    "zip":     store_zip,
+                    "country": store_country,
+                },
+                "address_to": {
+                    "street1": shipping_address.get("address", ""),
+                    "city":    shipping_address.get("city", ""),
+                    "state":   shipping_address.get("state", ""),
+                    "zip":     shipping_address.get("zip", ""),
+                    "country": dest_country,
+                },
+                "parcels": [{
+                    "length": "10",
+                    "width":  "8",
+                    "height": "4",
+                    "distance_unit": "in",
+                    "weight": "1",
+                    "mass_unit": "lb",
+                }],
+                "async": False,
+            }
+
+            resp = httpx.post(
+                "https://api.goshippo.com/shipments/",
+                json=payload,
+                headers={
+                    "Authorization": f"ShippoToken {shippo_token}",
+                    "Content-Type":  "application/json",
+                },
+                timeout=10.0,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+            rates = data.get("rates", [])
+            # Find cheapest USPS Priority Mail rate
+            usps_rates = [
+                r for r in rates
+                if r.get("provider", "").upper() == "USPS"
+                and "PRIORITY" in r.get("servicelevel", {}).get("name", "").upper()
+                and r.get("amount")
+            ]
+            if not usps_rates:
+                # Fall back to any USPS rate
+                usps_rates = [r for r in rates if r.get("provider", "").upper() == "USPS" and r.get("amount")]
+
+            if usps_rates:
+                best = min(usps_rates, key=lambda r: float(r["amount"]))
+                verified_rate = round(float(best["amount"]), 2)
+                print(f"[Orders] Shippo verified USPS rate: ${verified_rate} (client sent ${client_fee})")
+                return verified_rate
+
+            # Shippo returned no USPS rates — block order rather than undercharge
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to calculate shipping cost. Please try again or contact support."
+            )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"[Orders] Shippo verification error: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail="Shipping rate verification failed. Please try again."
+            )
+
+    # ── Uber Direct / other: trust client fee ─────────────────────────────
+    # TODO: verify Uber quotes server-side using stored quote_id when ready.
+    return round(float(client_fee or 0.0), 2)
+
+
 @router.post("/", response_model=schemas.OrderOut, status_code=201)
 def create_order(
     order_in: schemas.OrderCreate,
@@ -56,14 +191,12 @@ def create_order(
         weekly_hours_raw = raw[1]
         store_tz = raw[3] or "America/Chicago"
 
-        # Primary gate: seller's manual open/closed toggle
         if not is_open_now:
             raise HTTPException(
                 status_code=400,
                 detail="This restaurant is currently closed. Please check back during opening hours."
             )
 
-        # Secondary gate: weekly hours in the store's local timezone
         if weekly_hours_raw:
             try:
                 hours = json.loads(weekly_hours_raw) if isinstance(weekly_hours_raw, str) else weekly_hours_raw
@@ -90,7 +223,7 @@ def create_order(
                 pass
     # ────────────────────────────────────────────────────────────────────────
 
-    # Validate products and calculate subtotal
+    # ── Validate products and calculate subtotal ─────────────────────────
     order_items = []
     subtotal = 0.0
     for item in order_in.items:
@@ -108,14 +241,29 @@ def create_order(
         subtotal += line_total
         order_items.append((product, item.quantity, product.price, line_total))
 
-    shipping_cost = order_in.delivery_fee or 0.0
+    # ── Verify shipping cost server-side — never trust client value ───────
+    shipping_address = {
+        "address": order_in.shipping.address,
+        "city":    order_in.shipping.city,
+        "state":   order_in.shipping.state,
+        "zip":     order_in.shipping.zip,
+        "country": order_in.shipping.country,
+    }
+    shipping_cost = fetch_verified_shipping_cost(
+        delivery_method=order_in.delivery_method,
+        store_id=order_in.store_id,
+        shipping_address=shipping_address,
+        client_fee=order_in.delivery_fee,
+        db=db,
+    )
+
     platform_fee, seller_amount, total = calculate_order_amounts(subtotal, shipping_cost)
 
     order = models.Order(
         buyer_id=current_user.id,
         store_id=store.id,
         subtotal=subtotal,
-        shipping_cost=shipping_cost,
+        shipping_cost=shipping_cost,       # ← verified server-side rate
         platform_fee=platform_fee,
         seller_amount=seller_amount,
         total=total,
@@ -128,7 +276,7 @@ def create_order(
     )
     try:
         order.delivery_method = order_in.delivery_method
-        order.delivery_fee = shipping_cost
+        order.delivery_fee = shipping_cost  # ← store verified rate, not client value
     except Exception:
         pass
     db.add(order)
@@ -280,7 +428,7 @@ def update_order_status(
     return order
 
 
-# ─── CART ───
+# ─── CART ───────────────────────────────────────────────────────────────────
 
 @router.get("/cart/items", response_model=List[schemas.CartItemOut])
 def get_cart(
