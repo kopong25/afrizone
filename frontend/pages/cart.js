@@ -76,7 +76,7 @@ export default function CartPage() {
   const [distanceInfo, setDistanceInfo] = useState(null);
 
   // ── Real Shippo rate state ─────────────────────────────────
-  const [uspsRate, setUspsRate] = useState(null); // null = not fetched yet
+  const [uspsRate, setUspsRate] = useState(null);
   const [fetchingUspsRate, setFetchingUspsRate] = useState(false);
 
   useEffect(() => {
@@ -184,22 +184,26 @@ export default function CartPage() {
       // ── Fetch real USPS rate from Shippo ──────────────────
       const realUspsRate = isRestaurant ? 0 : await fetchUspsEstimate(shipping, storeId);
 
+      // ── Resolve Uber option from API response only ─────────
+      // NEVER use a hardcoded fallback price for Uber — price mismatch causes checkout errors.
+      const uberOption = uberData.options?.find(o => o.id === "uber_express");
+
       let options = [];
 
       if (isRestaurant) {
-        options = [
-          {
+        if (uberOption) {
+          options.push({
             id: "uber_express",
-            label: "Uber Express Delivery",
+            label: uberOption.label || "Uber Express Delivery",
             icon: "🛵",
-            price: uberData.options?.find(o => o.id === "uber_express")?.price || 9.99,
-            eta: uberData.options?.find(o => o.id === "uber_express")?.eta || "~45 minutes",
-            description: "Hot food delivered fresh to your door.",
+            price: uberOption.price,
+            eta: uberOption.eta || "~45 minutes",
+            description: uberOption.description || "Hot food delivered fresh to your door.",
             provider: "uber_direct",
-            quote_id: uberData.options?.find(o => o.id === "uber_express")?.quote_id || null,
-          }
-        ];
-        if (storeDeliveryType === "both") {
+            quote_id: uberOption.quote_id || null,
+          });
+        }
+        if (storeDeliveryType === "both" || storeDeliveryType === "pickup") {
           options.push({
             id: "pickup",
             label: "Customer Pickup",
@@ -211,26 +215,29 @@ export default function CartPage() {
           });
         }
       } else {
-        options = [
-          {
-            id: "usps_priority",
-            label: "USPS Priority Mail",
-            icon: "📬",
-            price: realUspsRate,  // ← REAL Shippo rate, not hardcoded
-            eta: "1–3 business days",
-            description: "Tracked USPS shipping to your door.",
-            provider: "usps",
-          },
-          {
+        options.push({
+          id: "usps_priority",
+          label: "USPS Priority Mail",
+          icon: "📬",
+          price: realUspsRate,
+          eta: "1–3 business days",
+          description: "Tracked USPS shipping to your door.",
+          provider: "usps",
+        });
+
+        // Only add Uber if the API confirmed a real price for this address
+        if (uberOption) {
+          options.push({
             id: "uber_express",
-            label: "Uber Express Delivery",
+            label: uberOption.label || "Uber Express Delivery",
             icon: "🛵",
-            price: uberData.options?.find(o => o.id === "uber_express")?.price || 8.99,
-            eta: "2–4 hours",
-            description: "Same-day local delivery.",
+            price: uberOption.price,
+            eta: uberOption.eta || "2–4 hours",
+            description: uberOption.description || "Same-day local delivery.",
             provider: "uber_direct",
-          },
-        ];
+          });
+        }
+
         if (["pickup", "both"].includes(storeDeliveryType)) {
           options.push({
             id: "pickup",
@@ -242,6 +249,7 @@ export default function CartPage() {
             provider: "pickup",
           });
         }
+
         if (storeDeliveryType === "pickup") {
           options = [{
             id: "pickup",
@@ -256,25 +264,37 @@ export default function CartPage() {
       }
 
       setDeliveryOptions(options);
-      setSelectedDelivery(options[0]);
+      setSelectedDelivery(options[0] || null);
       return true;
     } catch (err) {
       const isRest = primaryStore?.vendor_type === "restaurant";
       const storeDelType = primaryStore?.delivery_type;
-      const pickupOption = { id: "pickup", label: "Customer Pickup", icon: "🏪", price: 0, eta: "Pick up at store", description: "Collect your order in person. No delivery charge.", provider: "pickup" };
-      const fallbackUsps = uspsRate || 8.99;
+      const pickupOption = {
+        id: "pickup", label: "Customer Pickup", icon: "🏪", price: 0,
+        eta: "Pick up at store", description: "Collect your order in person. No delivery charge.", provider: "pickup",
+      };
+
+      // ⚠️ Never show Uber with a guessed price — price mismatch causes checkout errors.
+      // Only show USPS (confirmed flat rate) and pickup (free) when API fails.
       const fallback = isRest
-        ? storeDelType === "both"
-          ? [{ id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "~45 minutes", description: "Hot food delivered fresh to your door.", provider: "uber_direct" }, pickupOption]
-          : [{ id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "~45 minutes", description: "Hot food delivered fresh to your door.", provider: "uber_direct" }]
+        ? storeDelType === "both" || storeDelType === "pickup"
+          ? [pickupOption]
+          : [] // restaurant with no pickup and no confirmed Uber price → block proceed
         : storeDelType === "pickup"
           ? [pickupOption]
-          : ["both", "pickup"].includes(storeDelType)
-            ? [{ id: "usps_priority", label: "USPS Priority Mail", icon: "📬", price: fallbackUsps, eta: "1–3 business days", provider: "usps" }, { id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "2–4 hours", provider: "uber_direct" }, pickupOption]
-            : [
-                { id: "usps_priority", label: "USPS Priority Mail", icon: "📬", price: fallbackUsps, eta: "1–3 business days", provider: "usps" },
-                { id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "2–4 hours", provider: "uber_direct" },
-              ];
+          : [
+              { id: "usps_priority", label: "USPS Priority Mail", icon: "📬", price: uspsRate || 8.99, eta: "1–3 business days", description: "Tracked USPS shipping to your door.", provider: "usps" },
+              ...(["both", "pickup"].includes(storeDelType) ? [pickupOption] : []),
+            ];
+
+      if (fallback.length === 0) {
+        toast.error("Could not load delivery options. Please check your connection and try again.");
+        setDeliveryOptions([]);
+        setSelectedDelivery(null);
+        return false;
+      }
+
+      toast.error("Live delivery rates unavailable — showing available options only.");
       setDeliveryOptions(fallback);
       setSelectedDelivery(fallback[0]);
       return true;
@@ -588,6 +608,15 @@ export default function CartPage() {
                       <FiLoader className="animate-spin" size={20} />
                       <span>Getting live shipping rates for your address...</span>
                     </div>
+                  ) : deliveryOptions.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-gray-500 mb-3">Could not load delivery options for your address.</p>
+                      <button
+                        onClick={fetchDeliveryOptions}
+                        className="text-sm bg-green-900 text-white px-4 py-2 rounded-lg hover:bg-green-800">
+                        Try Again
+                      </button>
+                    </div>
                   ) : (
                     <div className="space-y-3">
                       {deliveryOptions.map((opt) => (
@@ -765,8 +794,12 @@ export default function CartPage() {
 
                 {step === "delivery" && (
                   <div className="space-y-2 mt-5">
-                    <button onClick={() => { if (!selectedDelivery) { toast.error("Please select a delivery option"); return; } setStep("confirm"); }}
-                      className="w-full btn-primary py-3 flex items-center justify-center gap-2">
+                    <button onClick={() => {
+                      if (!selectedDelivery) { toast.error("Please select a delivery option"); return; }
+                      setStep("confirm");
+                    }}
+                      disabled={deliveryOptions.length === 0}
+                      className="w-full btn-primary py-3 flex items-center justify-center gap-2 disabled:opacity-60">
                       Review Order <FiArrowRight />
                     </button>
                     <button onClick={() => setStep("shipping")} className="w-full btn-secondary py-2.5 text-sm">← Back</button>
