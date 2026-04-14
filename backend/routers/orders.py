@@ -88,19 +88,31 @@ def fetch_verified_shipping_cost(
             import httpx
             from sqlalchemy import text
 
-            row = db.execute(
-                text("SELECT address, city, state, zip, country FROM stores WHERE id = :id"),
-                {"id": store_id},
-            ).fetchone()
-            if not row:
-                raise HTTPException(status_code=400, detail="Store address not found for shipping calculation.")
+            # FIXED — your stores table has no state/zip columns
+row = db.execute(
+    text("SELECT address, city, state, zip, country FROM stores WHERE id = :id"),
+    {"id": store_id},
+).fetchone()
+if not row:
+    raise HTTPException(status_code=400, detail="Store address not found for shipping calculation.")
 
-            src_country = (row[4] or "US").upper()
-            if src_country in ("USA", "UNITED STATES"):
-                src_country = "US"
-            dest_country = (shipping_address.get("country") or "US").upper()
-            if dest_country in ("USA", "UNITED STATES"):
-                dest_country = "US"
+src_country = (row[2] or "US").upper()   # ✅ row[2] = country
+if src_country in ("USA", "UNITED STATES"):
+    src_country = "US"
+dest_country = (shipping_address.get("country") or "US").upper()
+if dest_country in ("USA", "UNITED STATES"):
+    dest_country = "US"
+
+payload = {
+    "address_from": {
+        "street1": row[0] or "",   # address
+        "city":    row[1] or "",   # city
+        "state":   "",             # not stored — pass empty
+        "zip":     "",             # not stored — pass empty
+        "country": src_country,
+    },
+    ...
+}
 
             payload = {
                 "address_from": {

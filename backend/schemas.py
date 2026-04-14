@@ -56,15 +56,18 @@ class StoreCreate(BaseModel):
     description: Optional[str] = None
     country: str
     city: Optional[str] = None
+    state: Optional[str] = None    # ← add
+    zip: Optional[str] = None      # ← add
     business_type: Optional[str] = None
     phone: Optional[str] = None
     website: Optional[str] = None
-
 
 class StoreUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     city: Optional[str] = None
+    state: Optional[str] = None    # ← add
+    zip: Optional[str] = None      # ← add
     business_type: Optional[str] = None
     phone: Optional[str] = None
     website: Optional[str] = None
@@ -90,6 +93,8 @@ class StoreOut(BaseModel):
     banner_url: Optional[str]
     country: str
     city: Optional[str]
+    state: Optional[str] = None    # ← add
+    zip: Optional[str] = None      # ← add
     business_type: Optional[str]
     status: SellerStatus
     tier: SellerTier
@@ -179,6 +184,8 @@ class StoreMinimal(BaseModel):
     logo_url: Optional[str] = None
     address: Optional[str] = None
     city: Optional[str] = None
+    state: Optional[str] = None    # ← add
+    zip: Optional[str] = None      # ← add
     phone: Optional[str] = None
 
     model_config = {"from_attributes": True}
