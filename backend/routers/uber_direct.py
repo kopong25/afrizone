@@ -305,7 +305,7 @@ async def get_delivery_quote(
         "distance_miles": round(distance_miles, 1),
         "zone": get_zone_label(distance_miles),
         "zone_label": zone["label"],
-        "delivery_fee": customer_price(estimate_uber_cost(distance_miles)),
+         "delivery_fee": zone["charge"],
         "estimated_minutes": estimated_minutes,
         "uber_quote_id": uber_quote_id,
         "sandbox": UBER_SANDBOX,
@@ -586,7 +586,7 @@ async def get_delivery_options(
 
     if is_restaurant and offers_local:
         uber_cost = await get_uber_fee(store, customer_lat, customer_lng, payload.get("customer_address", ""))
-        uber_price = customer_price(uber_cost)
+        uber_price = zone["charge"] if zone else customer_price(uber_cost)
         zone_label = get_zone_label(distance_miles)
         options.append({
             "id":           "uber_express",
@@ -616,7 +616,7 @@ async def get_delivery_options(
 
     if getattr(store, "delivery_type", None) == "both" and not is_restaurant:
         uber_cost2 = await get_uber_fee(store, customer_lat, customer_lng, payload.get("customer_address", ""))
-        uber_price2 = customer_price(uber_cost2)
+        uber_price2 = zone["charge"] if zone else customer_price(uber_cost2)
         options.append({
             "id":           "uber_express",
             "label":        "Same-Day Local Delivery",
