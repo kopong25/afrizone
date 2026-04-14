@@ -70,7 +70,8 @@ export default function CartPage() {
     name: "", address: "", city: "", state: "", country: "USA", zip: "",
   });
 
-  const [deliveryOptions, setDeliveryOptions] = useState([]);
+  const [uberDebug, setUberDebug] = useState(null);
+  useEffect(() => setMounted(true), []);
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   const [loadingDelivery, setLoadingDelivery] = useState(false);
   const [distanceInfo, setDistanceInfo] = useState(null);
@@ -203,6 +204,7 @@ export default function CartPage() {
         });
 
         console.log("[Delivery] Uber API raw response:", JSON.stringify(res.data));
+        setUberDebug({ ok: true, data: res.data });
         setDistanceInfo(res.data);
 
         // Handle both shapes: res.data.options[] and res.data directly as array
@@ -234,6 +236,7 @@ export default function CartPage() {
         }
       } catch (e) {
         console.warn("[Delivery] Uber API failed:", e?.message);
+        setUberDebug({ ok: false, error: e?.message, status: e?.response?.status, detail: e?.response?.data });
         // uberAvailable stays false → show notice card below
       }
 
@@ -433,7 +436,7 @@ export default function CartPage() {
   const steps = ["cart", "shipping", "delivery", "confirm"];
   const stepLabels = ["Cart", "Address", "Delivery", "Confirm"];
 
-  if (loading) return (
+  if (!mounted || authLoading || loading) return (
     <>
       <Navbar />
       <div className="max-w-4xl mx-auto px-4 py-12 animate-pulse space-y-4">
@@ -591,6 +594,14 @@ export default function CartPage() {
               {step === "delivery" && (
                 <div className="bg-white rounded-2xl shadow-sm border p-6">
                   <h2 className="font-bold text-gray-900 mb-1 flex items-center gap-2"><FiTruck /> Choose Delivery</h2>
+
+                  {/* ── TEMP DEBUG: remove once Uber is working ── */}
+                  {uberDebug && (
+                    <div className={`text-xs rounded-lg p-3 mb-3 font-mono break-all ${uberDebug.ok ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+                      <p className="font-bold mb-1">{uberDebug.ok ? "✅ Uber API responded:" : "❌ Uber API failed:"}</p>
+                      <pre className="whitespace-pre-wrap">{JSON.stringify(uberDebug.ok ? uberDebug.data : { error: uberDebug.error, status: uberDebug.status, detail: uberDebug.detail }, null, 2)}</pre>
+                    </div>
+                  )}
 
                   {distanceInfo && (
                     <div className={`text-xs px-3 py-2 rounded-lg mb-4 font-medium ${
@@ -766,7 +777,7 @@ export default function CartPage() {
                   )}
                   <div className="border-t pt-3 flex justify-between font-bold text-base">
                     <span>Total</span>
-                    <span className="text-green-900">${total.toFixed(2)}</span>
+                    <span className="text-green-900" suppressHydrationWarning>${total.toFixed(2)}</span>
                   </div>
                 </div>
 
