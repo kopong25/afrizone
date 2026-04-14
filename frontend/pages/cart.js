@@ -76,7 +76,7 @@ export default function CartPage() {
   const [distanceInfo, setDistanceInfo] = useState(null);
 
   // ── Real Shippo rate state ─────────────────────────────────
-  const [uspsRate, setUspsRate] = useState(null); // null = not fetched yet
+  const [uspsRate, setUspsRate] = useState(null);
   const [fetchingUspsRate, setFetchingUspsRate] = useState(false);
 
   useEffect(() => {
@@ -134,27 +134,26 @@ export default function CartPage() {
     setSelectedDelivery(null);
 
     try {
+      // ── 1. Resolve store metadata ──────────────────────────
       const storeId = items[0]?.product?.store_id || primaryStore?.id;
+      let storeVendorType = primaryStore?.vendor_type;
+      let storeDeliveryType = primaryStore?.delivery_type;
 
-      let storeVendorType = null;
-      let storeDeliveryType = null;
       if (storeId) {
         try {
           const storeRes = await api.get(`/sellers/${storeId}/public`);
-          storeVendorType = storeRes.data?.vendor_type ?? primaryStore?.vendor_type;
-          storeDeliveryType = storeRes.data?.delivery_type ?? primaryStore?.delivery_type;
+          storeVendorType  = storeRes.data?.vendor_type  ?? storeVendorType;
+          storeDeliveryType = storeRes.data?.delivery_type ?? storeDeliveryType;
         } catch {
-          storeVendorType = primaryStore?.vendor_type;
-          storeDeliveryType = primaryStore?.delivery_type;
+          // keep primary store values
         }
-      } else {
-        storeVendorType = primaryStore?.vendor_type;
-        storeDeliveryType = primaryStore?.delivery_type;
       }
 
       const isRestaurant = storeVendorType === "restaurant";
-      const offersLocal = ["local_delivery", "both"].includes(storeDeliveryType);
+      // Pickup offered when store supports it
+      const offersPickup = ["pickup", "both"].includes(storeDeliveryType);
 
+      // ── 2. Geocode customer address ────────────────────────
       let customerLat = null, customerLng = null;
       try {
         const geo = await fetch(
@@ -169,7 +168,10 @@ export default function CartPage() {
         }
       } catch {}
 
-      let uberData = { options: [], distance_miles: null };
+      // ── 3. Fetch real Uber Direct quote (no silent fallback) ──
+      let uberAvailable = false;
+      let uberOption = null;
+
       try {
         const res = await api.post("/uber-direct/delivery-options", {
           store_id: storeId,
@@ -177,114 +179,100 @@ export default function CartPage() {
           customer_lng: customerLng,
           customer_address: `${shipping.address}, ${shipping.city}, ${shipping.state}`,
         });
-        uberData = res.data;
+
         setDistanceInfo(res.data);
-      } catch {}
 
-      // ── Fetch real USPS rate from Shippo ──────────────────
-      const realUspsRate = isRestaurant ? 0 : await fetchUspsEstimate(shipping, storeId);
+        const uberQuote = res.data?.options?.find(o => o.id === "uber_express");
 
+        if (uberQuote?.price != null) {
+          uberAvailable = true;
+          uberOption = {
+            id: "uber_express",
+            label: "Uber Express Delivery",
+            icon: "🛵",
+            price: uberQuote.price,              // ← REAL price only, no fallback
+            eta: uberQuote.eta || (isRestaurant ? "~45 minutes" : "2–4 hours"),
+            description: isRestaurant
+              ? "Hot food delivered fresh to your door."
+              : "Same-day local delivery.",
+            provider: "uber_direct",
+            quote_id: uberQuote.quote_id || null,
+          };
+        }
+        // If API responds but returns no usable quote, uberAvailable stays false
+      } catch {
+        // Uber API unreachable — uberAvailable stays false, show notice card
+      }
+
+      // Uber unavailable notice card (non-selectable, shown so user understands)
+      const uberUnavailableOption = {
+        id: "uber_unavailable",
+        label: "Uber Express Delivery",
+        icon: "🛵",
+        price: null,
+        eta: null,
+        description: "Uber is not available at this time.",
+        provider: "uber_direct",
+        unavailable: true,
+      };
+
+      // ── 4. Fetch real USPS rate (non-restaurants only) ────
+      let uspsOption = null;
+      if (!isRestaurant) {
+        const realUspsRate = await fetchUspsEstimate(shipping, storeId);
+        uspsOption = {
+          id: "usps_priority",
+          label: "USPS Priority Mail",
+          icon: "📬",
+          price: realUspsRate,
+          eta: "1–3 business days",
+          description: "Tracked USPS shipping to your door.",
+          provider: "usps",
+        };
+      }
+
+      // ── 5. Pickup option ───────────────────────────────────
+      const pickupOption = {
+        id: "pickup",
+        label: "Customer Pickup",
+        icon: "🏪",
+        price: 0,
+        eta: isRestaurant ? "Ready in ~30 mins" : "Pick up at store",
+        description: "Collect your order in person. No delivery charge.",
+        provider: "pickup",
+      };
+
+      // ── 6. Assemble options ────────────────────────────────
+      // Restaurant:     Uber (or unavailable notice) + Pickup if store supports it
+      // Non-restaurant: USPS + Uber (or unavailable notice) + Pickup if store supports it
       let options = [];
 
       if (isRestaurant) {
-        options = [
-          {
-            id: "uber_express",
-            label: "Uber Express Delivery",
-            icon: "🛵",
-            price: uberData.options?.find(o => o.id === "uber_express")?.price || 9.99,
-            eta: uberData.options?.find(o => o.id === "uber_express")?.eta || "~45 minutes",
-            description: "Hot food delivered fresh to your door.",
-            provider: "uber_direct",
-            quote_id: uberData.options?.find(o => o.id === "uber_express")?.quote_id || null,
-          }
-        ];
-        if (storeDeliveryType === "both") {
-          options.push({
-            id: "pickup",
-            label: "Customer Pickup",
-            icon: "🏪",
-            price: 0,
-            eta: "Ready in ~30 mins",
-            description: "Pick up your order directly from the store. No delivery charge.",
-            provider: "pickup",
-          });
-        }
+        options.push(uberAvailable ? uberOption : uberUnavailableOption);
+        if (offersPickup) options.push(pickupOption);
       } else {
-        options = [
-          {
-            id: "usps_priority",
-            label: "USPS Priority Mail",
-            icon: "📬",
-            price: realUspsRate,  // ← REAL Shippo rate, not hardcoded
-            eta: "1–3 business days",
-            description: "Tracked USPS shipping to your door.",
-            provider: "usps",
-          },
-          {
-            id: "uber_express",
-            label: "Uber Express Delivery",
-            icon: "🛵",
-            price: uberData.options?.find(o => o.id === "uber_express")?.price || 8.99,
-            eta: "2–4 hours",
-            description: "Same-day local delivery.",
-            provider: "uber_direct",
-          },
-        ];
-        if (["pickup", "both"].includes(storeDeliveryType)) {
-          options.push({
-            id: "pickup",
-            label: "Customer Pickup",
-            icon: "🏪",
-            price: 0,
-            eta: "Pick up at store",
-            description: "Collect your order in person. No delivery charge.",
-            provider: "pickup",
-          });
-        }
-        if (storeDeliveryType === "pickup") {
-          options = [{
-            id: "pickup",
-            label: "Customer Pickup",
-            icon: "🏪",
-            price: 0,
-            eta: "Pick up at store",
-            description: "Collect your order in person. No delivery charge.",
-            provider: "pickup",
-          }];
-        }
+        if (uspsOption) options.push(uspsOption);
+        options.push(uberAvailable ? uberOption : uberUnavailableOption);
+        if (offersPickup) options.push(pickupOption);
       }
 
       setDeliveryOptions(options);
-      setSelectedDelivery(options[0]);
+      // Auto-select first selectable option (skip unavailable Uber card)
+      const firstSelectable = options.find(o => !o.unavailable);
+      setSelectedDelivery(firstSelectable || null);
+
       return true;
     } catch (err) {
-      const isRest = primaryStore?.vendor_type === "restaurant";
-      const storeDelType = primaryStore?.delivery_type;
-      const pickupOption = { id: "pickup", label: "Customer Pickup", icon: "🏪", price: 0, eta: "Pick up at store", description: "Collect your order in person. No delivery charge.", provider: "pickup" };
-      const fallbackUsps = uspsRate || 8.99;
-      const fallback = isRest
-        ? storeDelType === "both"
-          ? [{ id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "~45 minutes", description: "Hot food delivered fresh to your door.", provider: "uber_direct" }, pickupOption]
-          : [{ id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "~45 minutes", description: "Hot food delivered fresh to your door.", provider: "uber_direct" }]
-        : storeDelType === "pickup"
-          ? [pickupOption]
-          : ["both", "pickup"].includes(storeDelType)
-            ? [{ id: "usps_priority", label: "USPS Priority Mail", icon: "📬", price: fallbackUsps, eta: "1–3 business days", provider: "usps" }, { id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "2–4 hours", provider: "uber_direct" }, pickupOption]
-            : [
-                { id: "usps_priority", label: "USPS Priority Mail", icon: "📬", price: fallbackUsps, eta: "1–3 business days", provider: "usps" },
-                { id: "uber_express", label: "Uber Express Delivery", icon: "🛵", price: 8.99, eta: "2–4 hours", provider: "uber_direct" },
-              ];
-      setDeliveryOptions(fallback);
-      setSelectedDelivery(fallback[0]);
-      return true;
+      console.error("[fetchDeliveryOptions] Unexpected error:", err);
+      toast.error("Could not load delivery options. Please try again.");
+      return false;
     } finally {
       setLoadingDelivery(false);
     }
   };
 
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const shippingCost = selectedDelivery ? selectedDelivery.price : 0;
+  const shippingCost = selectedDelivery?.price ?? 0;
   const discountAmount = discount?.discount_amount || 0;
   const total = subtotal + shippingCost - discountAmount;
 
@@ -578,7 +566,7 @@ export default function CartPage() {
                       {distanceInfo.distance_miles
                         ? `📍 Store is ${distanceInfo.distance_miles} miles from your address`
                         : "📍 Calculating distance..."}
-                      {distanceInfo.distance_zone === "long_distance" && " — shipping only available"}
+                      {distanceInfo.distance_zone === "long_distance" && " — long distance"}
                       {distanceInfo.sandbox && " (sandbox mode)"}
                     </div>
                   )}
@@ -590,37 +578,65 @@ export default function CartPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {deliveryOptions.map((opt) => (
-                        <label key={opt.id}
-                          className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                            selectedDelivery?.id === opt.id
-                              ? "border-green-700 bg-green-50"
-                              : "border-gray-200 hover:border-gray-300"
-                          }`}>
-                          <input type="radio" name="delivery" value={opt.id}
-                            checked={selectedDelivery?.id === opt.id}
-                            onChange={() => setSelectedDelivery(opt)}
-                            className="mt-1 accent-green-700" />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-gray-800">{opt.icon} {opt.label}</span>
-                              <span className="font-black text-green-900">${opt.price.toFixed(2)}</span>
+                      {deliveryOptions.map((opt) => {
+                        // ── Uber unavailable notice card (non-selectable) ──
+                        if (opt.unavailable) {
+                          return (
+                            <div key={opt.id}
+                              className="flex items-start gap-4 p-4 rounded-xl border-2 border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed">
+                              <div className="mt-1 w-4 h-4 rounded-full border-2 border-gray-300 flex-shrink-0" />
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-gray-400">{opt.icon} {opt.label}</span>
+                                  <span className="text-xs text-gray-400 italic">Unavailable</span>
+                                </div>
+                                <p className="text-sm text-red-400 mt-0.5">{opt.description}</p>
+                                <span className="inline-block mt-1 text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full font-medium">
+                                  Powered by Uber
+                                </span>
+                              </div>
                             </div>
-                            <p className="text-sm text-gray-500 mt-0.5">{opt.eta}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">{opt.description}</p>
-                            {opt.provider === "uber_direct" && (
-                              <span className="inline-block mt-1 text-xs bg-black text-white px-2 py-0.5 rounded-full font-medium">
-                                Powered by Uber
-                              </span>
-                            )}
-                            {opt.provider === "usps" && (
-                              <span className="inline-block mt-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                                Live USPS rate
-                              </span>
-                            )}
-                          </div>
-                        </label>
-                      ))}
+                          );
+                        }
+
+                        // ── Normal selectable card ──────────────────────
+                        return (
+                          <label key={opt.id}
+                            className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                              selectedDelivery?.id === opt.id
+                                ? "border-green-700 bg-green-50"
+                                : "border-gray-200 hover:border-gray-300"
+                            }`}>
+                            <input type="radio" name="delivery" value={opt.id}
+                              checked={selectedDelivery?.id === opt.id}
+                              onChange={() => setSelectedDelivery(opt)}
+                              className="mt-1 accent-green-700" />
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-gray-800">{opt.icon} {opt.label}</span>
+                                <span className="font-black text-green-900">${opt.price.toFixed(2)}</span>
+                              </div>
+                              <p className="text-sm text-gray-500 mt-0.5">{opt.eta}</p>
+                              <p className="text-xs text-gray-400 mt-0.5">{opt.description}</p>
+                              {opt.provider === "uber_direct" && (
+                                <span className="inline-block mt-1 text-xs bg-black text-white px-2 py-0.5 rounded-full font-medium">
+                                  Powered by Uber
+                                </span>
+                              )}
+                              {opt.provider === "usps" && (
+                                <span className="inline-block mt-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                                  Live USPS rate
+                                </span>
+                              )}
+                              {opt.provider === "pickup" && (
+                                <span className="inline-block mt-1 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">
+                                  Free
+                                </span>
+                              )}
+                            </div>
+                          </label>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -765,8 +781,10 @@ export default function CartPage() {
 
                 {step === "delivery" && (
                   <div className="space-y-2 mt-5">
-                    <button onClick={() => { if (!selectedDelivery) { toast.error("Please select a delivery option"); return; } setStep("confirm"); }}
-                      className="w-full btn-primary py-3 flex items-center justify-center gap-2">
+                    <button onClick={() => {
+                      if (!selectedDelivery) { toast.error("Please select a delivery option"); return; }
+                      setStep("confirm");
+                    }} className="w-full btn-primary py-3 flex items-center justify-center gap-2">
                       Review Order <FiArrowRight />
                     </button>
                     <button onClick={() => setStep("shipping")} className="w-full btn-secondary py-2.5 text-sm">← Back</button>
