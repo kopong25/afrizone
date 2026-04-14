@@ -184,25 +184,21 @@ export default function CartPage() {
       // ── Fetch real USPS rate from Shippo ──────────────────
       const realUspsRate = isRestaurant ? 0 : await fetchUspsEstimate(shipping, storeId);
 
-      // ── Resolve Uber option from API response only ─────────
-      // NEVER use a hardcoded fallback price for Uber — price mismatch causes checkout errors.
-      const uberOption = uberData.options?.find(o => o.id === "uber_express");
-
       let options = [];
 
       if (isRestaurant) {
-        if (uberOption) {
-          options.push({
+        options = [
+          {
             id: "uber_express",
-            label: uberOption.label || "Uber Express Delivery",
+            label: "Uber Express Delivery",
             icon: "🛵",
-            price: uberOption.price,
-            eta: uberOption.eta || "~45 minutes",
-            description: uberOption.description || "Hot food delivered fresh to your door.",
+            price: uberData.options?.find(o => o.id === "uber_express")?.price || 9.99,
+            eta: uberData.options?.find(o => o.id === "uber_express")?.eta || "~45 minutes",
+            description: "Hot food delivered fresh to your door.",
             provider: "uber_direct",
-            quote_id: uberOption.quote_id || null,
-          });
-        }
+            quote_id: uberData.options?.find(o => o.id === "uber_express")?.quote_id || null,
+          }
+        ];
         if (storeDeliveryType === "both") {
           options.push({
             id: "pickup",
@@ -220,20 +216,20 @@ export default function CartPage() {
             id: "usps_priority",
             label: "USPS Priority Mail",
             icon: "📬",
-            price: realUspsRate,
+            price: realUspsRate,  // ← REAL Shippo rate, not hardcoded
             eta: "1–3 business days",
             description: "Tracked USPS shipping to your door.",
             provider: "usps",
           },
-          ...(uberOption ? [{
+          {
             id: "uber_express",
-            label: uberOption.label || "Uber Express Delivery",
+            label: "Uber Express Delivery",
             icon: "🛵",
-            price: uberOption.price,
-            eta: uberOption.eta || "2–4 hours",
-            description: uberOption.description || "Same-day local delivery.",
+            price: uberData.options?.find(o => o.id === "uber_express")?.price || 8.99,
+            eta: "2–4 hours",
+            description: "Same-day local delivery.",
             provider: "uber_direct",
-          }] : []),
+          },
         ];
         if (["pickup", "both"].includes(storeDeliveryType)) {
           options.push({
@@ -260,7 +256,7 @@ export default function CartPage() {
       }
 
       setDeliveryOptions(options);
-      setSelectedDelivery(options[0] || null);
+      setSelectedDelivery(options[0]);
       return true;
     } catch (err) {
       const isRest = primaryStore?.vendor_type === "restaurant";
