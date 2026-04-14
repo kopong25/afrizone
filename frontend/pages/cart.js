@@ -119,13 +119,13 @@ export default function CartPage() {
         country:  "US",
         weight_lbs: 1.0,
       });
-      const rate = res.data?.rate || 8.99;
+      const rate = res.data?.rate || 4.99;
       setUspsRate(rate);
       return rate;
     } catch (err) {
       console.warn("[USPS Estimate] Failed, using fallback:", err);
-      setUspsRate(8.99);
-      return 8.99;
+      setUspsRate(4.99);
+      return 4.99;
     } finally {
       setFetchingUspsRate(false);
     }
@@ -139,7 +139,6 @@ export default function CartPage() {
 
     try {
       // ── 1. Resolve store metadata ──────────────────────────
-      // Snapshot items + byStore synchronously right now (closure may be stale)
       const currentItems = items;
       const currentByStore = currentItems.reduce((acc, item) => {
         const sid = item.product.store?.id || item.product.store_id || "unknown";
@@ -170,8 +169,6 @@ export default function CartPage() {
       }
 
       const isRestaurant = storeVendorType === "restaurant";
-      // Always show pickup unless the store has never configured delivery at all
-      // Treat null/undefined deliveryType as "all options available" (safe default)
       const offersPickup = !storeDeliveryType || ["pickup", "both", "local_delivery"].includes(storeDeliveryType);
 
       console.log("[Delivery] isRestaurant:", isRestaurant, "offersPickup:", offersPickup);
@@ -194,9 +191,12 @@ export default function CartPage() {
         console.warn("[Delivery] Geocode failed:", e?.message);
       }
 
-      // ── 3. Fetch real Uber Direct quote (no silent fallback) ──
-      let uberAvailable = false;
-      let uberOption = null;
+      // ── 3. Fetch delivery options from backend ─────────────
+      // The backend handles ALL routing logic — restaurant vs non-restaurant,
+      // distance thresholds, Uber availability, USPS vs Uber. We use its
+      // response as the single source of truth and only hydrate USPS prices
+      // with a live Shippo rate on top.
+      let apiOptions = [];
 
       try {
         const res = await api.post("/uber-direct/delivery-options", {
@@ -206,105 +206,71 @@ export default function CartPage() {
           customer_address: `${shipping.address}, ${shipping.city}, ${shipping.state}`,
         });
 
-        console.log("[Delivery] Uber API raw response:", JSON.stringify(res.data));
+        console.log("[Delivery] API raw response:", JSON.stringify(res.data));
         setUberDebug({ ok: true, data: res.data });
         setDistanceInfo(res.data);
 
-        // Handle both shapes: res.data.options[] and res.data directly as array
-        const uberOptions = Array.isArray(res.data?.options)
+        apiOptions = Array.isArray(res.data?.options)
           ? res.data.options
           : Array.isArray(res.data)
             ? res.data
             : [];
 
-        const uberQuote = uberOptions.find(o => o.id === "uber_express" || o.type === "uber_express");
-        console.log("[Delivery] Uber quote found:", JSON.stringify(uberQuote));
-
-        if (uberQuote?.price != null) {
-          uberAvailable = true;
-          uberOption = {
-            id: "uber_express",
-            label: "Uber Express Delivery",
-            icon: "🛵",
-            price: Number(uberQuote.price),
-            eta: uberQuote.eta || (isRestaurant ? "~45 minutes" : "2–4 hours"),
-            description: isRestaurant
-              ? "Hot food delivered fresh to your door."
-              : "Same-day local delivery.",
-            provider: "uber_direct",
-            quote_id: uberQuote.quote_id || null,
-          };
-        } else {
-          console.warn("[Delivery] Uber responded but no usable price in quote:", uberOptions);
-        }
       } catch (e) {
-        console.warn("[Delivery] Uber API failed:", e?.message);
+        console.warn("[Delivery] Delivery options API failed:", e?.message);
         setUberDebug({ ok: false, error: e?.message, status: e?.response?.status, detail: e?.response?.data });
-        // uberAvailable stays false → show notice card below
+
+        // Fallback: if the API is completely unreachable, show basic USPS
+        apiOptions = [{
+          id:          "usps_standard",
+          label:       "USPS Standard Shipping",
+          icon:        "📦",
+          price:       4.99,
+          eta:         "2–3 business days",
+          description: "Standard shipping with tracking.",
+          provider:    "usps",
+          available:   true,
+        }];
       }
 
-      // Uber unavailable notice card (non-selectable)
-      const uberUnavailableOption = {
-        id: "uber_unavailable",
-        label: "Uber Express Delivery",
-        icon: "🛵",
-        price: null,
-        eta: null,
-        description: "Uber is not available at this time.",
-        provider: "uber_direct",
-        unavailable: true,
-      };
+      // ── 4. Hydrate USPS options with live Shippo rate ──────
+      // For non-restaurant stores, replace the backend's static USPS price
+      // with a live rate from Shippo if available.
+      const hydratedOptions = await Promise.all(
+        apiOptions.map(async (opt) => {
+          if (opt.provider === "usps" && !isRestaurant) {
+            const realRate = await fetchUspsEstimate(shipping, storeId);
+            return { ...opt, price: realRate };
+          }
+          return opt;
+        })
+      );
 
-      // ── 4. Fetch real USPS rate (non-restaurants only) ────
-      let uspsOption = null;
-      if (!isRestaurant) {
-        const realUspsRate = await fetchUspsEstimate(shipping, storeId);
-        uspsOption = {
-          id: "usps_priority",
-          label: "USPS Priority Mail",
-          icon: "📬",
-          price: realUspsRate,
-          eta: "1–3 business days",
-          description: "Tracked USPS shipping to your door.",
-          provider: "usps",
-        };
+      // ── 5. Add pickup if store offers it and backend didn't include it ──
+      const hasPickup = hydratedOptions.some(o => o.provider === "pickup");
+      if (!hasPickup && offersPickup) {
+        hydratedOptions.push({
+          id:          "pickup",
+          label:       "Customer Pickup",
+          icon:        "🏪",
+          price:       0,
+          eta:         isRestaurant ? "Ready in ~30 mins" : "Pick up at store",
+          description: "Collect your order in person. No delivery charge.",
+          provider:    "pickup",
+          available:   true,
+        });
       }
 
-      // ── 5. Pickup option ───────────────────────────────────
-      const pickupOption = {
-        id: "pickup",
-        label: "Customer Pickup",
-        icon: "🏪",
-        price: 0,
-        eta: isRestaurant ? "Ready in ~30 mins" : "Pick up at store",
-        description: "Collect your order in person. No delivery charge.",
-        provider: "pickup",
-      };
+      console.log("[Delivery] Final options:", hydratedOptions.map(o => `${o.id}($${o.price})`));
 
-      // ── 6. Assemble options ────────────────────────────────
-      // Restaurant:     Uber (or unavailable notice) + Pickup
-      // Non-restaurant: USPS + Uber (or unavailable notice) + Pickup
-      let options = [];
-
-      if (isRestaurant) {
-        options.push(uberAvailable ? uberOption : uberUnavailableOption);
-        options.push(pickupOption); // always show pickup for restaurants
-      } else {
-        if (uspsOption) options.push(uspsOption);
-        options.push(uberAvailable ? uberOption : uberUnavailableOption);
-        if (offersPickup) options.push(pickupOption);
-      }
-
-      console.log("[Delivery] Final options:", options.map(o => o.id));
-
-      setDeliveryOptions(options);
-      // Auto-select first selectable option (skip unavailable Uber card)
-      const firstSelectable = options.find(o => !o.unavailable);
+      setDeliveryOptions(hydratedOptions);
+      // Auto-select first selectable option (skip unavailable cards)
+      const firstSelectable = hydratedOptions.find(o => !o.unavailable && o.available !== false);
       setSelectedDelivery(firstSelectable || null);
 
       return true;
     } catch (err) {
-      console.error("[fetchDeliveryOptions] Unexpected top-level error:", err);
+      console.error("[fetchDeliveryOptions] Unexpected error:", err);
       toast.error("Could not load delivery options. Please try again.");
       return false;
     } finally {
@@ -413,7 +379,7 @@ export default function CartPage() {
             country: shipping.country || "USA",
             zip:     shipping.zip.trim(),
           },
-          delivery_method: selectedDelivery?.id || "usps_priority",
+          delivery_method: selectedDelivery?.id || "usps_standard",
           delivery_fee: shippingCost || 0,
           uber_quote_id: selectedDelivery?.quote_id || null,
         };
@@ -598,7 +564,7 @@ export default function CartPage() {
                 <div className="bg-white rounded-2xl shadow-sm border p-6">
                   <h2 className="font-bold text-gray-900 mb-1 flex items-center gap-2"><FiTruck /> Choose Delivery</h2>
 
-                  {/* ── TEMP DEBUG: remove once Uber is working ── */}
+                  {/* ── TEMP DEBUG: remove once delivery is confirmed working ── */}
                   {uberDebug && (
                     <div className={`text-xs rounded-lg p-3 mb-3 font-mono break-all ${uberDebug.ok ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
                       <p className="font-bold mb-1">{uberDebug.ok ? "✅ Uber API responded:" : "❌ Uber API failed:"}</p>
@@ -628,8 +594,8 @@ export default function CartPage() {
                   ) : (
                     <div className="space-y-3">
                       {deliveryOptions.map((opt) => {
-                        // ── Uber unavailable notice card (non-selectable) ──
-                        if (opt.unavailable) {
+                        // ── Unavailable notice card (non-selectable) ──
+                        if (opt.unavailable || opt.available === false) {
                           return (
                             <div key={opt.id}
                               className="flex items-start gap-4 p-4 rounded-xl border-2 border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed">
@@ -640,9 +606,11 @@ export default function CartPage() {
                                   <span className="text-xs text-gray-400 italic">Unavailable</span>
                                 </div>
                                 <p className="text-sm text-red-400 mt-0.5">{opt.description}</p>
-                                <span className="inline-block mt-1 text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full font-medium">
-                                  Powered by Uber
-                                </span>
+                                {opt.provider === "uber_direct" && (
+                                  <span className="inline-block mt-1 text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full font-medium">
+                                    Powered by Uber
+                                  </span>
+                                )}
                               </div>
                             </div>
                           );
@@ -663,7 +631,9 @@ export default function CartPage() {
                             <div className="flex-1">
                               <div className="flex items-center justify-between">
                                 <span className="font-bold text-gray-800">{opt.icon} {opt.label}</span>
-                                <span className="font-black text-green-900">${opt.price.toFixed(2)}</span>
+                                <span className="font-black text-green-900">
+                                  {opt.price === 0 ? "FREE" : `$${Number(opt.price).toFixed(2)}`}
+                                </span>
                               </div>
                               <p className="text-sm text-gray-500 mt-0.5">{opt.eta}</p>
                               <p className="text-xs text-gray-400 mt-0.5">{opt.description}</p>
@@ -706,7 +676,9 @@ export default function CartPage() {
                       <span className="text-2xl">{selectedDelivery.icon}</span>
                       <div>
                         <p className="font-bold text-green-800 text-sm">{selectedDelivery.label}</p>
-                        <p className="text-xs text-green-600">{selectedDelivery.eta} · ${selectedDelivery.price.toFixed(2)}</p>
+                        <p className="text-xs text-green-600">
+                          {selectedDelivery.eta} · {selectedDelivery.price === 0 ? "FREE" : `$${Number(selectedDelivery.price).toFixed(2)}`}
+                        </p>
                       </div>
                     </div>
                   )}
@@ -743,7 +715,7 @@ export default function CartPage() {
                       {fetchingUspsRate && !selectedDelivery
                         ? <span className="text-gray-400 text-xs flex items-center gap-1"><FiLoader className="animate-spin" size={10} /> Getting rate...</span>
                         : selectedDelivery
-                          ? `$${shippingCost.toFixed(2)}`
+                          ? selectedDelivery.price === 0 ? "FREE" : `$${shippingCost.toFixed(2)}`
                           : <span className="text-gray-400 text-xs">Select delivery</span>
                       }
                     </span>
