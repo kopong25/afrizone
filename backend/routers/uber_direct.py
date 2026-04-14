@@ -1,12 +1,9 @@
 """
 Uber Direct integration for Afrizone — local hot food delivery.
-Zone Pricing model: flat fee per zone covers Uber cost + Afrizone profit margin.
+Pricing model: Live Uber Direct fee + $2.00 Afrizone margin.
 
-Pricing model:
-  Zone 1 (0-3 miles):  charge $5.99  → Uber ~$3.50 → Afrizone profit ~$2.49
-  Zone 2 (3-7 miles):  charge $8.99  → Uber ~$5.50 → Afrizone profit ~$3.49
-  Zone 3 (7-12 miles): charge $12.99 → Uber ~$8.50 → Afrizone profit ~$4.49
-  Zone 4 (12-20 miles):charge $16.99 → Uber ~$12.00 → Afrizone profit ~$4.99
+Sandbox fallback estimate:
+  base fee $3.50 + $0.90/mile (mirrors Uber Direct sandbox pricing)
 
 Uber Direct Sandbox base URL: https://api.uber.com (use test credentials)
 Production access requires approval from Uber after sandbox testing.
@@ -39,43 +36,31 @@ MAX_DELIVERY_MILES = 20
 SANDBOX_BASE_FEE   = 3.50   # dollars
 SANDBOX_PER_MILE   = 0.90   # dollars per mile
 
-# ── Zone Pricing Table ─────────────────────────────────────────────────────────
+# ── Zone Table (used for distance labels only — pricing is now live Uber + margin) ──
 DELIVERY_ZONES = [
     {
         "zone":      "zone_1",
         "label":     "Nearby",
         "min_miles": 0,
         "max_miles": 3,
-        "charge":    5.99,
-        "uber_est":  3.50,
-        "profit":    2.49,
     },
     {
         "zone":      "zone_2",
         "label":     "Local",
         "min_miles": 3,
         "max_miles": 7,
-        "charge":    8.99,
-        "uber_est":  5.50,
-        "profit":    3.49,
     },
     {
         "zone":      "zone_3",
         "label":     "Extended",
         "min_miles": 7,
         "max_miles": 12,
-        "charge":    12.99,
-        "uber_est":  8.50,
-        "profit":    4.49,
     },
     {
         "zone":      "zone_4",
         "label":     "Far",
         "min_miles": 12,
         "max_miles": 20,
-        "charge":    16.99,
-        "uber_est":  12.00,
-        "profit":    4.99,
     },
 ]
 
@@ -111,7 +96,7 @@ def get_zone_label(miles: float) -> str:
 def get_zone_for_distance(distance_miles: float) -> dict | None:
     """
     Return the matching zone dict for a given distance, or None if out of range.
-    Used to determine delivery pricing tier.
+    Used for zone label only — pricing comes from live Uber API.
     """
     if distance_miles > MAX_DELIVERY_MILES:
         return None
@@ -201,13 +186,13 @@ async def get_uber_token() -> str:
 @router.get("/zones")
 def get_delivery_zones():
     """
-    Return zone pricing table — shown to customers before they place a local delivery order.
+    Return zone distance table — shown to customers before they place a local delivery order.
     No auth required.
     """
     return {
         "zones": DELIVERY_ZONES,
         "max_delivery_miles": MAX_DELIVERY_MILES,
-        "note": "Delivery fee is determined by distance from restaurant to your address.",
+        "note": "Delivery fee is determined by live Uber Direct pricing + $2.00 Afrizone service fee.",
         "sandbox": UBER_SANDBOX,
     }
 
@@ -269,6 +254,7 @@ async def get_delivery_quote(
 
     uber_quote_id = None
     estimated_minutes = 45  # default estimate
+    uber_fee_cents = None
 
     if UBER_CLIENT_ID and UBER_CLIENT_SECRET and UBER_CUSTOMER_ID:
         try:
@@ -296,23 +282,28 @@ async def get_delivery_quote(
                 if r.status_code == 200:
                     data = r.json()
                     uber_quote_id = data.get("quote_id")
+                    uber_fee_cents = data.get("fee", 0)
                     estimated_minutes = data.get("duration", 45) // 60 if data.get("duration") else 45
         except Exception as e:
-            print(f"[Uber Quote] Failed to get live quote: {e} — using zone estimate")
+            print(f"[Uber Quote] Failed to get live quote: {e} — using distance estimate")
+
+    # Live Uber fee if available, else distance-based estimate
+    uber_cost = round(uber_fee_cents / 100, 2) if uber_fee_cents else estimate_uber_cost(distance_miles)
+    delivery_fee = customer_price(uber_cost)
 
     return {
         "available": True,
         "distance_miles": round(distance_miles, 1),
         "zone": get_zone_label(distance_miles),
         "zone_label": zone["label"],
-         "delivery_fee": zone["charge"],
+        "delivery_fee": delivery_fee,
         "estimated_minutes": estimated_minutes,
         "uber_quote_id": uber_quote_id,
         "sandbox": UBER_SANDBOX,
         "breakdown": {
-            "customer_pays": zone["charge"],
-            "uber_cost_estimate": zone["uber_est"],
-            "afrizone_margin": zone["profit"],
+            "customer_pays": delivery_fee,
+            "uber_cost": uber_cost,
+            "afrizone_margin": AFRIZONE_MARGIN,
         }
     }
 
@@ -520,7 +511,7 @@ async def get_delivery_options(
     Logic:
     - Distance >= 15 miles → USPS Priority Mail only ($6.99, 1-3 days)
     - Distance < 15 miles + grocery/fashion/beauty store → USPS Standard ($4.99, 2-3 days)
-    - Distance < 15 miles + restaurant store → Uber Express ($9.99, ~45min)
+    - Distance < 15 miles + restaurant store → Uber Express (live Uber fee + $2.00, ~45min)
     - Distance < 15 miles + both delivery types → show both options
 
     Payload: { store_id, customer_lat, customer_lng, customer_address }
@@ -586,7 +577,7 @@ async def get_delivery_options(
 
     if is_restaurant and offers_local:
         uber_cost = await get_uber_fee(store, customer_lat, customer_lng, payload.get("customer_address", ""))
-        uber_price = zone["charge"] if zone else customer_price(uber_cost)
+        uber_price = customer_price(uber_cost)  # live Uber fee + $2.00 Afrizone margin
         zone_label = get_zone_label(distance_miles)
         options.append({
             "id":           "uber_express",
@@ -616,7 +607,7 @@ async def get_delivery_options(
 
     if getattr(store, "delivery_type", None) == "both" and not is_restaurant:
         uber_cost2 = await get_uber_fee(store, customer_lat, customer_lng, payload.get("customer_address", ""))
-        uber_price2 = zone["charge"] if zone else customer_price(uber_cost2)
+        uber_price2 = customer_price(uber_cost2)  # live Uber fee + $2.00 Afrizone margin
         options.append({
             "id":           "uber_express",
             "label":        "Same-Day Local Delivery",
