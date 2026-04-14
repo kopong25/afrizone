@@ -135,23 +135,42 @@ export default function CartPage() {
 
     try {
       // ── 1. Resolve store metadata ──────────────────────────
-      const storeId = items[0]?.product?.store_id || primaryStore?.id;
-      let storeVendorType = primaryStore?.vendor_type;
-      let storeDeliveryType = primaryStore?.delivery_type;
+      // Snapshot items + byStore synchronously right now (closure may be stale)
+      const currentItems = items;
+      const currentByStore = currentItems.reduce((acc, item) => {
+        const sid = item.product.store?.id || item.product.store_id || "unknown";
+        if (!acc[sid]) acc[sid] = { store: item.product.store || { id: sid }, items: [] };
+        acc[sid].items.push(item);
+        return acc;
+      }, {});
+      const currentPrimaryStore = Object.values(currentByStore)[0]?.store;
+
+      const storeId = currentItems[0]?.product?.store_id
+        || currentItems[0]?.product?.store?.id
+        || currentPrimaryStore?.id;
+
+      let storeVendorType  = currentPrimaryStore?.vendor_type  || null;
+      let storeDeliveryType = currentPrimaryStore?.delivery_type || null;
+
+      console.log("[Delivery] storeId:", storeId, "vendorType:", storeVendorType, "deliveryType:", storeDeliveryType);
 
       if (storeId) {
         try {
           const storeRes = await api.get(`/sellers/${storeId}/public`);
           storeVendorType  = storeRes.data?.vendor_type  ?? storeVendorType;
           storeDeliveryType = storeRes.data?.delivery_type ?? storeDeliveryType;
-        } catch {
-          // keep primary store values
+          console.log("[Delivery] Store API resolved — vendorType:", storeVendorType, "deliveryType:", storeDeliveryType);
+        } catch (e) {
+          console.warn("[Delivery] Could not fetch store metadata, using cart data:", e?.message);
         }
       }
 
       const isRestaurant = storeVendorType === "restaurant";
-      // Pickup offered when store supports it
-      const offersPickup = ["pickup", "both"].includes(storeDeliveryType);
+      // Always show pickup unless the store has never configured delivery at all
+      // Treat null/undefined deliveryType as "all options available" (safe default)
+      const offersPickup = !storeDeliveryType || ["pickup", "both", "local_delivery"].includes(storeDeliveryType);
+
+      console.log("[Delivery] isRestaurant:", isRestaurant, "offersPickup:", offersPickup);
 
       // ── 2. Geocode customer address ────────────────────────
       let customerLat = null, customerLng = null;
@@ -166,7 +185,10 @@ export default function CartPage() {
           customerLat = parseFloat(geoData[0].lat);
           customerLng = parseFloat(geoData[0].lon);
         }
-      } catch {}
+        console.log("[Delivery] Geocode:", customerLat, customerLng);
+      } catch (e) {
+        console.warn("[Delivery] Geocode failed:", e?.message);
+      }
 
       // ── 3. Fetch real Uber Direct quote (no silent fallback) ──
       let uberAvailable = false;
@@ -180,9 +202,18 @@ export default function CartPage() {
           customer_address: `${shipping.address}, ${shipping.city}, ${shipping.state}`,
         });
 
+        console.log("[Delivery] Uber API raw response:", JSON.stringify(res.data));
         setDistanceInfo(res.data);
 
-        const uberQuote = res.data?.options?.find(o => o.id === "uber_express");
+        // Handle both shapes: res.data.options[] and res.data directly as array
+        const uberOptions = Array.isArray(res.data?.options)
+          ? res.data.options
+          : Array.isArray(res.data)
+            ? res.data
+            : [];
+
+        const uberQuote = uberOptions.find(o => o.id === "uber_express" || o.type === "uber_express");
+        console.log("[Delivery] Uber quote found:", JSON.stringify(uberQuote));
 
         if (uberQuote?.price != null) {
           uberAvailable = true;
@@ -190,7 +221,7 @@ export default function CartPage() {
             id: "uber_express",
             label: "Uber Express Delivery",
             icon: "🛵",
-            price: uberQuote.price,              // ← REAL price only, no fallback
+            price: Number(uberQuote.price),
             eta: uberQuote.eta || (isRestaurant ? "~45 minutes" : "2–4 hours"),
             description: isRestaurant
               ? "Hot food delivered fresh to your door."
@@ -198,13 +229,15 @@ export default function CartPage() {
             provider: "uber_direct",
             quote_id: uberQuote.quote_id || null,
           };
+        } else {
+          console.warn("[Delivery] Uber responded but no usable price in quote:", uberOptions);
         }
-        // If API responds but returns no usable quote, uberAvailable stays false
-      } catch {
-        // Uber API unreachable — uberAvailable stays false, show notice card
+      } catch (e) {
+        console.warn("[Delivery] Uber API failed:", e?.message);
+        // uberAvailable stays false → show notice card below
       }
 
-      // Uber unavailable notice card (non-selectable, shown so user understands)
+      // Uber unavailable notice card (non-selectable)
       const uberUnavailableOption = {
         id: "uber_unavailable",
         label: "Uber Express Delivery",
@@ -243,18 +276,20 @@ export default function CartPage() {
       };
 
       // ── 6. Assemble options ────────────────────────────────
-      // Restaurant:     Uber (or unavailable notice) + Pickup if store supports it
-      // Non-restaurant: USPS + Uber (or unavailable notice) + Pickup if store supports it
+      // Restaurant:     Uber (or unavailable notice) + Pickup
+      // Non-restaurant: USPS + Uber (or unavailable notice) + Pickup
       let options = [];
 
       if (isRestaurant) {
         options.push(uberAvailable ? uberOption : uberUnavailableOption);
-        if (offersPickup) options.push(pickupOption);
+        options.push(pickupOption); // always show pickup for restaurants
       } else {
         if (uspsOption) options.push(uspsOption);
         options.push(uberAvailable ? uberOption : uberUnavailableOption);
         if (offersPickup) options.push(pickupOption);
       }
+
+      console.log("[Delivery] Final options:", options.map(o => o.id));
 
       setDeliveryOptions(options);
       // Auto-select first selectable option (skip unavailable Uber card)
@@ -263,7 +298,7 @@ export default function CartPage() {
 
       return true;
     } catch (err) {
-      console.error("[fetchDeliveryOptions] Unexpected error:", err);
+      console.error("[fetchDeliveryOptions] Unexpected top-level error:", err);
       toast.error("Could not load delivery options. Please try again.");
       return false;
     } finally {
