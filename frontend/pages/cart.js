@@ -71,7 +71,6 @@ export default function CartPage() {
   });
 
   const [mounted, setMounted] = useState(false);
-  const [uberDebug, setUberDebug] = useState(null);
   const [deliveryOptions, setDeliveryOptions] = useState([]);
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   const [loadingDelivery, setLoadingDelivery] = useState(false);
@@ -107,53 +106,50 @@ export default function CartPage() {
     } catch { toast.error("Failed to remove item"); }
   };
 
-  // ── Fetch real Shippo rate estimate ───────────────────────
+  // ── Fetch real Shippo rate estimate (cached) ───────────────
   const fetchUspsEstimate = async (shippingAddress, storeId) => {
-  // Cache key based on address + store — reuse if same
-  const cacheKey = `${storeId}-${shippingAddress.zip}-${shippingAddress.state}`;
-  if (cachedShippingKey === cacheKey && uspsRate !== null) {
-    return uspsRate;
-  }
-
-  setFetchingUspsRate(true);
-  try {
-    const res = await api.post("/shipping/estimate", {
-      store_id:   storeId,
-      address:    shippingAddress.address,
-      city:       shippingAddress.city,
-      state:      shippingAddress.state,
-      zip:        shippingAddress.zip,
-      country:    "US",
-      weight_lbs: 1.0,
-    });
-    const rate = res.data?.rate || 8.99;
-    setUspsRate(rate);
-    setCachedShippingKey(cacheKey);
-    return rate;
-  } catch (err) {
-    console.warn("[USPS Estimate] Failed, using fallback:", err);
-    setUspsRate(8.99);
-    return 8.99;
-  } finally {
-    setFetchingUspsRate(false);
-  }
-};
+    const cacheKey = `${storeId}-${shippingAddress.zip}-${shippingAddress.state}`;
+    if (cachedShippingKey === cacheKey && uspsRate !== null) {
+      return uspsRate;
+    }
+    setFetchingUspsRate(true);
+    try {
+      const res = await api.post("/shipping/estimate", {
+        store_id:   storeId,
+        address:    shippingAddress.address,
+        city:       shippingAddress.city,
+        state:      shippingAddress.state,
+        zip:        shippingAddress.zip,
+        country:    "US",
+        weight_lbs: 1.0,
+      });
+      const rate = res.data?.rate || 8.99;
+      setUspsRate(rate);
+      setCachedShippingKey(cacheKey);
+      return rate;
+    } catch (err) {
+      console.warn("[USPS Estimate] Failed, using fallback:", err);
+      setUspsRate(8.99);
+      return 8.99;
+    } finally {
+      setFetchingUspsRate(false);
+    }
+  };
 
   // ── Delivery routing ───────────────────────────────────────
   const fetchDeliveryOptions = async () => {
-  // Don't re-fetch if we already have options for same address
-  if (deliveryOptions.length > 0 && uspsRate !== null) {
-    return true;
-  }
-  const fetchDeliveryOptions = async () => {
+    // Don't re-fetch if we already have options and a cached rate
+    if (deliveryOptions.length > 0 && uspsRate !== null) {
+      return true;
+    }
+
     setLoadingDelivery(true);
     setDeliveryOptions([]);
     setSelectedDelivery(null);
 
     try {
-      // ── 1. Resolve store metadata ──────────────────────────
-      const currentItems = items;
-      const currentByStore = currentItems.reduce((acc, item) => {
+      // ── 1. Resolve store metadata ────────────────────────
+      const currentByStore = items.reduce((acc, item) => {
         const sid = item.product.store?.id || item.product.store_id || "unknown";
         if (!acc[sid]) acc[sid] = { store: item.product.store || { id: sid }, items: [] };
         acc[sid].items.push(item);
@@ -161,32 +157,27 @@ export default function CartPage() {
       }, {});
       const currentPrimaryStore = Object.values(currentByStore)[0]?.store;
 
-      const storeId = currentItems[0]?.product?.store_id
-        || currentItems[0]?.product?.store?.id
+      const storeId = items[0]?.product?.store_id
+        || items[0]?.product?.store?.id
         || currentPrimaryStore?.id;
 
       let storeVendorType  = currentPrimaryStore?.vendor_type  || null;
       let storeDeliveryType = currentPrimaryStore?.delivery_type || null;
-
-      console.log("[Delivery] storeId:", storeId, "vendorType:", storeVendorType, "deliveryType:", storeDeliveryType);
 
       if (storeId) {
         try {
           const storeRes = await api.get(`/sellers/${storeId}/public`);
           storeVendorType  = storeRes.data?.vendor_type  ?? storeVendorType;
           storeDeliveryType = storeRes.data?.delivery_type ?? storeDeliveryType;
-          console.log("[Delivery] Store API resolved — vendorType:", storeVendorType, "deliveryType:", storeDeliveryType);
         } catch (e) {
-          console.warn("[Delivery] Could not fetch store metadata, using cart data:", e?.message);
+          console.warn("[Delivery] Could not fetch store metadata:", e?.message);
         }
       }
 
       const isRestaurant = storeVendorType === "restaurant";
       const offersPickup = !storeDeliveryType || ["pickup", "both", "local_delivery"].includes(storeDeliveryType);
 
-      console.log("[Delivery] isRestaurant:", isRestaurant, "offersPickup:", offersPickup);
-
-      // ── 2. Geocode customer address ────────────────────────
+      // ── 2. Geocode customer address ──────────────────────
       let customerLat = null, customerLng = null;
       try {
         const geo = await fetch(
@@ -199,56 +190,34 @@ export default function CartPage() {
           customerLat = parseFloat(geoData[0].lat);
           customerLng = parseFloat(geoData[0].lon);
         }
-        console.log("[Delivery] Geocode:", customerLat, customerLng);
       } catch (e) {
         console.warn("[Delivery] Geocode failed:", e?.message);
       }
 
-      // ── 3. Fetch delivery options from backend ─────────────
-      // The backend handles ALL routing logic — restaurant vs non-restaurant,
-      // distance thresholds, Uber availability, USPS vs Uber. We use its
-      // response as the single source of truth and only hydrate USPS prices
-      // with a live Shippo rate on top.
+      // ── 3. Fetch delivery options from backend ───────────
       let apiOptions = [];
-
       try {
         const res = await api.post("/uber-direct/delivery-options", {
-          store_id: storeId,
-          customer_lat: customerLat,
-          customer_lng: customerLng,
+          store_id:         storeId,
+          customer_lat:     customerLat,
+          customer_lng:     customerLng,
           customer_address: `${shipping.address}, ${shipping.city}, ${shipping.state}`,
         });
-
-        console.log("[Delivery] API raw response:", JSON.stringify(res.data));
-        setUberDebug({ ok: true, data: res.data });
         setDistanceInfo(res.data);
-
         apiOptions = Array.isArray(res.data?.options)
           ? res.data.options
-          : Array.isArray(res.data)
-            ? res.data
-            : [];
-
+          : Array.isArray(res.data) ? res.data : [];
       } catch (e) {
         console.warn("[Delivery] Delivery options API failed:", e?.message);
-        setUberDebug({ ok: false, error: e?.message, status: e?.response?.status, detail: e?.response?.data });
-
-        // Fallback: if the API is completely unreachable, show basic USPS
         apiOptions = [{
-          id:          "usps_standard",
-          label:       "USPS Standard Shipping",
-          icon:        "📦",
-          price:       4.99,
-          eta:         "2–3 business days",
+          id: "usps_standard", label: "USPS Standard Shipping", icon: "📦",
+          price: 8.99, eta: "2–3 business days",
           description: "Standard shipping with tracking.",
-          provider:    "usps",
-          available:   true,
+          provider: "usps", available: true,
         }];
       }
 
-      // ── 4. Hydrate USPS options with live Shippo rate ──────
-      // For non-restaurant stores, replace the backend's static USPS price
-      // with a live rate from Shippo if available.
+      // ── 4. Hydrate USPS options with live Shippo rate ────
       const hydratedOptions = await Promise.all(
         apiOptions.map(async (opt) => {
           if (opt.provider === "usps" && !isRestaurant) {
@@ -259,29 +228,22 @@ export default function CartPage() {
         })
       );
 
-      // ── 5. Add pickup if store offers it and backend didn't include it ──
+      // ── 5. Add pickup if missing ─────────────────────────
       const hasPickup = hydratedOptions.some(o => o.provider === "pickup");
       if (!hasPickup && offersPickup) {
         hydratedOptions.push({
-          id:          "pickup",
-          label:       "Customer Pickup",
-          icon:        "🏪",
-          price:       0,
-          eta:         isRestaurant ? "Ready in ~30 mins" : "Pick up at store",
+          id: "pickup", label: "Customer Pickup", icon: "🏪",
+          price: 0, eta: isRestaurant ? "Ready in ~30 mins" : "Pick up at store",
           description: "Collect your order in person. No delivery charge.",
-          provider:    "pickup",
-          available:   true,
+          provider: "pickup", available: true,
         });
       }
 
-      console.log("[Delivery] Final options:", hydratedOptions.map(o => `${o.id}($${o.price})`));
-
       setDeliveryOptions(hydratedOptions);
-      // Auto-select first selectable option (skip unavailable cards)
       const firstSelectable = hydratedOptions.find(o => !o.unavailable && o.available !== false);
       setSelectedDelivery(firstSelectable || null);
-
       return true;
+
     } catch (err) {
       console.error("[fetchDeliveryOptions] Unexpected error:", err);
       toast.error("Could not load delivery options. Please try again.");
@@ -306,7 +268,6 @@ export default function CartPage() {
     return acc;
   }, {});
 
-  const hasRestaurant = Object.values(byStore).some(({ store }) => store.vendor_type === "restaurant");
   const primaryStore = Object.values(byStore)[0]?.store;
 
   const applyDiscount = async () => {
@@ -362,6 +323,7 @@ export default function CartPage() {
     if (typeof window !== "undefined") {
       try { window._azMemToken = authToken; } catch {}
     }
+
     const authHeaders = { Authorization: `Bearer ${authToken}` };
     setCheckingOut(true);
     try {
@@ -577,7 +539,6 @@ export default function CartPage() {
                 <div className="bg-white rounded-2xl shadow-sm border p-6">
                   <h2 className="font-bold text-gray-900 mb-1 flex items-center gap-2"><FiTruck /> Choose Delivery</h2>
 
-                  
                   {distanceInfo && (
                     <div className={`text-xs px-3 py-2 rounded-lg mb-4 font-medium ${
                       distanceInfo.distance_zone === "long_distance"
@@ -600,7 +561,6 @@ export default function CartPage() {
                   ) : (
                     <div className="space-y-3">
                       {deliveryOptions.map((opt) => {
-                        // ── Unavailable notice card (non-selectable) ──
                         if (opt.unavailable || opt.available === false) {
                           return (
                             <div key={opt.id}
@@ -621,8 +581,6 @@ export default function CartPage() {
                             </div>
                           );
                         }
-
-                        // ── Normal selectable card ──────────────────────
                         return (
                           <label key={opt.id}
                             className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
@@ -729,7 +687,6 @@ export default function CartPage() {
                   {selectedDelivery && (
                     <p className="text-xs text-gray-400">{selectedDelivery.icon} {selectedDelivery.label} · {selectedDelivery.eta}</p>
                   )}
-                  {/* Discount */}
                   <div className="pt-2">
                     {discount ? (
                       <div className="bg-green-50 border border-green-200 rounded-lg p-2.5 flex items-center justify-between">
@@ -762,7 +719,6 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                {/* Navigation buttons */}
                 {step === "cart" && (
                   <button onClick={() => {
                     if (Object.keys(byStore).length > 1) {
