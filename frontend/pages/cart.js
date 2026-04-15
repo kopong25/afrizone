@@ -564,14 +564,7 @@ export default function CartPage() {
                 <div className="bg-white rounded-2xl shadow-sm border p-6">
                   <h2 className="font-bold text-gray-900 mb-1 flex items-center gap-2"><FiTruck /> Choose Delivery</h2>
 
-                  {/* ── TEMP DEBUG: remove once delivery is confirmed working ── */}
-                  {uberDebug && (
-                    <div className={`text-xs rounded-lg p-3 mb-3 font-mono break-all ${uberDebug.ok ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
-                      <p className="font-bold mb-1">{uberDebug.ok ? "✅ Uber API responded:" : "❌ Uber API failed:"}</p>
-                      <pre className="whitespace-pre-wrap">{JSON.stringify(uberDebug.ok ? uberDebug.data : { error: uberDebug.error, status: uberDebug.status, detail: uberDebug.detail }, null, 2)}</pre>
-                    </div>
-                  )}
-
+                  
                   {distanceInfo && (
                     <div className={`text-xs px-3 py-2 rounded-lg mb-4 font-medium ${
                       distanceInfo.distance_zone === "long_distance"

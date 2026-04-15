@@ -594,15 +594,52 @@ async def get_delivery_options(
         })
 
     if not is_restaurant and (offers_shipping or getattr(store, "delivery_type", None) == "both"):
+        # Get live Shippo rate
+        try:
+            from routers.shipping import shippo_post, _build_parcel_estimate, SHIPPO_API_KEY
+            if SHIPPO_API_KEY and store.address and store.city:
+                shipment = await shippo_post("shipments", {
+                    "address_from": {
+                        "name":    store.name,
+                        "street1": store.address,
+                        "city":    store.city,
+                        "state":   store.state if hasattr(store, "state") and store.state else "AZ",
+                        "zip":     store.zip if hasattr(store, "zip") and store.zip else "85225",
+                        "country": "US",
+                    },
+                    "address_to": {
+                        "name":    "Customer",
+                        "street1": customer_address or "123 Main St",
+                        "city":    payload.get("customer_city", "Phoenix"),
+                        "state":   payload.get("customer_state", "AZ"),
+                        "zip":     payload.get("customer_zip", "85001"),
+                        "country": "US",
+                    },
+                    "parcels": [_build_parcel_estimate(1.0)],
+                    "async": False,
+                })
+                rates = shipment.get("rates", [])
+                usps_rates = [r for r in rates if r.get("provider", "").upper() == "USPS"]
+                if usps_rates:
+                    best = min(usps_rates, key=lambda r: float(r.get("amount", 9999)))
+                    usps_price = round(float(best["amount"]), 2)
+                else:
+                    usps_price = 8.99
+            else:
+                usps_price = 8.99
+        except Exception as e:
+            print(f"[DeliveryOptions] Shippo rate error: {e}")
+            usps_price = 8.99
+
         options.append({
-            "id":           "usps_standard",
-            "label":        "USPS Standard Shipping",
-            "icon":         "📦",
-            "price":        4.99,
-            "eta":          "2–3 business days",
-            "description":  "Reliable standard shipping with tracking.",
-            "provider":     "usps",
-            "available":    True,
+            "id":          "usps_standard",
+            "label":       "USPS Standard Shipping",
+            "icon":        "📦",
+            "price":       usps_price,
+            "eta":         "2–3 business days",
+            "description": "Reliable standard shipping with tracking.",
+            "provider":    "usps",
+            "available":   True,
         })
 
     if getattr(store, "delivery_type", None) == "both" and not is_restaurant:
