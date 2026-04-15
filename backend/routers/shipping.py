@@ -120,7 +120,7 @@ def _build_parcel(order: models.Order) -> dict:
 
 def _build_parcel_estimate(weight_lbs: float = 1.0) -> dict:
     return {
-        "length": "12", "width": "10", "height": "6",
+        "length": "6", "width": "4", "height": "2",
         "distance_unit": "in",
         "weight": str(round(weight_lbs, 2)),
         "mass_unit": "lb",
@@ -201,8 +201,8 @@ async def get_shipping_estimate(
             "name":    store.name,
             "street1": store.address,
             "city":    store.city,
-            "state":   "TX",
-            "zip":     "77001",
+            "state":   store.state if hasattr(store, "state") and store.state else "AZ",
+            "zip":     store.zip if hasattr(store, "zip") and store.zip else "85225",
             "country": "US",
         }
         address_to = {
