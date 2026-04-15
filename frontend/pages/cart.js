@@ -79,6 +79,7 @@ export default function CartPage() {
 
   // ── Real Shippo rate state ─────────────────────────────────
   const [uspsRate, setUspsRate] = useState(null);
+  const [cachedShippingKey, setCachedShippingKey] = useState(null);
   const [fetchingUspsRate, setFetchingUspsRate] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -108,30 +109,42 @@ export default function CartPage() {
 
   // ── Fetch real Shippo rate estimate ───────────────────────
   const fetchUspsEstimate = async (shippingAddress, storeId) => {
-    setFetchingUspsRate(true);
-    try {
-      const res = await api.post("/shipping/estimate", {
-        store_id: storeId,
-        address:  shippingAddress.address,
-        city:     shippingAddress.city,
-        state:    shippingAddress.state,
-        zip:      shippingAddress.zip,
-        country:  "US",
-        weight_lbs: 1.0,
-      });
-      const rate = res.data?.rate || 4.99;
-      setUspsRate(rate);
-      return rate;
-    } catch (err) {
-      console.warn("[USPS Estimate] Failed, using fallback:", err);
-      setUspsRate(4.99);
-      return 4.99;
-    } finally {
-      setFetchingUspsRate(false);
-    }
-  };
+  // Cache key based on address + store — reuse if same
+  const cacheKey = `${storeId}-${shippingAddress.zip}-${shippingAddress.state}`;
+  if (cachedShippingKey === cacheKey && uspsRate !== null) {
+    return uspsRate;
+  }
+
+  setFetchingUspsRate(true);
+  try {
+    const res = await api.post("/shipping/estimate", {
+      store_id:   storeId,
+      address:    shippingAddress.address,
+      city:       shippingAddress.city,
+      state:      shippingAddress.state,
+      zip:        shippingAddress.zip,
+      country:    "US",
+      weight_lbs: 1.0,
+    });
+    const rate = res.data?.rate || 8.99;
+    setUspsRate(rate);
+    setCachedShippingKey(cacheKey);
+    return rate;
+  } catch (err) {
+    console.warn("[USPS Estimate] Failed, using fallback:", err);
+    setUspsRate(8.99);
+    return 8.99;
+  } finally {
+    setFetchingUspsRate(false);
+  }
+};
 
   // ── Delivery routing ───────────────────────────────────────
+  const fetchDeliveryOptions = async () => {
+  // Don't re-fetch if we already have options for same address
+  if (deliveryOptions.length > 0 && uspsRate !== null) {
+    return true;
+  }
   const fetchDeliveryOptions = async () => {
     setLoadingDelivery(true);
     setDeliveryOptions([]);
