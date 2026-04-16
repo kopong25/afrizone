@@ -797,7 +797,7 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
     offers_shipping = delivery_type in ["shipping", "both"] or not delivery_type
 
     # Whether this store can offer pickup at all
-    offers_pickup   = delivery_type in ["pickup", "both", "local_delivery"]
+    offers_pickup   = delivery_type in ["pickup", "both", "local_delivery", "shipping"] or not delivery_type
     # Pickup is only useful if the customer is actually nearby
     customer_is_nearby = distance_miles is not None and distance_miles <= PICKUP_NEARBY_MILES
 
