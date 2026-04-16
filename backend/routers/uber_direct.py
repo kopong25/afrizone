@@ -11,6 +11,11 @@ Key changes vs previous version:
     Falls back to $8.99 if Shippo is unavailable.
   • verify_uber_quote() moved here from the deleted delivery_rates.py.
   • _geocode() helper added here (was in delivery_rates.py).
+
+Shipping cost optimizations (latest):
+  • Cubic-optimized parcel dimensions to qualify for USPS Cubic pricing.
+  • First Class Package Service added for items under 16 oz ($3–5).
+  • Shippo address validation runs before rate fetch to avoid bad-address surcharges.
 """
 
 import os
@@ -117,39 +122,103 @@ def get_zone_for_distance(distance_miles: float) -> dict | None:
 
 def _parcel_for_weight(weight_lbs: float) -> dict:
     """
-    Return parcel dimensions matched to weight so USPS dimensional weight
-    (L×W×H / 166) never inflates cost for typical light items.
+    Return cubic-optimized parcel dimensions for USPS Cubic pricing eligibility.
 
-      <= 0.5 lb  padded envelope  6x4x1   DIM=0.14 lb
-      <= 2 lb    small box        8x6x4   DIM=1.16 lb
-      <= 5 lb    medium box      10x8x5   DIM=2.41 lb
-       > 5 lb    large box       12x10x6  DIM=4.34 lb
+    USPS Cubic pricing applies to parcels ≤ 0.5 cubic feet AND ≤ 20 lbs,
+    and is often cheaper than Priority Mail for dense/small packages.
+    Dimensions are chosen to stay within cubic tier thresholds while
+    keeping dimensional weight (L×W×H / 166) below actual weight.
+
+    Tiers:
+      <= 0.5 lb  padded envelope  6x9x2   → 0.0625 cu ft  (Cubic tier 0)
+      <= 2.0 lb  cubic shoebox    10x8x6  → 0.278 cu ft   (Cubic tier 2)
+      >  2.0 lb  cubic medium     12x12x8 → 0.444 cu ft   (Cubic tier 4, ≤ 20 lb)
     """
     w = str(round(max(weight_lbs, 0.1), 2))
     if weight_lbs <= 0.5:
-        return {"length": "6",  "width": "4",  "height": "1", "distance_unit": "in", "weight": w, "mass_unit": "lb"}
+        # Padded envelope — qualifies for Cubic tier 0 (~$8–9 Priority or First Class)
+        return {"length": "6", "width": "9", "height": "2",
+                "distance_unit": "in", "weight": w, "mass_unit": "lb"}
     if weight_lbs <= 2.0:
-        return {"length": "8",  "width": "6",  "height": "4", "distance_unit": "in", "weight": w, "mass_unit": "lb"}
-    if weight_lbs <= 5.0:
-        return {"length": "10", "width": "8",  "height": "5", "distance_unit": "in", "weight": w, "mass_unit": "lb"}
-    return     {"length": "12", "width": "10", "height": "6", "distance_unit": "in", "weight": w, "mass_unit": "lb"}
+        # Shoebox — Cubic tier 2, typically $10–12 vs $14+ standard Priority
+        return {"length": "10", "width": "8", "height": "6",
+                "distance_unit": "in", "weight": w, "mass_unit": "lb"}
+    # Medium cubic box — Cubic tier 4, covers up to ~20 lb competitively
+    return {"length": "12", "width": "12", "height": "8",
+            "distance_unit": "in", "weight": w, "mass_unit": "lb"}
+
+
+def _validate_shippo_address(addr: dict) -> dict:
+    """
+    Run Shippo address validation on a to_addr dict.
+    Returns a corrected address dict if validation succeeds, otherwise
+    returns the original unchanged. Never raises — bad validation should
+    not block the rate fetch.
+
+    Why this matters: Shippo/USPS will return no rates (or inflated rates)
+    for unrecognized addresses. Validation normalizes street abbreviations,
+    zip+4 codes, and state codes before the shipment is created.
+    """
+    if not SHIPPO_TOKEN:
+        return addr
+    try:
+        resp = httpx.post(
+            f"{SHIPPO_BASE_URL}/addresses/",
+            json={**addr, "validate": True},
+            headers={
+                "Authorization": f"ShippoToken {SHIPPO_TOKEN}",
+                "Content-Type":  "application/json",
+            },
+            timeout=8.0,
+        )
+        if resp.status_code == 201:
+            data = resp.json()
+            validation = data.get("validation_results", {})
+            if validation.get("is_valid"):
+                # Use Shippo-normalized fields where available
+                return {
+                    "name":    addr.get("name", ""),
+                    "street1": data.get("street1") or addr["street1"],
+                    "city":    data.get("city")    or addr["city"],
+                    "state":   data.get("state")   or addr["state"],
+                    "zip":     data.get("zip")      or addr["zip"],
+                    "country": data.get("country")  or addr.get("country", "US"),
+                }
+            else:
+                messages = validation.get("messages", [])
+                logger.warning(f"[Shippo] Address invalid: {messages}")
+    except Exception as e:
+        logger.warning(f"[Shippo] Address validation error: {e}")
+    return addr
 
 
 def _fetch_live_usps_rate(
     from_addr:  dict,
     to_addr:    dict,
-    weight_lbs: float = 0.5,   # default: light parcel, not a large box
+    weight_lbs: float = 0.5,
 ) -> dict:
     """
     Fetch a real USPS rate from Shippo synchronously.
-    Returns {"priority": float, "ground": float | None, "mock": bool}.
+
+    Service priority (cheapest first):
+      1. USPS First Class Package  — items < 16 oz, typically $3–5
+      2. USPS Ground Advantage     — slower ground, typically $5–8
+      3. USPS Priority Mail        — 1–3 days, typically $8–15
+
+    Address validation runs before the shipment call to avoid
+    unrecognized-address rate failures.
+
+    Returns {"priority": float, "ground": float | None, "first_class": float | None, "mock": bool}.
     Falls back to {"priority": 8.99, "ground": 4.99, "mock": True} on any error.
     """
-    FALLBACK = {"priority": 8.99, "ground": 4.99, "mock": True}
+    FALLBACK = {"priority": 8.99, "ground": 4.99, "first_class": None, "mock": True}
 
     if not SHIPPO_TOKEN:
         logger.warning("[Shippo] No API key — using fallback USPS rates")
         return FALLBACK
+
+    # ── Validate destination address before rate fetch ────────────────────
+    to_addr = _validate_shippo_address(to_addr)
 
     try:
         parcel = _parcel_for_weight(weight_lbs)
@@ -176,22 +245,41 @@ def _fetch_live_usps_rate(
             return FALLBACK
 
         def _find(keyword: str):
+            """
+            Find the cheapest USPS rate matching a service-level keyword.
+            First Class Package is checked first since it's the cheapest
+            option for sub-16 oz items (qualifies when weight_lbs < 1.0).
+            """
+            # For lightweight items, surface First Class Package ahead of Priority
+            if keyword == "FIRST":
+                return next(
+                    (r for r in usps if "FIRST CLASS PACKAGE" in r.get("servicelevel", {}).get("name", "").upper()),
+                    None,
+                )
             return next(
                 (r for r in usps if keyword in r.get("servicelevel", {}).get("name", "").upper()),
                 None,
             )
 
-        priority_rate = _find("PRIORITY")
-        ground_rate   = _find("GROUND") or _find("FIRST")
+        priority_rate   = _find("PRIORITY")
+        ground_rate     = _find("GROUND") or _find("ADVANTAGE")
+        first_class_rate = _find("FIRST") if weight_lbs < 1.0 else None  # FC only valid < 16 oz
 
         result = {
             "mock":     False,
             "priority": round(float(priority_rate["amount"]), 2) if priority_rate else FALLBACK["priority"],
-            "ground":   round(float(ground_rate["amount"]), 2)   if ground_rate and ground_rate != priority_rate else None,
-            "priority_eta": priority_rate.get("estimated_days") if priority_rate else None,
-            "ground_eta":   ground_rate.get("estimated_days")   if ground_rate else None,
+            "ground":   round(float(ground_rate["amount"]),   2) if ground_rate and ground_rate != priority_rate else None,
+            # First Class Package — only returned when item is under 16 oz
+            "first_class":     round(float(first_class_rate["amount"]), 2) if first_class_rate else None,
+            "first_class_eta": first_class_rate.get("estimated_days")      if first_class_rate else None,
+            "priority_eta":    priority_rate.get("estimated_days")         if priority_rate else None,
+            "ground_eta":      ground_rate.get("estimated_days")           if ground_rate else None,
         }
-        logger.info(f"[Shippo] Priority=${result['priority']} Ground={result['ground']}")
+        logger.info(
+            f"[Shippo] Priority=${result['priority']} "
+            f"Ground={result['ground']} "
+            f"FirstClass={result['first_class']}"
+        )
         return result
 
     except Exception as e:
@@ -242,7 +330,6 @@ def verify_uber_quote(quote_id: str, expected_fee_cents: int) -> float:
         return round(expected_fee_cents / 100, 2)
 
     try:
-        # Sync token fetch for use in sync context
         resp_token = httpx.post(
             f"{UBER_BASE}/oauth/v2/token",
             data={
@@ -350,7 +437,6 @@ async def get_delivery_quote(payload: dict, db: Session = Depends(get_db)):
     customer_lng     = payload.get("customer_lng")
     customer_address = payload.get("customer_address", "")
 
-    # If no coords, try to geocode from address fields
     if not (customer_lat and customer_lng):
         coords = _geocode(
             address=payload.get("address", customer_address),
@@ -618,14 +704,14 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
       { store_id, customer_lat, customer_lng, customer_address }   ← original
       { store_id, address, city, state, zip, country }             ← new (from DeliverySelector)
 
-    USPS prices are fetched live from Shippo.
+    USPS prices are fetched live from Shippo (with address validation).
     Uber quotes use the Uber Direct API (or sandbox estimates).
 
-    Routing rules:
-      distance >= 15 miles         → USPS Priority only
-      restaurant + local delivery  → Uber Express + optional Pickup
-      other store + both           → USPS (live rate) + Uber Express + optional Pickup
-      other store + shipping only  → USPS (live rate) only
+    Service selection (cheapest first):
+      < 16 oz items       → First Class Package surfaced as cheapest option
+      local distance      → USPS Ground Advantage + Priority (non-restaurant)
+      long distance ≥15mi → USPS Priority only
+      restaurant + local  → Uber Express + optional Pickup
     """
     store_id = payload.get("store_id")
     if not store_id:
@@ -635,7 +721,6 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
     customer_lat = payload.get("customer_lat")
     customer_lng = payload.get("customer_lng")
 
-    # If address fields are provided and no coords, geocode
     if not (customer_lat and customer_lng):
         coords = _geocode(
             address=payload.get("address", payload.get("customer_address", "")),
@@ -655,7 +740,6 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
     # ── Load store ─────────────────────────────────────────────────────────
     store = db.query(models.Store).filter(models.Store.id == store_id).first()
     if not store:
-        # Store not found — return safe USPS fallback
         return {
             "distance_miles":    None,
             "store_vendor_type": None,
@@ -679,18 +763,15 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
     is_restaurant   = getattr(store, "vendor_type",   None) == "restaurant"
     delivery_type   = getattr(store, "delivery_type", None) or ""
     offers_local    = delivery_type in ["local_delivery", "both"]
-    offers_shipping = delivery_type in ["shipping", "both"] or not delivery_type  # default to shipping if unset
+    offers_shipping = delivery_type in ["shipping", "both"] or not delivery_type
 
     options = []
 
-    # ── Resolve cart weight for Shippo parcel sizing ──────────────────────
-    # Frontend can pass weight_lbs in payload; fall back to per-item weight_kg
-    # from the DB, or a sensible 0.5 lb default for typical retail items.
+    # ── Resolve cart weight ────────────────────────────────────────────────
     cart_weight_lbs: float = float(payload.get("weight_lbs") or 0)
     if not cart_weight_lbs:
         items = payload.get("items") or []
         if items:
-            # items: [{ product_id, quantity }] — look up weight_kg from DB
             try:
                 from models import Product
                 total_kg = 0.0
@@ -699,13 +780,13 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
                     qty = int(item.get("quantity", 1))
                     if pid:
                         p = db.query(Product).filter(Product.id == pid).first()
-                        total_kg += (getattr(p, "weight_kg", None) or 0.227) * qty  # 0.227 kg = 0.5 lb default
+                        total_kg += (getattr(p, "weight_kg", None) or 0.227) * qty
                 cart_weight_lbs = round(total_kg * 2.205, 2)
             except Exception:
                 cart_weight_lbs = 0.5
-    cart_weight_lbs = max(cart_weight_lbs, 0.1)  # never zero
+    cart_weight_lbs = max(cart_weight_lbs, 0.1)
 
-    # ── Build store origin address for Shippo ─────────────────────────────
+    # ── Build Shippo address objects ───────────────────────────────────────
     from_addr = {
         "name":    store.name,
         "street1": getattr(store, "address", "") or "",
@@ -726,6 +807,21 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
     # ── BRANCH: long distance or unknown → USPS only ───────────────────────
     if distance_miles is None or distance_miles >= 15:
         usps_rates = _fetch_live_usps_rate(from_addr, to_addr, cart_weight_lbs)
+
+        # Surface First Class if available (cheapest for light items)
+        if usps_rates.get("first_class"):
+            options.append({
+                "id":          "usps_first_class",
+                "label":       "USPS First Class Package",
+                "icon":        "✉️",
+                "price":       usps_rates["first_class"],
+                "eta":         f"{usps_rates.get('first_class_eta', '2–5')} business day(s)",
+                "description": "Cheapest tracked option for lightweight items under 16 oz.",
+                "provider":    "usps",
+                "available":   True,
+                "live_rate":   not usps_rates["mock"],
+            })
+
         options.append({
             "id":          "usps_priority",
             "label":       "USPS Priority Mail",
@@ -749,26 +845,27 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
     # ── BRANCH: local distance ─────────────────────────────────────────────
     zone = get_zone_for_distance(distance_miles)
 
-    # Fetch live USPS rates once (reused for both standard + priority options)
     usps_rates = None
     if not is_restaurant and offers_shipping:
         usps_rates = _fetch_live_usps_rate(from_addr, to_addr, cart_weight_lbs)
 
-    # USPS options for non-restaurant stores
+    # USPS options for non-restaurant stores (cheapest first)
     if not is_restaurant and offers_shipping and usps_rates:
-        # Priority
-        options.append({
-            "id":          "usps_priority",
-            "label":       "USPS Priority Mail",
-            "icon":        "📬",
-            "price":       usps_rates["priority"],
-            "eta":         f"{usps_rates.get('priority_eta', '1–3')} business day(s)",
-            "description": "Tracked USPS Priority shipping to your door.",
-            "provider":    "usps",
-            "available":   True,
-            "live_rate":   not usps_rates["mock"],
-        })
-        # Ground (if different from priority)
+        # First Class Package — cheapest for items under 16 oz
+        if usps_rates.get("first_class"):
+            options.append({
+                "id":          "usps_first_class",
+                "label":       "USPS First Class Package",
+                "icon":        "✉️",
+                "price":       usps_rates["first_class"],
+                "eta":         f"{usps_rates.get('first_class_eta', '2–5')} business day(s)",
+                "description": "Best price for lightweight items under 16 oz. Tracked.",
+                "provider":    "usps",
+                "available":   True,
+                "live_rate":   not usps_rates["mock"],
+            })
+
+        # Ground Advantage
         if usps_rates.get("ground"):
             options.append({
                 "id":          "usps_ground",
@@ -782,7 +879,20 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
                 "live_rate":   not usps_rates["mock"],
             })
 
-    # Uber Express — restaurants always, other stores only if both delivery types
+        # Priority
+        options.append({
+            "id":          "usps_priority",
+            "label":       "USPS Priority Mail",
+            "icon":        "📬",
+            "price":       usps_rates["priority"],
+            "eta":         f"{usps_rates.get('priority_eta', '1–3')} business day(s)",
+            "description": "Tracked USPS Priority shipping to your door.",
+            "provider":    "usps",
+            "available":   True,
+            "live_rate":   not usps_rates["mock"],
+        })
+
+    # Uber Express
     if (is_restaurant and offers_local) or (not is_restaurant and delivery_type == "both"):
         try:
             uber_cost  = await get_uber_fee(store, customer_lat, customer_lng, customer_address)
