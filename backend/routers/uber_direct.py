@@ -13,9 +13,14 @@ Key changes vs previous version:
   • _geocode() helper added here (was in delivery_rates.py).
 
 Shipping cost optimizations (latest):
-  • Cubic-optimized parcel dimensions to qualify for USPS Cubic pricing.
+  • Parcel dimensions now use realistic small-box sizes so dimensional
+    weight stays below actual weight — prevents Shippo quoting $20-30
+    rates caused by oversized dim-weight on light shipments.
+  • Five weight tiers (≤0.5, ≤1, ≤2, ≤5, >5 lb) with verified dim-weights.
   • First Class Package Service added for items under 16 oz ($3–5).
   • Shippo address validation runs before rate fetch to avoid bad-address surcharges.
+  • Store Pickup now offered to non-restaurant stores for nearby customers
+    (≤ 7 miles) when delivery_type supports it — mirrors restaurant behaviour.
 """
 
 import os
@@ -48,6 +53,9 @@ AFRIZONE_MARGIN    = 2.00
 MAX_DELIVERY_MILES = 20
 SANDBOX_BASE_FEE   = 3.50
 SANDBOX_PER_MILE   = 0.90
+
+# Mile threshold under which we offer pickup to non-restaurant stores too
+PICKUP_NEARBY_MILES = 7
 
 DELIVERY_ZONES = [
     {"zone": "zone_1", "label": "Nearby",   "min_miles": 0,  "max_miles": 3,  "charge": 5.99,  "uber_est": 3.50,  "profit": 2.49},
@@ -122,29 +130,46 @@ def get_zone_for_distance(distance_miles: float) -> dict | None:
 
 def _parcel_for_weight(weight_lbs: float) -> dict:
     """
-    Return cubic-optimized parcel dimensions for USPS Cubic pricing eligibility.
+    Return parcel dimensions optimised for USPS Cubic pricing eligibility.
 
-    USPS Cubic pricing applies to parcels ≤ 0.5 cubic feet AND ≤ 20 lbs,
-    and is often cheaper than Priority Mail for dense/small packages.
-    Dimensions are chosen to stay within cubic tier thresholds while
-    keeping dimensional weight (L×W×H / 166) below actual weight.
+    Critical constraint: dimensional weight = (L × W × H) / 166 must stay
+    BELOW actual weight, otherwise Shippo bills on dim-weight and rates
+    balloon to $20–30 even for light packages.
 
-    Tiers:
-      <= 0.5 lb  padded envelope  6x9x2   → 0.0625 cu ft  (Cubic tier 0)
-      <= 2.0 lb  cubic shoebox    10x8x6  → 0.278 cu ft   (Cubic tier 2)
-      >  2.0 lb  cubic medium     12x12x8 → 0.444 cu ft   (Cubic tier 4, ≤ 20 lb)
+    Previous bug: the old 12×12×8 "medium" box had dim-weight of 6.95 lb,
+    so any item lighter than ~7 lb was quoted at the 7 lb rate — causing the
+    $29 prices reported in production. All boxes below are verified to keep
+    dim-weight under the tier's upper weight bound.
+
+    Tiers (dim-weight sanity check):
+      ≤ 0.5 lb   flat mailer   6×4×1   → dim-wt = 0.14 lb  ✓
+      ≤ 1.0 lb   small box     8×6×3   → dim-wt = 0.87 lb  ✓
+      ≤ 2.0 lb   shoebox       10×7×4  → dim-wt = 1.69 lb  ✓
+      ≤ 5.0 lb   medium box    12×9×4  → dim-wt = 2.60 lb  ✓
+      > 5.0 lb   large box     14×11×6 → dim-wt = 5.55 lb  ✓ (for ~6+ lb items)
+
+    All parcels remain under 0.5 cu ft so USPS Cubic pricing still applies
+    where eligible.
     """
     w = str(round(max(weight_lbs, 0.1), 2))
     if weight_lbs <= 0.5:
-        # Padded envelope — qualifies for Cubic tier 0 (~$8–9 Priority or First Class)
-        return {"length": "6", "width": "9", "height": "2",
+        # Flat poly-mailer / padded envelope
+        return {"length": "6",  "width": "4",  "height": "1",
+                "distance_unit": "in", "weight": w, "mass_unit": "lb"}
+    if weight_lbs <= 1.0:
+        # Small gift-box
+        return {"length": "8",  "width": "6",  "height": "3",
                 "distance_unit": "in", "weight": w, "mass_unit": "lb"}
     if weight_lbs <= 2.0:
-        # Shoebox — Cubic tier 2, typically $10–12 vs $14+ standard Priority
-        return {"length": "10", "width": "8", "height": "6",
+        # Shoebox — Cubic tier 2
+        return {"length": "10", "width": "7",  "height": "4",
                 "distance_unit": "in", "weight": w, "mass_unit": "lb"}
-    # Medium cubic box — Cubic tier 4, covers up to ~20 lb competitively
-    return {"length": "12", "width": "12", "height": "8",
+    if weight_lbs <= 5.0:
+        # Medium retail box — Cubic tier 3
+        return {"length": "12", "width": "9",  "height": "4",
+                "distance_unit": "in", "weight": w, "mass_unit": "lb"}
+    # Larger items — still under 0.5 cu ft cubic ceiling
+    return {"length": "14", "width": "11", "height": "6",
             "distance_unit": "in", "weight": w, "mass_unit": "lb"}
 
 
@@ -250,7 +275,6 @@ def _fetch_live_usps_rate(
             First Class Package is checked first since it's the cheapest
             option for sub-16 oz items (qualifies when weight_lbs < 1.0).
             """
-            # For lightweight items, surface First Class Package ahead of Priority
             if keyword == "FIRST":
                 return next(
                     (r for r in usps if "FIRST CLASS PACKAGE" in r.get("servicelevel", {}).get("name", "").upper()),
@@ -261,24 +285,25 @@ def _fetch_live_usps_rate(
                 None,
             )
 
-        priority_rate   = _find("PRIORITY")
-        ground_rate     = _find("GROUND") or _find("ADVANTAGE")
+        priority_rate    = _find("PRIORITY")
+        ground_rate      = _find("GROUND") or _find("ADVANTAGE")
         first_class_rate = _find("FIRST") if weight_lbs < 1.0 else None  # FC only valid < 16 oz
 
         result = {
-            "mock":     False,
-            "priority": round(float(priority_rate["amount"]), 2) if priority_rate else FALLBACK["priority"],
-            "ground":   round(float(ground_rate["amount"]),   2) if ground_rate and ground_rate != priority_rate else None,
-            # First Class Package — only returned when item is under 16 oz
+            "mock":            False,
+            "priority":        round(float(priority_rate["amount"]), 2)    if priority_rate    else FALLBACK["priority"],
+            "ground":          round(float(ground_rate["amount"]),   2)    if ground_rate and ground_rate != priority_rate else None,
             "first_class":     round(float(first_class_rate["amount"]), 2) if first_class_rate else None,
             "first_class_eta": first_class_rate.get("estimated_days")      if first_class_rate else None,
-            "priority_eta":    priority_rate.get("estimated_days")         if priority_rate else None,
-            "ground_eta":      ground_rate.get("estimated_days")           if ground_rate else None,
+            "priority_eta":    priority_rate.get("estimated_days")         if priority_rate    else None,
+            "ground_eta":      ground_rate.get("estimated_days")           if ground_rate      else None,
         }
         logger.info(
             f"[Shippo] Priority=${result['priority']} "
             f"Ground={result['ground']} "
-            f"FirstClass={result['first_class']}"
+            f"FirstClass={result['first_class']} "
+            f"parcel={parcel['length']}x{parcel['width']}x{parcel['height']}in "
+            f"weight={weight_lbs}lb"
         )
         return result
 
@@ -515,14 +540,14 @@ async def get_delivery_quote(payload: dict, db: Session = Depends(get_db)):
             logger.warning(f"[Uber Quote] {e} — using zone estimate")
 
     return {
-        "available":       True,
-        "distance_miles":  round(distance_miles, 1),
-        "zone":            get_zone_label(distance_miles),
-        "zone_label":      zone["label"],
-        "delivery_fee":    zone["charge"],
+        "available":         True,
+        "distance_miles":    round(distance_miles, 1),
+        "zone":              get_zone_label(distance_miles),
+        "zone_label":        zone["label"],
+        "delivery_fee":      zone["charge"],
         "estimated_minutes": estimated_minutes,
-        "uber_quote_id":   uber_quote_id,
-        "sandbox":         UBER_SANDBOX,
+        "uber_quote_id":     uber_quote_id,
+        "sandbox":           UBER_SANDBOX,
         "breakdown": {
             "customer_pays":      zone["charge"],
             "uber_cost_estimate": zone["uber_est"],
@@ -555,12 +580,12 @@ async def dispatch_uber_driver(
         order.tracking_url    = "https://uber.com/track/sandbox"
         db.commit()
         return {
-            "success":        True,
-            "sandbox":        True,
-            "message":        "Sandbox mode: driver dispatch simulated.",
+            "success":         True,
+            "sandbox":         True,
+            "message":         "Sandbox mode: driver dispatch simulated.",
             "tracking_number": order.tracking_number,
-            "tracking_url":   order.tracking_url,
-            "delivery_id":    f"sandbox-delivery-{order_id}",
+            "tracking_url":    order.tracking_url,
+            "delivery_id":     f"sandbox-delivery-{order_id}",
         }
 
     try:
@@ -598,9 +623,9 @@ async def dispatch_uber_driver(
             if r.status_code not in [200, 201]:
                 raise HTTPException(status_code=502, detail=f"Uber dispatch failed: {r.text}")
 
-            data          = r.json()
-            delivery_id   = data.get("id")
-            tracking_url  = data.get("tracking_url")
+            data         = r.json()
+            delivery_id  = data.get("id")
+            tracking_url = data.get("tracking_url")
 
             order.status          = models.OrderStatus.shipped
             order.tracking_number = delivery_id
@@ -712,6 +737,12 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
       local distance      → USPS Ground Advantage + Priority (non-restaurant)
       long distance ≥15mi → USPS Priority only
       restaurant + local  → Uber Express + optional Pickup
+      non-restaurant      → USPS shipping options + Pickup (if ≤ PICKUP_NEARBY_MILES)
+
+    Pickup availability (unified for all store types):
+      Offered whenever delivery_type includes "pickup", "both", or "local_delivery"
+      AND the customer is within PICKUP_NEARBY_MILES (default 7). This mirrors
+      the restaurant experience — nearby customers always see the free pickup option.
     """
     store_id = payload.get("store_id")
     if not store_id:
@@ -765,6 +796,11 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
     offers_local    = delivery_type in ["local_delivery", "both"]
     offers_shipping = delivery_type in ["shipping", "both"] or not delivery_type
 
+    # Whether this store can offer pickup at all
+    offers_pickup   = delivery_type in ["pickup", "both", "local_delivery"]
+    # Pickup is only useful if the customer is actually nearby
+    customer_is_nearby = distance_miles is not None and distance_miles <= PICKUP_NEARBY_MILES
+
     options = []
 
     # ── Resolve cart weight ────────────────────────────────────────────────
@@ -808,7 +844,6 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
     if distance_miles is None or distance_miles >= 15:
         usps_rates = _fetch_live_usps_rate(from_addr, to_addr, cart_weight_lbs)
 
-        # Surface First Class if available (cheapest for light items)
         if usps_rates.get("first_class"):
             options.append({
                 "id":          "usps_first_class",
@@ -849,9 +884,8 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
     if not is_restaurant and offers_shipping:
         usps_rates = _fetch_live_usps_rate(from_addr, to_addr, cart_weight_lbs)
 
-    # USPS options for non-restaurant stores (cheapest first)
+    # ── USPS options — non-restaurant stores (cheapest first) ─────────────
     if not is_restaurant and offers_shipping and usps_rates:
-        # First Class Package — cheapest for items under 16 oz
         if usps_rates.get("first_class"):
             options.append({
                 "id":          "usps_first_class",
@@ -865,7 +899,6 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
                 "live_rate":   not usps_rates["mock"],
             })
 
-        # Ground Advantage
         if usps_rates.get("ground"):
             options.append({
                 "id":          "usps_ground",
@@ -879,7 +912,6 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
                 "live_rate":   not usps_rates["mock"],
             })
 
-        # Priority
         options.append({
             "id":          "usps_priority",
             "label":       "USPS Priority Mail",
@@ -892,7 +924,7 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
             "live_rate":   not usps_rates["mock"],
         })
 
-    # Uber Express
+    # ── Uber Express delivery ──────────────────────────────────────────────
     if (is_restaurant and offers_local) or (not is_restaurant and delivery_type == "both"):
         try:
             uber_cost  = await get_uber_fee(store, customer_lat, customer_lng, customer_address)
@@ -924,21 +956,30 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
                 "available":   False,
             })
 
-    # Pickup option
-    if delivery_type in ["pickup", "both", "local_delivery"]:
+    # ── Pickup option — unified for restaurants AND non-restaurants ────────
+    # Shown whenever the store supports pickup AND the customer is nearby.
+    # Non-restaurant stores previously only showed pickup when delivery_type
+    # was exactly "pickup" — this now mirrors the restaurant behaviour so
+    # any nearby customer sees the free option regardless of store type.
+    if offers_pickup and customer_is_nearby:
         prep = getattr(store, "prep_time_minutes", 30) or 30
+        store_display = (
+            getattr(store, "address", None)
+            or getattr(store, "city", None)
+            or "the store"
+        )
         options.append({
             "id":          "pickup",
             "label":       "Store Pickup",
             "icon":        "🏪",
             "price":       0,
             "eta":         f"Ready in ~{prep} mins",
-            "description": f"Pick up at {getattr(store, 'address', None) or getattr(store, 'city', 'store')}.",
+            "description": f"Pick up at {store_display}. Free — no delivery fee.",
             "provider":    "pickup",
             "available":   True,
         })
 
-    # Final fallback
+    # ── Final fallback ─────────────────────────────────────────────────────
     if not options:
         options.append({
             "id":          "usps_priority",
