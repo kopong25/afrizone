@@ -1,4 +1,4 @@
-vfrom sqlalchemy import (
+from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Text,
     ForeignKey, Enum, JSON, BigInteger
 )
