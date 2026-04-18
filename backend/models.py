@@ -1,4 +1,4 @@
-from sqlalchemy import (
+vfrom sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Text,
     ForeignKey, Enum, JSON, BigInteger
 )
@@ -204,7 +204,7 @@ class Product(Base):
     weight_kg = Column(Float, nullable=True)
     ships_from = Column(String, nullable=True)
 
-    # Jersey customization fee — set by seller, charged when buyer adds name/number
+    # Jersey customization fee
     customization_fee = Column(Float, default=0.0, nullable=True)
 
     # Stats
@@ -278,12 +278,19 @@ class Order(Base):
     # Tracking
     tracking_number = Column(String, nullable=True)
     uber_quote_id   = Column(String, nullable=True)
-    tracking_url = Column(String, nullable=True)
-    notes = Column(Text, nullable=True)
+    tracking_url    = Column(String, nullable=True)
+    notes           = Column(Text, nullable=True)
 
     # Delivery
     delivery_method = Column(String, nullable=True)
     delivery_fee    = Column(Float,  nullable=True)
+
+    # ── FIX: store the Shippo rate object_id chosen at checkout ──────────
+    # This is the rate_id returned by /delivery/delivery-options.
+    # Passing it to Shippo when creating a label guarantees the label cost
+    # matches the quoted price exactly — no recalculation, no surprise charges.
+    shippo_rate_id  = Column(String, nullable=True)
+    # ─────────────────────────────────────────────────────────────────────
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

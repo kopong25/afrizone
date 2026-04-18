@@ -350,7 +350,18 @@ async def create_shipping_label(
 
     validate_shipping_address(order)
 
+    # ── FIX: use the rate locked at checkout time ─────────────────────────
+    # Priority order:
+    #   1. rate_id passed explicitly as query param (seller override)
+    #   2. order.shippo_rate_id saved when customer selected shipping at checkout
+    #   3. auto-fetch as last resort (original behaviour — can cause discrepancy)
+    if rate_id == "auto" and order.shippo_rate_id:
+        rate_id = order.shippo_rate_id
+        logger.info(f"[SHIPPO] Using locked checkout rate: {rate_id} for order {order_id}")
+    # ─────────────────────────────────────────────────────────────────────
+
     if rate_id == "auto":
+        # No stored rate — fall back to fetching fresh (legacy orders / pickup orders)
         try:
             shipment = await shippo_post("shipments", {
                 "address_from": _build_address_from(store),
@@ -365,7 +376,7 @@ async def create_shipping_label(
                     detail="Shippo returned no rates for this address. Verify the shipping address and try again.",
                 )
             rate_id = _pick_best_rate(rates)
-            logger.info(f"[SHIPPO] Auto-selected rate: {rate_id}")
+            logger.info(f"[SHIPPO] Auto-selected rate (no stored rate): {rate_id}")
 
         except HTTPException:
             raise
