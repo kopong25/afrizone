@@ -40,6 +40,7 @@ export default function Navbar() {
     if (searchQ.trim()) {
       router.push(`/?q=${encodeURIComponent(searchQ)}`);
       setShowSuggestions(false);
+      setMobileOpen(false);
     }
   };
 
@@ -54,7 +55,7 @@ export default function Navbar() {
           <span className="font-black text-xl text-yellow-400 tracking-tight">AFRIZONE</span>
         </Link>
 
-        {/* Search bar */}
+        {/* Search bar — desktop only */}
         <div className="flex-1 max-w-xl relative hidden md:block">
           <form onSubmit={handleSearch} className="flex">
             <input
@@ -143,15 +144,13 @@ export default function Navbar() {
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
                         <FiShoppingCart size={15} /> Cart {cartCount > 0 && <span className="ml-auto bg-yellow-400 text-green-900 text-xs font-bold px-1.5 rounded-full">{cartCount}</span>}
                       </Link>
-                      <Link href="/referral" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-              <FiGift size={14} /> Referral Program
-            </Link>
-            <Link href="/messages"
-              className="text-gray-300 hover:text-white transition-colors text-sm flex items-center gap-1">
-              <FiMessageSquare size={16}/> Messages
-            </Link>
-            <Link
-              href="/wishlist" onClick={() => setUserMenuOpen(false)}
+                      <Link href="/referral" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+                        <FiGift size={14} /> Referral Program
+                      </Link>
+                      <Link href="/messages" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+                        <FiMessageSquare size={15} /> Messages
+                      </Link>
+                      <Link href="/wishlist" onClick={() => setUserMenuOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
                         ❤️ Wishlist
                       </Link>
@@ -194,15 +193,48 @@ export default function Navbar() {
         </div>
       </div>
 
+      {/* ── Mobile search bar — always visible on mobile ── */}
+      <div className="md:hidden bg-green-800 border-t border-green-700 px-4 py-2 relative">
+        <form onSubmit={handleSearch} className="flex">
+          <input
+            type="text"
+            placeholder="Search African products, stores..."
+            value={searchQ}
+            onChange={(e) => setSearchQ(e.target.value)}
+            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+            className="flex-1 bg-white text-gray-900 px-3 py-2 rounded-l-lg text-sm focus:outline-none"
+          />
+          <button type="submit" className="bg-yellow-500 hover:bg-yellow-400 px-4 rounded-r-lg transition-colors">
+            <FiSearch className="text-green-900" size={18} />
+          </button>
+        </form>
+        {/* Mobile autocomplete dropdown */}
+        {showSuggestions && suggestions.length > 0 && (
+          <div className="absolute left-4 right-4 top-full bg-white rounded-xl shadow-xl mt-1 overflow-hidden z-50 border">
+            {suggestions.map((p) => (
+              <Link key={p.id} href={`/products/${p.slug}`}
+                onClick={() => setShowSuggestions(false)}
+                className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                  {p.images?.[0]
+                    ? <img src={p.images[0]} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center text-lg">🛒</div>
+                  }
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{p.name}</p>
+                  <p className="text-xs text-green-700 font-semibold">${p.price.toFixed(2)}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Mobile menu */}
       {mobileOpen && (
         <div className="md:hidden bg-green-800 border-t border-green-700 px-4 py-4 space-y-3">
-          <form onSubmit={handleSearch} className="flex">
-            <input type="text" placeholder="Search..." value={searchQ}
-              onChange={(e) => setSearchQ(e.target.value)}
-              className="flex-1 bg-white text-gray-900 px-3 py-2 rounded-l-lg text-sm focus:outline-none" />
-            <button type="submit" className="bg-yellow-500 px-3 rounded-r-lg"><FiSearch className="text-green-900" /></button>
-          </form>
           <Link href="/" className="block text-sm py-2 hover:text-yellow-400" onClick={() => setMobileOpen(false)}>🏪 Shop</Link>
           <Link href="/stores" className="block text-sm py-2 hover:text-yellow-400" onClick={() => setMobileOpen(false)}>🏬 Stores</Link>
           <Link href="/jerseys" className="block text-sm py-2 font-black text-yellow-400" onClick={() => setMobileOpen(false)}>⚽ World Cup 2026 Jerseys</Link>
