@@ -4,7 +4,6 @@ import Cookies from "js-cookie";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // ─── Token store ─────────────────────────────────────────────────────────────
-// Priority: sessionStorage (works in iOS Private) → localStorage → cookie
 let _memoryToken = null;
 
 function _write(token) {
@@ -13,7 +12,8 @@ function _write(token) {
   try {
     if (token) {
       const isProd = typeof window !== "undefined" && window.location.protocol === "https:";
-      Cookies.set("afrizone_token", token, { expires: 7, sameSite: isProd ? "None" : "Lax", secure: isProd });
+      // ✅ FIX 1: Extended from 7 → 365 days so login persists for a full year
+      Cookies.set("afrizone_token", token, { expires: 365, sameSite: isProd ? "None" : "Lax", secure: isProd });
     } else {
       Cookies.remove("afrizone_token");
     }
@@ -44,11 +44,6 @@ export function clearAuthToken() {
   _write(null);
 }
 
-/**
- * Call this once on app boot (in _app.js useEffect).
- * Reads token from all storage layers and warms _memoryToken so the
- * first protected API call never fires without a token.
- */
 export function loadStoredToken() {
   const token = _read();
   if (token) {
@@ -58,10 +53,6 @@ export function loadStoredToken() {
   return token;
 }
 
-/**
- * Returns true if a token exists in any storage layer.
- * Use this to gate protected pages without making an API call.
- */
 export function hasToken() {
   return !!(_memoryToken || _read());
 }
@@ -72,21 +63,20 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Attach token to EVERY request — re-read storage each time to handle
-// iOS Safari resetting module state on page navigation.
 api.interceptors.request.use((config) => {
-  // FIX: removed window._azMemToken fallback — it could inject a stale/wrong token.
-  // _memoryToken is kept in sync by loadStoredToken() and setAuthToken().
   const token = _memoryToken || _read();
-
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-    if (!_memoryToken) _memoryToken = token; // keep in sync
+    if (!_memoryToken) _memoryToken = token;
   }
   return config;
 });
 
 // ─── Global 401 handler ──────────────────────────────────────────────────────
+// ✅ FIX 2: Removed aggressive auto-redirect + token wipe on 401.
+// Only clear the token if the server explicitly rejects it on a non-auth route,
+// but DO NOT force-redirect — let the UI handle it gracefully so the user
+// is never unexpectedly kicked out mid-session.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -94,21 +84,16 @@ api.interceptors.response.use(
       const url = error.config?.url || "";
       const isAuthRoute = url.includes("/auth/me") || url.includes("/auth/login");
 
+      // Only clear memory token for non-auth routes where there's no stored token
+      // (i.e. truly unauthenticated requests, not expired JWTs)
       if (!isAuthRoute) {
         const stored = _read();
         if (!stored) {
-          // No token — user is logged out, clear memory just in case
           _memoryToken = null;
         }
-        // Token exists but server rejected it (expired/revoked).
-        // Clear it so the next request doesn't keep sending a bad token.
-        else {
-          clearAuthToken();
-          // Redirect to login if we're in a browser context
-          if (typeof window !== "undefined") {
-            window.location.href = "/login";
-          }
-        }
+        // ✅ Removed: clearAuthToken() + window.location.href = "/login"
+        // Previously this kicked users out whenever any API call got a 401.
+        // Now we just reject the promise and let each page/component handle it.
       }
     }
     return Promise.reject(error);

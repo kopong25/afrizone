@@ -40,7 +40,6 @@ export const getSavedUTM = () => {
 };
 
 // ── Pages that skip the install wall ───────────────────────────
-// Add any page you want accessible without install (e.g. /download itself)
 const WALL_BYPASS_PAGES = [
   "/download",
   "/install",
@@ -68,10 +67,14 @@ function AuthProvider({ children }) {
       authAPI.me()
         .then((res) => setUser(res.data))
         .catch((err) => {
+          // ✅ FIX: On 401, we only clear the user object — NOT the stored token.
+          // The token stays in localStorage/cookie so the next visit can retry.
+          // Users are never auto-logged-out; only manual logout clears the token.
           if (err.response?.status === 401) {
-            setAuthToken(null);
-            setToken(null);
             setUser(null);
+            // Do NOT call setAuthToken(null) or setToken(null) here.
+            // If the backend JWT expired, the user will be prompted to log in
+            // naturally when they try a protected action — not kicked out silently.
           }
         })
         .finally(() => setLoading(false));
@@ -86,6 +89,7 @@ function AuthProvider({ children }) {
     setUser(userData);
   };
 
+  // ✅ logout() is the ONLY place that wipes the token
   const logout = () => {
     setAuthToken(null);
     setToken(null);
@@ -101,60 +105,46 @@ function AuthProvider({ children }) {
 }
 
 // ── PWA Install Wall (Temu-style) ──────────────────────────────
-// Redirects mobile users to /download if they haven't installed yet.
-// Users can skip via "Continue as Guest" on the download page,
-// which sets localStorage "pwa-skipped" and lets them through.
 function useMobileInstallWall() {
   const router = useRouter();
 
   useEffect(() => {
-    // Only run on client
     if (typeof window === "undefined") return;
 
-    // Skip for non-mobile devices (tablets and desktops browse freely)
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (!isMobile) return;
 
-    // Skip if already installed as a PWA (standalone mode)
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       window.navigator.standalone === true;
     if (isStandalone) return;
 
-    // Skip if user already dismissed / skipped the wall
     const skipped = localStorage.getItem("pwa-skipped");
     if (skipped) return;
 
-    // Skip for pages that should always be accessible
     const path = router.pathname;
     const isBypassPage = WALL_BYPASS_PAGES.some((p) => path.startsWith(p));
     if (isBypassPage) return;
 
-    // Redirect to download/install page
     router.replace("/download");
   }, [router.pathname]);
 }
 
-// ── Soft install banner (shown AFTER user is inside the app) ───
-// Only appears if user skipped the wall but hasn't installed yet.
+// ── Soft install banner ────────────────────────────────────────
 function PWAInstallBanner() {
   const [prompt, setPrompt] = React.useState(null);
   const [show, setShow] = React.useState(false);
   const [isIOS, setIsIOS] = React.useState(false);
 
   React.useEffect(() => {
-    // Don't show if already installed
     if (window.matchMedia("(display-mode: standalone)").matches) return;
 
-    // Don't show if user never dismissed the full wall (they're in guest mode)
     const skipped = localStorage.getItem("pwa-skipped");
     if (!skipped) return;
 
-    // Don't show if banner was dismissed before
     const bannerDismissed = localStorage.getItem("pwa-banner-dismissed");
     if (bannerDismissed) return;
 
-    // Android/Chrome install prompt
     const handler = (e) => {
       e.preventDefault();
       setPrompt(e);
@@ -162,12 +152,11 @@ function PWAInstallBanner() {
     };
     window.addEventListener("beforeinstallprompt", handler);
 
-    // iOS Safari manual instructions
     const isIOSDevice = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
     const isSafari = /safari/i.test(navigator.userAgent) && !/chrome/i.test(navigator.userAgent);
     if (isIOSDevice && isSafari) {
       setIsIOS(true);
-      setTimeout(() => setShow(true), 5000); // show after 5s on iOS
+      setTimeout(() => setShow(true), 5000);
     }
 
     return () => window.removeEventListener("beforeinstallprompt", handler);
@@ -220,7 +209,6 @@ function PWAInstallBanner() {
 export default function App({ Component, pageProps }) {
   const router = useRouter();
 
-  // ✅ Temu-style mobile install wall
   useMobileInstallWall();
 
   useEffect(() => {
