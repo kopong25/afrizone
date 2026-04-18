@@ -168,17 +168,16 @@ def _fetch_live_usps_rate(from_addr: dict, to_addr: dict, weight_lbs: float = 0.
         first_class_rate = _find("FIRST") if weight_lbs < 1.0 else None
 
         def _safe_rate(rate_obj, max_price, fallback_price):
-            """
-            Return rate amount, capped at max_price.
-            If Shippo returns anything above max (abnormal rate), use fallback.
-            """
             if rate_obj is None:
                 return None
             try:
-                raw = round(float(rate_obj["amount"]), 2)
-                if raw > max_price:
-                    logger.warning(f"[Shippo] Abnormal rate ${raw} capped to ${fallback_price}")
+                raw_str = rate_obj.get("amount") or rate_obj.get("amount_local")
+                if raw_str is None:
                     return fallback_price
+                raw = round(float(raw_str), 2)
+                if raw > max_price:
+                    logger.warning(f"[Shippo] Abnormal rate ${raw} — returning fallback ${fallback_price}")
+                    return fallback_price  # Hard cap, never return the abnormal rate
                 return raw
             except Exception:
                 return fallback_price
