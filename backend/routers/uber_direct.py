@@ -496,11 +496,7 @@ async def get_delivery_options(payload: dict, db: Session = Depends(get_db)):
                              "price": usps["first_class"], "eta": f"{usps.get('first_class_eta','2–5')} day(s)",
                              "description": "Best price for lightweight items under 16 oz.", "provider": "usps",
                              "available": True, "live_rate": not usps["mock"]})
-        if usps.get("ground"):
-            options.append({"id": "usps_ground", "label": "USPS Ground Advantage", "icon": "📦",
-                             "price": usps["ground"], "eta": f"{usps.get('ground_eta','2–5')} day(s)",
-                             "description": "Affordable ground shipping with tracking.", "provider": "usps",
-                             "available": True, "live_rate": not usps["mock"]})
+        
         options.append({"id": "usps_priority", "label": "USPS Priority Mail", "icon": "📬",
                         "price": usps["priority"], "eta": f"{usps.get('priority_eta','1–3')} day(s)",
                         "description": "Tracked USPS shipping to your door.", "provider": "usps",
