@@ -194,6 +194,10 @@ export default function ProductDetail() {
   const [jerseyNumber, setJerseyNumber] = useState("");
   const [customizationFee, setCustomizationFee] = useState(0);
 
+  // ── Swipe state ───────────────────────────────────────────────
+  const [touchStartX, setTouchStartX] = useState(null);
+  const [touchEndX, setTouchEndX] = useState(null);
+
   useEffect(() => {
     if (!slug) return;
     const timeout = setTimeout(() => setLoading(false), 8000);
@@ -231,6 +235,20 @@ export default function ProductDetail() {
   }) ?? false;
 
   const showJerseyPreview = customizeJersey && isJerseyProduct;
+
+  // ── Swipe handlers ────────────────────────────────────────────
+  const handleTouchStart = (e) => setTouchStartX(e.touches[0].clientX);
+  const handleTouchMove  = (e) => setTouchEndX(e.touches[0].clientX);
+  const handleTouchEnd   = () => {
+    if (touchStartX === null || touchEndX === null) return;
+    const diff = touchStartX - touchEndX;
+    if (Math.abs(diff) > 40) {
+      if (diff > 0) setSelectedImage((i) => Math.min(i + 1, images.length - 1));
+      else          setSelectedImage((i) => Math.max(i - 1, 0));
+    }
+    setTouchStartX(null);
+    setTouchEndX(null);
+  };
 
   const toggleWishlist = async () => {
     if (!user) { router.push("/login"); return; }
@@ -341,7 +359,13 @@ export default function ProductDetail() {
 
         <div className="grid md:grid-cols-2 gap-10 mb-6">
           <div>
-            <div className="aspect-square bg-gray-100 rounded-2xl overflow-hidden mb-3 relative">
+            {/* ── Main image with swipe + arrows ── */}
+            <div
+              className="aspect-square bg-gray-100 rounded-2xl overflow-hidden mb-3 relative"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
               {showJerseyPreview ? (
                 <JerseyPreview name={jerseyName} number={jerseyNumber} />
               ) : (
@@ -359,6 +383,31 @@ export default function ProductDetail() {
                       <FiEdit3 size={11} /> Customizable
                     </div>
                   )}
+                  {/* Arrow buttons */}
+                  {images.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => setSelectedImage((i) => Math.max(i - 1, 0))}
+                        disabled={selectedImage === 0}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 rounded-full w-9 h-9 flex items-center justify-center shadow transition-all disabled:opacity-20 text-xl font-bold"
+                      >‹</button>
+                      <button
+                        onClick={() => setSelectedImage((i) => Math.min(i + 1, images.length - 1))}
+                        disabled={selectedImage === images.length - 1}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 rounded-full w-9 h-9 flex items-center justify-center shadow transition-all disabled:opacity-20 text-xl font-bold"
+                      >›</button>
+                      {/* Dot indicators */}
+                      <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+                        {images.map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setSelectedImage(i)}
+                            className={`h-1.5 rounded-full transition-all ${i === selectedImage ? "bg-white w-4" : "bg-white/50 w-1.5"}`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
               {showJerseyPreview && (
@@ -368,6 +417,7 @@ export default function ProductDetail() {
               )}
             </div>
 
+            {/* Thumbnail strip */}
             {images.length > 1 && !showJerseyPreview && (
               <div className="flex gap-2 overflow-x-auto">
                 {images.map((img, i) => (
