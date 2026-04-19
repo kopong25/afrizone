@@ -1,3 +1,5 @@
+import Zoom from "react-medium-image-zoom";
+import "react-medium-image-zoom/dist/styles.css";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Navbar from "../../components/layout/Navbar";
@@ -371,12 +373,14 @@ export default function ProductDetail() {
               ) : (
                 <>
                   {images[selectedImage] ? (
-                    <img src={images[selectedImage]} alt={product.name} className="w-full h-full object-cover" />
+                    <Zoom>
+                       <img src={images[selectedImage]} alt={product.name} className="w-full h-full object-cover" />
+                    </Zoom>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-8xl">🛒</div>
                   )}
                   {discount > 0 && (
-                    <div className="absolute top-4 left-4 bg-red-500 text-white text-sm font-black px-3 py-1 rounded-full">-{discount}%</div>
+                    <div className="absolute top-4 left-4 bg-red-500 text-white text-sm font-black px-3 py-1 rounded-full">-       {discount}%</div>
                   )}
                   {isJerseyProduct && (
                     <div className="absolute top-4 right-4 bg-green-900 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
