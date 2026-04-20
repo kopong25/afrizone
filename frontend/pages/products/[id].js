@@ -620,10 +620,30 @@ export default function ProductDetail() {
 
             <div className="flex items-center justify-between mt-4 pt-4 border-t">
               {product.country_of_origin && <span className="flex items-center gap-1.5 text-sm text-gray-500"><FiPackage size={14} /> Made in {product.country_of_origin}</span>}
-              <button onClick={() => { navigator.clipboard?.writeText(window.location.href); toast.success("Link copied!"); }}
-                className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors ml-auto">
-                <FiShare2 size={14} /> Share
-              </button>
+              <div className="flex items-center gap-2 ml-auto">
+  
+    href={`https://wa.me/?text=${encodeURIComponent(product.name + " - " + (typeof window !== "undefined" ? window.location.href : ""))}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="flex items-center gap-1.5 text-sm text-green-600 hover:text-green-700 transition-colors font-medium"
+  >
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.124.558 4.17 1.535 5.943L.057 23.571a.75.75 0 0 0 .925.899l5.82-1.525A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.686-.5-5.232-1.375l-.374-.214-3.878 1.017 1.034-3.78-.23-.38A9.955 9.955 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+    WhatsApp
+  </a>
+  
+    href={`sms:?body=${encodeURIComponent(product.name + " - " + (typeof window !== "undefined" ? window.location.href : ""))}`}
+    className="flex items-center gap-1.5 text-sm text-blue-500 hover:text-blue-600 transition-colors font-medium"
+  >
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+    Text
+  </a>
+  <button
+    onClick={() => { navigator.clipboard?.writeText(window.location.href); toast.success("Link copied!"); }}
+    className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+  >
+    <FiShare2 size={14} /> Copy
+  </button>
+</div>
             </div>
           </div>
         </div>
