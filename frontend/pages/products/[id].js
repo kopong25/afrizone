@@ -16,16 +16,13 @@ import { FiShoppingCart, FiMapPin, FiPackage, FiShare2, FiHeart, FiCheck, FiEdit
 
 const JERSEY_TAGS = ["jersey","jerseys","kit","football kit","soccer jersey","customizable","custom jersey","sportswear"];
 
-// ── Realistic Back-of-Jersey SVG Preview ─────────────────────
 function JerseyPreview({ name, number }) {
   return (
     <div className="w-full h-full flex flex-col items-center justify-center relative"
       style={{ background: "linear-gradient(135deg, #e8e8e8 0%, #d4d4d4 100%)" }}>
-
       <p className="absolute top-3 left-0 right-0 text-center text-gray-600 text-xs uppercase tracking-widest font-bold z-10">
         Back of Jersey
       </p>
-
       <svg viewBox="0 0 340 380" xmlns="http://www.w3.org/2000/svg"
         className="w-full h-full" style={{ maxWidth: "320px", maxHeight: "320px" }}>
         <defs>
@@ -57,117 +54,45 @@ function JerseyPreview({ name, number }) {
             <feDropShadow dx="0" dy="1" stdDeviation="1" floodColor="#00000040" />
           </filter>
         </defs>
-
-        {/* Main white body */}
-        <path
-          d="M 88 42 L 52 68 L 22 148 L 68 162 L 68 340 L 272 340 L 272 162 L 318 148 L 288 68 L 252 42 Q 232 58 170 58 Q 108 58 88 42 Z"
-          fill="url(#bodyMain)"
-          filter="url(#jerseyDrop)"
-        />
-
-        {/* Left red side panel */}
-        <path
-          d="M 68 162 L 68 340 L 108 340 L 108 175 Z"
-          fill="url(#leftPanel)"
-        />
-
-        {/* Right red side panel */}
-        <path
-          d="M 272 162 L 272 340 L 232 340 L 232 175 Z"
-          fill="url(#rightPanel)"
-        />
-
-        {/* Left sleeve */}
-        <path
-          d="M 88 42 L 52 68 L 22 148 L 68 162 L 68 110 Q 76 78 88 42 Z"
-          fill="url(#leftSleeve)"
-          stroke="#d4d4ce"
-          strokeWidth="0.5"
-        />
-
-        {/* Right sleeve */}
-        <path
-          d="M 252 42 L 288 68 L 318 148 L 272 162 L 272 110 Q 264 78 252 42 Z"
-          fill="url(#rightSleeve)"
-          stroke="#d4d4ce"
-          strokeWidth="0.5"
-        />
-
-        {/* Left sleeve — green stripe */}
+        <path d="M 88 42 L 52 68 L 22 148 L 68 162 L 68 340 L 272 340 L 272 162 L 318 148 L 288 68 L 252 42 Q 232 58 170 58 Q 108 58 88 42 Z" fill="url(#bodyMain)" filter="url(#jerseyDrop)" />
+        <path d="M 68 162 L 68 340 L 108 340 L 108 175 Z" fill="url(#leftPanel)" />
+        <path d="M 272 162 L 272 340 L 232 340 L 232 175 Z" fill="url(#rightPanel)" />
+        <path d="M 88 42 L 52 68 L 22 148 L 68 162 L 68 110 Q 76 78 88 42 Z" fill="url(#leftSleeve)" stroke="#d4d4ce" strokeWidth="0.5" />
+        <path d="M 252 42 L 288 68 L 318 148 L 272 162 L 272 110 Q 264 78 252 42 Z" fill="url(#rightSleeve)" stroke="#d4d4ce" strokeWidth="0.5" />
         <path d="M 28 128 L 24 142 L 68 156 L 68 143 Z" fill="#166534" />
-        {/* Left sleeve — red stripe */}
         <path d="M 24 142 L 22 148 L 68 162 L 68 156 Z" fill="#dc2626" />
-
-        {/* Right sleeve — green stripe */}
         <path d="M 312 128 L 316 142 L 272 156 L 272 143 Z" fill="#166534" />
-        {/* Right sleeve — red stripe */}
         <path d="M 316 142 L 318 148 L 272 162 L 272 156 Z" fill="#dc2626" />
-
-        {/* Back neckline — small scoop */}
-        <path
-          d="M 118 44 Q 170 72 222 44"
-          fill="none"
-          stroke="#c8c8c3"
-          strokeWidth="2"
-        />
-
-        {/* Seam lines */}
+        <path d="M 118 44 Q 170 72 222 44" fill="none" stroke="#c8c8c3" strokeWidth="2" />
         <line x1="88" y1="42" x2="68" y2="162" stroke="#d8d8d3" strokeWidth="0.8" />
         <line x1="252" y1="42" x2="272" y2="162" stroke="#d8d8d3" strokeWidth="0.8" />
         <line x1="68" y1="162" x2="68" y2="340" stroke="#d8d8d3" strokeWidth="0.8" />
         <line x1="272" y1="162" x2="272" y2="340" stroke="#d8d8d3" strokeWidth="0.8" />
         <line x1="68" y1="330" x2="272" y2="330" stroke="#d0d0cb" strokeWidth="1.2" />
-
-        {/* ── NAME — pushed up close to neckline ── */}
         {name && (
-          <text
-            x="170"
-            y="105"
-            textAnchor="middle"
-            fill="#1a1a1a"
-            fontFamily="Arial Black, Impact, sans-serif"
-            fontWeight="900"
+          <text x="170" y="105" textAnchor="middle" fill="#1a1a1a"
+            fontFamily="Arial Black, Impact, sans-serif" fontWeight="900"
             fontSize={name.length > 11 ? "17" : name.length > 8 ? "21" : "25"}
-            letterSpacing="5"
-            filter="url(#textShadow)"
-          >
+            letterSpacing="5" filter="url(#textShadow)">
             {name}
           </text>
         )}
-
-        {/* ── NUMBER — just below the name ── */}
         {number && (
-          <text
-            x="170"
-            y={name ? "210" : "190"}
-            textAnchor="middle"
-            fill="#1a1a1a"
-            fontFamily="Arial Black, Impact, sans-serif"
-            fontWeight="900"
-            fontSize={name ? "96" : "108"}
-            filter="url(#textShadow)"
-          >
+          <text x="170" y={name ? "210" : "190"} textAnchor="middle" fill="#1a1a1a"
+            fontFamily="Arial Black, Impact, sans-serif" fontWeight="900"
+            fontSize={name ? "96" : "108"} filter="url(#textShadow)">
             {number}
           </text>
         )}
-
-        {/* Placeholder when nothing entered */}
         {!name && !number && (
           <>
             <rect x="120" y="82" width="100" height="20" rx="5" fill="#d4d4ce" opacity="0.8" />
             <rect x="130" y="115" width="80" height="68" rx="6" fill="#d4d4ce" opacity="0.6" />
-            <text x="170" y="97" textAnchor="middle" fill="#aaaaaa" fontSize="12"
-              fontFamily="Arial, sans-serif" fontWeight="bold" letterSpacing="3">
-              YOUR NAME
-            </text>
-            <text x="170" y="162" textAnchor="middle" fill="#aaaaaa" fontSize="14"
-              fontFamily="Arial, sans-serif" fontWeight="bold">
-              # 00
-            </text>
+            <text x="170" y="97" textAnchor="middle" fill="#aaaaaa" fontSize="12" fontFamily="Arial, sans-serif" fontWeight="bold" letterSpacing="3">YOUR NAME</text>
+            <text x="170" y="162" textAnchor="middle" fill="#aaaaaa" fontSize="14" fontFamily="Arial, sans-serif" fontWeight="bold"># 00</text>
           </>
         )}
       </svg>
-
       <p className="absolute bottom-2 left-0 right-0 text-center text-gray-500 text-xs">
         Preview only — actual print may vary
       </p>
@@ -190,13 +115,10 @@ export default function ProductDetail() {
   const [addedToCart, setAddedToCart] = useState(false);
   const [wishlisted, setWishlisted] = useState(false);
   const [selectedVariants, setSelectedVariants] = useState({});
-
   const [customizeJersey, setCustomizeJersey] = useState(false);
   const [jerseyName, setJerseyName] = useState("");
   const [jerseyNumber, setJerseyNumber] = useState("");
   const [customizationFee, setCustomizationFee] = useState(0);
-
-  // ── Swipe state ───────────────────────────────────────────────
   const [touchStartX, setTouchStartX] = useState(null);
   const [touchEndX, setTouchEndX] = useState(null);
 
@@ -238,7 +160,6 @@ export default function ProductDetail() {
 
   const showJerseyPreview = customizeJersey && isJerseyProduct;
 
-  // ── Swipe handlers ────────────────────────────────────────────
   const handleTouchStart = (e) => setTouchStartX(e.touches[0].clientX);
   const handleTouchMove  = (e) => setTouchEndX(e.touches[0].clientX);
   const handleTouchEnd   = () => {
@@ -332,6 +253,7 @@ export default function ProductDetail() {
       </div>
     </>
   );
+
   if (!product) return (
     <>
       <Navbar />
@@ -347,6 +269,8 @@ export default function ProductDetail() {
   const discount = product.compare_price
     ? Math.round(((product.compare_price - product.price) / product.compare_price) * 100) : 0;
   const images = product.images?.length > 0 ? product.images : [null];
+  const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+  const shareText = encodeURIComponent((product.name || "") + " - " + shareUrl);
 
   return (
     <>
@@ -355,13 +279,18 @@ export default function ProductDetail() {
         <nav className="text-sm text-gray-400 mb-6 flex items-center gap-2 flex-wrap">
           <Link href="/" className="hover:text-green-900">Home</Link>
           <span>/</span>
-          {product.country_of_origin && <><span className="hover:text-green-900">{product.country_of_origin}</span><span>/</span></>}
+          {product.country_of_origin && (
+            <>
+              <span className="hover:text-green-900">{product.country_of_origin}</span>
+              <span>/</span>
+            </>
+          )}
           <span className="text-gray-700 font-medium truncate">{product.name}</span>
         </nav>
 
         <div className="grid md:grid-cols-2 gap-10 mb-6">
           <div>
-            {/* ── Main image with swipe + arrows ── */}
+            {/* Main image with swipe + arrows + zoom */}
             <div
               className="aspect-square bg-gray-100 rounded-2xl overflow-hidden mb-3 relative"
               onTouchStart={handleTouchStart}
@@ -374,33 +303,37 @@ export default function ProductDetail() {
                 <>
                   {images[selectedImage] ? (
                     <Zoom>
-                       <img src={images[selectedImage]} alt={product.name} className="w-full h-full object-cover" />
+                      <img src={images[selectedImage]} alt={product.name} className="w-full h-full object-cover" />
                     </Zoom>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-8xl">🛒</div>
                   )}
                   {discount > 0 && (
-                    <div className="absolute top-4 left-4 bg-red-500 text-white text-sm font-black px-3 py-1 rounded-full">-       {discount}%</div>
+                    <div className="absolute top-4 left-4 bg-red-500 text-white text-sm font-black px-3 py-1 rounded-full">
+                      -{discount}%
+                    </div>
                   )}
                   {isJerseyProduct && (
                     <div className="absolute top-4 right-4 bg-green-900 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
                       <FiEdit3 size={11} /> Customizable
                     </div>
                   )}
-                  {/* Arrow buttons */}
                   {images.length > 1 && (
                     <>
                       <button
                         onClick={() => setSelectedImage((i) => Math.max(i - 1, 0))}
                         disabled={selectedImage === 0}
                         className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 rounded-full w-9 h-9 flex items-center justify-center shadow transition-all disabled:opacity-20 text-xl font-bold"
-                      >‹</button>
+                      >
+                        &#8249;
+                      </button>
                       <button
                         onClick={() => setSelectedImage((i) => Math.min(i + 1, images.length - 1))}
                         disabled={selectedImage === images.length - 1}
                         className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 rounded-full w-9 h-9 flex items-center justify-center shadow transition-all disabled:opacity-20 text-xl font-bold"
-                      >›</button>
-                      {/* Dot indicators */}
+                      >
+                        &#8250;
+                      </button>
                       <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
                         {images.map((_, i) => (
                           <button
@@ -425,9 +358,15 @@ export default function ProductDetail() {
             {images.length > 1 && !showJerseyPreview && (
               <div className="flex gap-2 overflow-x-auto">
                 {images.map((img, i) => (
-                  <button key={i} onClick={() => setSelectedImage(i)}
-                    className={`w-16 h-16 rounded-xl overflow-hidden border-2 flex-shrink-0 transition-all ${i === selectedImage ? "border-green-900 shadow-md" : "border-transparent hover:border-gray-300"}`}>
-                    {img ? <img src={img} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100 flex items-center justify-center">🛒</div>}
+                  <button
+                    key={i}
+                    onClick={() => setSelectedImage(i)}
+                    className={`w-16 h-16 rounded-xl overflow-hidden border-2 flex-shrink-0 transition-all ${i === selectedImage ? "border-green-900 shadow-md" : "border-transparent hover:border-gray-300"}`}
+                  >
+                    {img
+                      ? <img src={img} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full bg-gray-100 flex items-center justify-center">🛒</div>
+                    }
                   </button>
                 ))}
               </div>
@@ -440,8 +379,10 @@ export default function ProductDetail() {
           <div>
             <div className="flex items-start justify-between gap-3 mb-2">
               <h1 className="text-2xl font-black text-gray-900 leading-snug">{product.name}</h1>
-              <button onClick={toggleWishlist}
-                className={`p-2 rounded-xl border transition-all flex-shrink-0 ${wishlisted ? "bg-red-50 border-red-200 text-red-500" : "border-gray-200 text-gray-300 hover:border-red-200 hover:text-red-400"}`}>
+              <button
+                onClick={toggleWishlist}
+                className={`p-2 rounded-xl border transition-all flex-shrink-0 ${wishlisted ? "bg-red-50 border-red-200 text-red-500" : "border-gray-200 text-gray-300 hover:border-red-200 hover:text-red-400"}`}
+              >
                 <FiHeart size={20} className={wishlisted ? "fill-current" : ""} />
               </button>
             </div>
@@ -449,31 +390,50 @@ export default function ProductDetail() {
             {product.review_count > 0 && (
               <div className="flex items-center gap-2 mb-4">
                 <StarDisplay rating={product.avg_rating} size={16} showNumber />
-                <a href="#reviews" className="text-sm text-green-700 hover:underline">{product.review_count} review{product.review_count !== 1 ? "s" : ""}</a>
+                <a href="#reviews" className="text-sm text-green-700 hover:underline">
+                  {product.review_count} review{product.review_count !== 1 ? "s" : ""}
+                </a>
               </div>
             )}
 
             <div className="flex items-baseline gap-3 mb-1">
               <span className="text-4xl font-black text-green-900">${finalPrice.toFixed(2)}</span>
-              {product.compare_price && <span className="text-xl text-gray-300 line-through">${Number(product.compare_price).toFixed(2)}</span>}
-              {discount > 0 && <span className="bg-red-100 text-red-700 text-sm font-bold px-2.5 py-0.5 rounded-full">Save {discount}%</span>}
+              {product.compare_price && (
+                <span className="text-xl text-gray-300 line-through">${Number(product.compare_price).toFixed(2)}</span>
+              )}
+              {discount > 0 && (
+                <span className="bg-red-100 text-red-700 text-sm font-bold px-2.5 py-0.5 rounded-full">Save {discount}%</span>
+              )}
             </div>
-            {variantModifier !== 0 && <p className="text-xs text-gray-400 mb-1">Base: ${Number(product.price).toFixed(2)} {variantModifier > 0 ? `+$${variantModifier.toFixed(2)}` : `-$${Math.abs(variantModifier).toFixed(2)}`}</p>}
-            {customizationCharge > 0 && <p className="text-xs text-green-700 font-semibold mb-1">+${customizationCharge.toFixed(2)} customization fee included</p>}
+            {variantModifier !== 0 && (
+              <p className="text-xs text-gray-400 mb-1">
+                Base: ${Number(product.price).toFixed(2)} {variantModifier > 0 ? `+$${variantModifier.toFixed(2)}` : `-$${Math.abs(variantModifier).toFixed(2)}`}
+              </p>
+            )}
+            {customizationCharge > 0 && (
+              <p className="text-xs text-green-700 font-semibold mb-1">+${customizationCharge.toFixed(2)} customization fee included</p>
+            )}
             <p className="text-sm text-gray-400 mb-5">
-              {product.stock > 0 ? <span className="text-green-600 font-medium">✓ In stock</span> : <span className="text-red-500 font-medium">Out of stock</span>}
+              {product.stock > 0
+                ? <span className="text-green-600 font-medium">✓ In stock</span>
+                : <span className="text-red-500 font-medium">Out of stock</span>
+              }
             </p>
 
             {product.store && (
-              <Link href={`/stores/${product.store.slug}`}
-                className="flex items-center gap-3 bg-gray-50 hover:bg-gray-100 rounded-xl p-3 mb-5 transition-colors border">
+              <Link
+                href={`/stores/${product.store.slug}`}
+                className="flex items-center gap-3 bg-gray-50 hover:bg-gray-100 rounded-xl p-3 mb-5 transition-colors border"
+              >
                 {product.store.logo_url
                   ? <img src={product.store.logo_url} className="w-11 h-11 rounded-full object-cover border" />
                   : <div className="w-11 h-11 rounded-full bg-green-900 flex items-center justify-center text-white font-black">{product.store.name[0]}</div>
                 }
                 <div>
                   <p className="font-semibold text-gray-800 text-sm">{product.store.name}</p>
-                  <p className="text-xs text-gray-400 flex items-center gap-1"><FiMapPin size={10} /> {product.store.city || product.store.country}</p>
+                  <p className="text-xs text-gray-400 flex items-center gap-1">
+                    <FiMapPin size={10} /> {product.store.city || product.store.country}
+                  </p>
                 </div>
                 <span className="ml-auto text-xs text-green-700 font-medium">Visit store →</span>
               </Link>
@@ -483,11 +443,15 @@ export default function ProductDetail() {
               <div key={groupName} className="mb-4">
                 <label className="text-sm font-bold text-gray-700 block mb-2">
                   {groupName}
-                  {selectedVariants[groupName] && <span className="font-normal text-gray-400 ml-2">— {selectedVariants[groupName].value}</span>}
+                  {selectedVariants[groupName] && (
+                    <span className="font-normal text-gray-400 ml-2">— {selectedVariants[groupName].value}</span>
+                  )}
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {groupVariants.map((v) => (
-                    <button key={v.id} onClick={() => setSelectedVariants((s) => ({ ...s, [groupName]: v }))}
+                    <button
+                      key={v.id}
+                      onClick={() => setSelectedVariants((s) => ({ ...s, [groupName]: v }))}
                       disabled={v.stock === 0}
                       className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
                         selectedVariants[groupName]?.id === v.id
@@ -495,9 +459,14 @@ export default function ProductDetail() {
                           : v.stock === 0
                             ? "border-gray-200 text-gray-300 line-through cursor-not-allowed"
                             : "border-gray-200 text-gray-700 hover:border-green-900"
-                      }`}>
+                      }`}
+                    >
                       {v.value}
-                      {v.price_modifier !== 0 && <span className="text-xs ml-1 opacity-70">{v.price_modifier > 0 ? `+$${v.price_modifier}` : `-$${Math.abs(v.price_modifier)}`}</span>}
+                      {v.price_modifier !== 0 && (
+                        <span className="text-xs ml-1 opacity-70">
+                          {v.price_modifier > 0 ? `+$${v.price_modifier}` : `-$${Math.abs(v.price_modifier)}`}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -508,7 +477,8 @@ export default function ProductDetail() {
               <div className={`rounded-2xl mb-5 overflow-hidden border-2 transition-all ${customizeJersey ? "border-green-700" : "border-gray-200"}`}>
                 <button
                   onClick={() => setCustomizeJersey(!customizeJersey)}
-                  className={`w-full flex items-center justify-between p-4 transition-colors ${customizeJersey ? "bg-green-50" : "bg-gray-50 hover:bg-gray-100"}`}>
+                  className={`w-full flex items-center justify-between p-4 transition-colors ${customizeJersey ? "bg-green-50" : "bg-gray-50 hover:bg-gray-100"}`}
+                >
                   <div className="flex items-center gap-3">
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${customizeJersey ? "bg-green-700 border-green-700" : "border-gray-300"}`}>
                       {customizeJersey && <FiCheck size={12} className="text-white" strokeWidth={3} />}
@@ -561,7 +531,6 @@ export default function ProductDetail() {
                         />
                       </div>
                     </div>
-
                     {(jerseyName || jerseyNumber) && (
                       <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-4 text-center">
                         <p className="text-xs text-green-800 font-semibold flex items-center justify-center gap-1.5">
@@ -569,7 +538,6 @@ export default function ProductDetail() {
                         </p>
                       </div>
                     )}
-
                     <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
                       <p className="text-xs text-yellow-800 font-semibold flex items-center gap-1.5 mb-1">
                         ℹ️ Customization Info
@@ -590,13 +558,20 @@ export default function ProductDetail() {
                 <span className="px-4 py-3 font-bold min-w-[48px] text-center">{quantity}</span>
                 <button onClick={() => setQuantity(Math.min(product.stock, quantity + 1))} className="px-4 py-3 hover:bg-gray-100 font-bold text-lg">+</button>
               </div>
-              <button onClick={addToCart} disabled={addingToCart || product.stock === 0}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-bold text-sm transition-all disabled:opacity-50 ${addedToCart ? "bg-green-100 text-green-800 border border-green-300" : "bg-green-900 hover:bg-green-800 text-white"}`}>
+              <button
+                onClick={addToCart}
+                disabled={addingToCart || product.stock === 0}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-bold text-sm transition-all disabled:opacity-50 ${addedToCart ? "bg-green-100 text-green-800 border border-green-300" : "bg-green-900 hover:bg-green-800 text-white"}`}
+              >
                 {addedToCart ? <><FiCheck /> Added!</> : <><FiShoppingCart /> {addingToCart ? "Adding..." : "Add to Cart"}</>}
               </button>
             </div>
 
-            {addedToCart && <Link href="/cart" className="block text-center text-sm text-green-700 font-semibold hover:underline mb-4">View Cart & Checkout →</Link>}
+            {addedToCart && (
+              <Link href="/cart" className="block text-center text-sm text-green-700 font-semibold hover:underline mb-4">
+                View Cart &amp; Checkout →
+              </Link>
+            )}
 
             {product.tags?.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
@@ -618,58 +593,35 @@ export default function ProductDetail() {
               </div>
             )}
 
-            <div className="flex items-center justify-between mt-4 pt-4 border-t">
-  {product.country_of_origin && (
-    <span className="flex items-center gap-1.5 text-sm text-gray-500">
-      <FiPackage size={14} /> Made in {product.country_of_origin}
-    </span>
-  )}
-  <div className="flex items-center gap-2 ml-auto">
-    
-      href={`https://wa.me/?text=${encodeURIComponent((product.name || "") + " - " + (typeof window !== "undefined" ? window.location.href : ""))}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center gap-1 text-sm text-green-600 hover:text-green-700 transition-colors font-medium"
-    >
-      💬 WhatsApp
-    </a>
-    
-      href={`sms:?body=${encodeURIComponent((product.name || "") + " - " + (typeof window !== "undefined" ? window.location.href : ""))}`}
-      className="flex items-center gap-1 text-sm text-blue-500 hover:text-blue-600 transition-colors font-medium"
-    >
-      📱 Text
-    </a>
-    <button
-      onClick={() => { navigator.clipboard?.writeText(window.location.href); toast.success("Link copied!"); }}
-      className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
-    >
-      <FiShare2 size={14} /> Copy
-    </button>
-  </div>
-</div>
-  
-    href={`https://wa.me/?text=${encodeURIComponent(product.name + " - " + (typeof window !== "undefined" ? window.location.href : ""))}`}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="flex items-center gap-1.5 text-sm text-green-600 hover:text-green-700 transition-colors font-medium"
-  >
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.124.558 4.17 1.535 5.943L.057 23.571a.75.75 0 0 0 .925.899l5.82-1.525A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.686-.5-5.232-1.375l-.374-.214-3.878 1.017 1.034-3.78-.23-.38A9.955 9.955 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-    WhatsApp
-  </a>
-  
-    href={`sms:?body=${encodeURIComponent(product.name + " - " + (typeof window !== "undefined" ? window.location.href : ""))}`}
-    className="flex items-center gap-1.5 text-sm text-blue-500 hover:text-blue-600 transition-colors font-medium"
-  >
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
-    Text
-  </a>
-  <button
-    onClick={() => { navigator.clipboard?.writeText(window.location.href); toast.success("Link copied!"); }}
-    className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
-  >
-    <FiShare2 size={14} /> Copy
-  </button>
-</div>
+            {/* Share + Made in row */}
+            <div className="flex items-center justify-between mt-4 pt-4 border-t flex-wrap gap-2">
+              {product.country_of_origin && (
+                <span className="flex items-center gap-1.5 text-sm text-gray-500">
+                  <FiPackage size={14} /> Made in {product.country_of_origin}
+                </span>
+              )}
+              <div className="flex items-center gap-3 ml-auto">
+                <a
+                  href={"https://wa.me/?text=" + shareText}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-sm font-medium text-green-600 hover:text-green-700 transition-colors"
+                >
+                  💬 WhatsApp
+                </a>
+                <a
+                  href={"sms:?body=" + shareText}
+                  className="flex items-center gap-1 text-sm font-medium text-blue-500 hover:text-blue-600 transition-colors"
+                >
+                  📱 Text
+                </a>
+                <button
+                  onClick={() => { navigator.clipboard?.writeText(shareUrl); toast.success("Link copied!"); }}
+                  className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <FiShare2 size={14} /> Copy
+                </button>
+              </div>
             </div>
           </div>
         </div>
