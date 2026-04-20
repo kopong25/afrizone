@@ -619,8 +619,34 @@ export default function ProductDetail() {
             )}
 
             <div className="flex items-center justify-between mt-4 pt-4 border-t">
-              {product.country_of_origin && <span className="flex items-center gap-1.5 text-sm text-gray-500"><FiPackage size={14} /> Made in {product.country_of_origin}</span>}
-              <div className="flex items-center gap-2 ml-auto">
+  {product.country_of_origin && (
+    <span className="flex items-center gap-1.5 text-sm text-gray-500">
+      <FiPackage size={14} /> Made in {product.country_of_origin}
+    </span>
+  )}
+  <div className="flex items-center gap-2 ml-auto">
+    
+      href={`https://wa.me/?text=${encodeURIComponent((product.name || "") + " - " + (typeof window !== "undefined" ? window.location.href : ""))}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-1 text-sm text-green-600 hover:text-green-700 transition-colors font-medium"
+    >
+      💬 WhatsApp
+    </a>
+    
+      href={`sms:?body=${encodeURIComponent((product.name || "") + " - " + (typeof window !== "undefined" ? window.location.href : ""))}`}
+      className="flex items-center gap-1 text-sm text-blue-500 hover:text-blue-600 transition-colors font-medium"
+    >
+      📱 Text
+    </a>
+    <button
+      onClick={() => { navigator.clipboard?.writeText(window.location.href); toast.success("Link copied!"); }}
+      className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+    >
+      <FiShare2 size={14} /> Copy
+    </button>
+  </div>
+</div>
   
     href={`https://wa.me/?text=${encodeURIComponent(product.name + " - " + (typeof window !== "undefined" ? window.location.href : ""))}`}
     target="_blank"
