@@ -16,36 +16,62 @@ import { FiShoppingCart, FiMapPin, FiPackage, FiShare2, FiHeart, FiCheck, FiEdit
 
 const JERSEY_TAGS = ["jersey","jerseys","kit","football kit","soccer jersey","customizable","custom jersey","sportswear"];
 
-function JerseyPreview({ name, number }) {
+// Maps color variant names to jersey color schemes
+const JERSEY_COLOR_SCHEMES = {
+  white:  { body: "#f8f8f8", bodyGrad2: "#eeeeee", panel: "#1a1a1a", panelGrad: "#333333", collar: "#1a1a1a", text: "#1a1a1a" },
+  yellow: { body: "#FFD700", bodyGrad2: "#FFC200", panel: "#1a1a1a", panelGrad: "#333333", collar: "#1a1a1a", text: "#1a1a1a" },
+  black:  { body: "#2a2a2a", bodyGrad2: "#1a1a1a", panel: "#FFD700", panelGrad: "#FFC200", collar: "#FFD700", text: "#ffffff" },
+  red:    { body: "#dc2626", bodyGrad2: "#b91c1c", panel: "#1a1a1a", panelGrad: "#333333", collar: "#1a1a1a", text: "#ffffff" },
+  blue:   { body: "#1d4ed8", bodyGrad2: "#1e3a8a", panel: "#ffffff", panelGrad: "#eeeeee", collar: "#ffffff",  text: "#ffffff" },
+  green:  { body: "#166534", bodyGrad2: "#14532d", panel: "#FFD700", panelGrad: "#FFC200", collar: "#FFD700", text: "#ffffff" },
+  navy:   { body: "#1e3a5f", bodyGrad2: "#172a45", panel: "#ffffff", panelGrad: "#eeeeee", collar: "#ffffff",  text: "#ffffff" },
+};
+
+function getColorScheme(colorValue) {
+  if (!colorValue) return JERSEY_COLOR_SCHEMES.white;
+  const key = colorValue.toLowerCase().trim();
+  return JERSEY_COLOR_SCHEMES[key] || JERSEY_COLOR_SCHEMES.white;
+}
+
+function JerseyPreview({ name, number, color }) {
+  const c = getColorScheme(color);
+  const gradId = "bodyMain_" + (color || "white").replace(/\s/g, "_");
+  const leftPanelId  = "leftPanel_"  + (color || "white").replace(/\s/g, "_");
+  const rightPanelId = "rightPanel_" + (color || "white").replace(/\s/g, "_");
+
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center relative"
-      style={{ background: "linear-gradient(135deg, #e8e8e8 0%, #d4d4d4 100%)" }}>
+    <div
+      className="w-full h-full flex flex-col items-center justify-center relative"
+      style={{ background: "linear-gradient(135deg, #e8e8e8 0%, #d4d4d4 100%)" }}
+    >
       <p className="absolute top-3 left-0 right-0 text-center text-gray-600 text-xs uppercase tracking-widest font-bold z-10">
         Back of Jersey
       </p>
-      <svg viewBox="0 0 340 380" xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-full" style={{ maxWidth: "320px", maxHeight: "320px" }}>
+
+      {color && (
+        <p className="absolute top-8 left-0 right-0 text-center text-gray-500 text-xs z-10 capitalize">
+          {color}
+        </p>
+      )}
+
+      <svg
+        viewBox="0 0 340 380"
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-full"
+        style={{ maxWidth: "320px", maxHeight: "320px" }}
+      >
         <defs>
-          <linearGradient id="bodyMain" x1="0%" y1="0%" x2="5%" y2="100%">
-            <stop offset="0%" stopColor="#f5f5f0" />
-            <stop offset="50%" stopColor="#efefea" />
-            <stop offset="100%" stopColor="#e8e8e3" />
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="5%" y2="100%">
+            <stop offset="0%" stopColor={c.body} />
+            <stop offset="100%" stopColor={c.bodyGrad2} />
           </linearGradient>
-          <linearGradient id="leftPanel" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#b91c1c" />
-            <stop offset="100%" stopColor="#dc2626" />
+          <linearGradient id={leftPanelId} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor={c.panel} />
+            <stop offset="100%" stopColor={c.panelGrad} />
           </linearGradient>
-          <linearGradient id="rightPanel" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#dc2626" />
-            <stop offset="100%" stopColor="#b91c1c" />
-          </linearGradient>
-          <linearGradient id="leftSleeve" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#f0f0eb" />
-            <stop offset="100%" stopColor="#e4e4df" />
-          </linearGradient>
-          <linearGradient id="rightSleeve" x1="100%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#f0f0eb" />
-            <stop offset="100%" stopColor="#e4e4df" />
+          <linearGradient id={rightPanelId} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor={c.panelGrad} />
+            <stop offset="100%" stopColor={c.panel} />
           </linearGradient>
           <filter id="jerseyDrop">
             <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#00000030" />
@@ -54,45 +80,107 @@ function JerseyPreview({ name, number }) {
             <feDropShadow dx="0" dy="1" stdDeviation="1" floodColor="#00000040" />
           </filter>
         </defs>
-        <path d="M 88 42 L 52 68 L 22 148 L 68 162 L 68 340 L 272 340 L 272 162 L 318 148 L 288 68 L 252 42 Q 232 58 170 58 Q 108 58 88 42 Z" fill="url(#bodyMain)" filter="url(#jerseyDrop)" />
-        <path d="M 68 162 L 68 340 L 108 340 L 108 175 Z" fill="url(#leftPanel)" />
-        <path d="M 272 162 L 272 340 L 232 340 L 232 175 Z" fill="url(#rightPanel)" />
-        <path d="M 88 42 L 52 68 L 22 148 L 68 162 L 68 110 Q 76 78 88 42 Z" fill="url(#leftSleeve)" stroke="#d4d4ce" strokeWidth="0.5" />
-        <path d="M 252 42 L 288 68 L 318 148 L 272 162 L 272 110 Q 264 78 252 42 Z" fill="url(#rightSleeve)" stroke="#d4d4ce" strokeWidth="0.5" />
-        <path d="M 28 128 L 24 142 L 68 156 L 68 143 Z" fill="#166534" />
-        <path d="M 24 142 L 22 148 L 68 162 L 68 156 Z" fill="#dc2626" />
-        <path d="M 312 128 L 316 142 L 272 156 L 272 143 Z" fill="#166534" />
-        <path d="M 316 142 L 318 148 L 272 162 L 272 156 Z" fill="#dc2626" />
-        <path d="M 118 44 Q 170 72 222 44" fill="none" stroke="#c8c8c3" strokeWidth="2" />
-        <line x1="88" y1="42" x2="68" y2="162" stroke="#d8d8d3" strokeWidth="0.8" />
-        <line x1="252" y1="42" x2="272" y2="162" stroke="#d8d8d3" strokeWidth="0.8" />
-        <line x1="68" y1="162" x2="68" y2="340" stroke="#d8d8d3" strokeWidth="0.8" />
-        <line x1="272" y1="162" x2="272" y2="340" stroke="#d8d8d3" strokeWidth="0.8" />
-        <line x1="68" y1="330" x2="272" y2="330" stroke="#d0d0cb" strokeWidth="1.2" />
+
+        {/* Main body */}
+        <path
+          d="M 88 42 L 52 68 L 22 148 L 68 162 L 68 340 L 272 340 L 272 162 L 318 148 L 288 68 L 252 42 Q 232 58 170 58 Q 108 58 88 42 Z"
+          fill={"url(#" + gradId + ")"}
+          filter="url(#jerseyDrop)"
+        />
+
+        {/* Left side panel */}
+        <path d="M 68 162 L 68 340 L 108 340 L 108 175 Z" fill={"url(#" + leftPanelId + ")"} />
+
+        {/* Right side panel */}
+        <path d="M 272 162 L 272 340 L 232 340 L 232 175 Z" fill={"url(#" + rightPanelId + ")"} />
+
+        {/* Left sleeve */}
+        <path
+          d="M 88 42 L 52 68 L 22 148 L 68 162 L 68 110 Q 76 78 88 42 Z"
+          fill={c.body}
+          stroke={c.panel}
+          strokeWidth="1"
+        />
+
+        {/* Right sleeve */}
+        <path
+          d="M 252 42 L 288 68 L 318 148 L 272 162 L 272 110 Q 264 78 252 42 Z"
+          fill={c.body}
+          stroke={c.panel}
+          strokeWidth="1"
+        />
+
+        {/* Sleeve panel accents */}
+        <path d="M 28 128 L 24 142 L 68 156 L 68 143 Z" fill={c.panel} />
+        <path d="M 24 142 L 22 148 L 68 162 L 68 156 Z" fill={c.panelGrad} />
+        <path d="M 312 128 L 316 142 L 272 156 L 272 143 Z" fill={c.panel} />
+        <path d="M 316 142 L 318 148 L 272 162 L 272 156 Z" fill={c.panelGrad} />
+
+        {/* Collar */}
+        <path
+          d="M 118 44 Q 170 72 222 44"
+          fill="none"
+          stroke={c.collar}
+          strokeWidth="6"
+          strokeLinecap="round"
+        />
+
+        {/* Seam lines */}
+        <line x1="88"  y1="42"  x2="68"  y2="162" stroke={c.panel} strokeWidth="0.6" strokeDasharray="4,3" opacity="0.4" />
+        <line x1="252" y1="42"  x2="272" y2="162" stroke={c.panel} strokeWidth="0.6" strokeDasharray="4,3" opacity="0.4" />
+        <line x1="68"  y1="162" x2="68"  y2="340" stroke={c.panel} strokeWidth="0.6" opacity="0.3" />
+        <line x1="272" y1="162" x2="272" y2="340" stroke={c.panel} strokeWidth="0.6" opacity="0.3" />
+        <line x1="68"  y1="330" x2="272" y2="330" stroke={c.panel} strokeWidth="1"   opacity="0.2" />
+
+        {/* NAME */}
         {name && (
-          <text x="170" y="105" textAnchor="middle" fill="#1a1a1a"
-            fontFamily="Arial Black, Impact, sans-serif" fontWeight="900"
+          <text
+            x="170" y="108"
+            textAnchor="middle"
+            fill={c.text}
+            fontFamily="Arial Black, Impact, sans-serif"
+            fontWeight="900"
             fontSize={name.length > 11 ? "17" : name.length > 8 ? "21" : "25"}
-            letterSpacing="5" filter="url(#textShadow)">
+            letterSpacing="5"
+            filter="url(#textShadow)"
+          >
             {name}
           </text>
         )}
+
+        {/* NUMBER */}
         {number && (
-          <text x="170" y={name ? "210" : "190"} textAnchor="middle" fill="#1a1a1a"
-            fontFamily="Arial Black, Impact, sans-serif" fontWeight="900"
-            fontSize={name ? "96" : "108"} filter="url(#textShadow)">
+          <text
+            x="170"
+            y={name ? "215" : "200"}
+            textAnchor="middle"
+            fill={c.text}
+            fontFamily="Arial Black, Impact, sans-serif"
+            fontWeight="900"
+            fontSize={name ? "96" : "108"}
+            filter="url(#textShadow)"
+          >
             {number}
           </text>
         )}
+
+        {/* Placeholder */}
         {!name && !number && (
           <>
-            <rect x="120" y="82" width="100" height="20" rx="5" fill="#d4d4ce" opacity="0.8" />
-            <rect x="130" y="115" width="80" height="68" rx="6" fill="#d4d4ce" opacity="0.6" />
-            <text x="170" y="97" textAnchor="middle" fill="#aaaaaa" fontSize="12" fontFamily="Arial, sans-serif" fontWeight="bold" letterSpacing="3">YOUR NAME</text>
-            <text x="170" y="162" textAnchor="middle" fill="#aaaaaa" fontSize="14" fontFamily="Arial, sans-serif" fontWeight="bold"># 00</text>
+            <rect x="120" y="82" width="100" height="20" rx="5" fill={c.panel} opacity="0.2" />
+            <rect x="130" y="115" width="80" height="68" rx="6" fill={c.panel} opacity="0.15" />
+            <text x="170" y="97" textAnchor="middle" fill={c.text} fontSize="11"
+              fontFamily="Arial, sans-serif" fontWeight="bold" letterSpacing="3" opacity="0.4">
+              YOUR NAME
+            </text>
+            <text x="170" y="162" textAnchor="middle" fill={c.text} fontSize="14"
+              fontFamily="Arial, sans-serif" fontWeight="bold" opacity="0.3">
+              # 00
+            </text>
           </>
         )}
       </svg>
+
       <p className="absolute bottom-2 left-0 right-0 text-center text-gray-500 text-xs">
         Preview only — actual print may vary
       </p>
@@ -159,6 +247,15 @@ export default function ProductDetail() {
   }) ?? false;
 
   const showJerseyPreview = customizeJersey && isJerseyProduct;
+
+  // Detect selected color variant for jersey preview
+  const selectedColorValue = Object.entries(selectedVariants).reduce((found, [groupName, variant]) => {
+    if (found) return found;
+    if (groupName.toLowerCase().includes("color") || groupName.toLowerCase().includes("colour")) {
+      return variant?.value?.toLowerCase() || null;
+    }
+    return null;
+  }, null);
 
   const handleTouchStart = (e) => setTouchStartX(e.touches[0].clientX);
   const handleTouchMove  = (e) => setTouchEndX(e.touches[0].clientX);
@@ -298,7 +395,7 @@ export default function ProductDetail() {
               onTouchEnd={handleTouchEnd}
             >
               {showJerseyPreview ? (
-                <JerseyPreview name={jerseyName} number={jerseyNumber} />
+                <JerseyPreview name={jerseyName} number={jerseyNumber} color={selectedColorValue} />
               ) : (
                 <>
                   {images[selectedImage] ? (
@@ -439,39 +536,65 @@ export default function ProductDetail() {
               </Link>
             )}
 
-            {Object.entries(variantGroups).map(([groupName, groupVariants]) => (
-              <div key={groupName} className="mb-4">
-                <label className="text-sm font-bold text-gray-700 block mb-2">
-                  {groupName}
-                  {selectedVariants[groupName] && (
-                    <span className="font-normal text-gray-400 ml-2">— {selectedVariants[groupName].value}</span>
+            {Object.entries(variantGroups).map(([groupName, groupVariants]) => {
+              const isColorGroup = groupName.toLowerCase().includes("color") || groupName.toLowerCase().includes("colour");
+              return (
+                <div key={groupName} className="mb-4">
+                  <label className="text-sm font-bold text-gray-700 block mb-2">
+                    {groupName}
+                    {selectedVariants[groupName] && (
+                      <span className="font-normal text-gray-400 ml-2">— {selectedVariants[groupName].value}</span>
+                    )}
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {groupVariants.map((v) => {
+                      const isSelected = selectedVariants[groupName]?.id === v.id;
+                      // For color groups, show color swatches
+                      if (isColorGroup) {
+                        const scheme = getColorScheme(v.value);
+                        return (
+                          <button
+                            key={v.id}
+                            onClick={() => setSelectedVariants((s) => ({ ...s, [groupName]: v }))}
+                            disabled={v.stock === 0}
+                            title={v.value}
+                            className={`w-9 h-9 rounded-full border-4 transition-all disabled:opacity-30 ${isSelected ? "border-green-900 scale-110 shadow-md" : "border-gray-200 hover:border-gray-400"}`}
+                            style={{ backgroundColor: scheme.body, outline: isSelected ? "2px solid #166534" : "none", outlineOffset: "2px" }}
+                          />
+                        );
+                      }
+                      return (
+                        <button
+                          key={v.id}
+                          onClick={() => setSelectedVariants((s) => ({ ...s, [groupName]: v }))}
+                          disabled={v.stock === 0}
+                          className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                            isSelected
+                              ? "border-green-900 bg-green-900 text-white"
+                              : v.stock === 0
+                                ? "border-gray-200 text-gray-300 line-through cursor-not-allowed"
+                                : "border-gray-200 text-gray-700 hover:border-green-900"
+                          }`}
+                        >
+                          {v.value}
+                          {v.price_modifier !== 0 && (
+                            <span className="text-xs ml-1 opacity-70">
+                              {v.price_modifier > 0 ? `+$${v.price_modifier}` : `-$${Math.abs(v.price_modifier)}`}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Hint to open customization when color is selected on jersey product */}
+                  {isColorGroup && isJerseyProduct && selectedVariants[groupName] && !customizeJersey && (
+                    <p className="text-xs text-green-700 mt-1.5 font-medium">
+                      ✓ {selectedVariants[groupName].value} selected — enable customization below to preview your name on this color
+                    </p>
                   )}
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {groupVariants.map((v) => (
-                    <button
-                      key={v.id}
-                      onClick={() => setSelectedVariants((s) => ({ ...s, [groupName]: v }))}
-                      disabled={v.stock === 0}
-                      className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
-                        selectedVariants[groupName]?.id === v.id
-                          ? "border-green-900 bg-green-900 text-white"
-                          : v.stock === 0
-                            ? "border-gray-200 text-gray-300 line-through cursor-not-allowed"
-                            : "border-gray-200 text-gray-700 hover:border-green-900"
-                      }`}
-                    >
-                      {v.value}
-                      {v.price_modifier !== 0 && (
-                        <span className="text-xs ml-1 opacity-70">
-                          {v.price_modifier > 0 ? `+$${v.price_modifier}` : `-$${Math.abs(v.price_modifier)}`}
-                        </span>
-                      )}
-                    </button>
-                  ))}
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {isJerseyProduct && (
               <div className={`rounded-2xl mb-5 overflow-hidden border-2 transition-all ${customizeJersey ? "border-green-700" : "border-gray-200"}`}>
@@ -492,7 +615,9 @@ export default function ProductDetail() {
                           : <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">FREE</span>
                         }
                       </p>
-                      <p className="text-xs text-gray-500 mt-0.5">Add your name and/or number to this jersey</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Add your name and number — preview updates live with your selected color
+                      </p>
                     </div>
                   </div>
                   <span className={`text-gray-400 transition-transform ${customizeJersey ? "rotate-180" : ""}`}>▾</span>
@@ -534,7 +659,8 @@ export default function ProductDetail() {
                     {(jerseyName || jerseyNumber) && (
                       <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-4 text-center">
                         <p className="text-xs text-green-800 font-semibold flex items-center justify-center gap-1.5">
-                          👆 See your jersey back preview in the image above
+                          👆 See your jersey preview in the image above
+                          {selectedColorValue && <span className="capitalize bg-green-200 px-2 py-0.5 rounded-full">{selectedColorValue}</span>}
                         </p>
                       </div>
                     )}
