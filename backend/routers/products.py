@@ -26,9 +26,13 @@ def list_products(
     db: Session = Depends(get_db)
 ):
     """Browse & search all active products with filters and pagination."""
-    query = db.query(models.Product).filter(
+    query = db.query(models.Product).join(
+        models.Store, models.Product.store_id == models.Store.id
+    ).filter(
         models.Product.is_active == True,
-        models.Product.stock > 0
+        models.Product.stock > 0,
+        # ── Hide products from suspended stores ──
+        models.Store.status != models.SellerStatus.suspended,
     )
 
     # Full-text search
@@ -88,12 +92,18 @@ def list_categories(db: Session = Depends(get_db)):
 @router.get("/{slug}", response_model=schemas.ProductOut)
 def get_product(slug: str, db: Session = Depends(get_db)):
     """Get a single product by slug (public)."""
-    product = db.query(models.Product).filter(
+    product = db.query(models.Product).join(
+        models.Store, models.Product.store_id == models.Store.id
+    ).filter(
         models.Product.slug == slug,
-        models.Product.is_active == True
+        models.Product.is_active == True,
+        # ── Block direct access to products from suspended stores ──
+        models.Store.status != models.SellerStatus.suspended,
     ).first()
+
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+
     # Increment view count
     product.view_count += 1
     db.commit()
