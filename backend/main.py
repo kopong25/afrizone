@@ -15,7 +15,6 @@ from routers import (
     shipping, messages, subscriptions, referrals,
     ads, push_notifications
 )
-
 from database import engine
 import models
 
@@ -29,8 +28,13 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+# ── Rate Limiter ──────────────────────────────────────────────
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# ── CORS ──────────────────────────────────────────────────────
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 ALLOWED_ORIGINS = [
     FRONTEND_URL,
     "http://localhost:3000",
@@ -48,6 +52,7 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+# ── Validation error handler ──────────────────────────────────
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
@@ -58,29 +63,26 @@ async def validation_exception_handler(request, exc):
         content={"detail": [{"msg": e["msg"], "loc": e["loc"]} for e in exc.errors()]},
     )
 
+# ── Routers ───────────────────────────────────────────────────
+app.include_router(auth.router,               prefix="/auth",          tags=["Auth"])
+app.include_router(sellers.router,            prefix="/sellers",       tags=["Sellers"])
+app.include_router(products.router,           prefix="/products",      tags=["Products"])
+app.include_router(orders.router,             prefix="/orders",        tags=["Orders"])
+app.include_router(payments.router,           prefix="/payments",      tags=["Payments"])
+app.include_router(reviews.router,            prefix="/reviews",       tags=["Reviews"])
+app.include_router(admin.router,              prefix="/admin",         tags=["Admin"])
+app.include_router(wishlist.router,           prefix="/wishlist",      tags=["Wishlist"])
+app.include_router(discounts.router,          prefix="/discounts",     tags=["Discounts"])
+app.include_router(variants.router,           prefix="/variants",      tags=["Variants"])
+app.include_router(shipping.router,           prefix="/shipping",      tags=["Shipping"])
+app.include_router(messages.router,           prefix="/messages",      tags=["Messages"])
+app.include_router(subscriptions.router,      prefix="/subscriptions", tags=["Subscriptions"])
+app.include_router(referrals.router,          prefix="/referrals",     tags=["Referrals"])
+app.include_router(ads.router,                prefix="/ads",           tags=["Ads"])
+app.include_router(push_notifications.router, prefix="/push",          tags=["Push"])
+app.include_router(uber_direct.router,        prefix="/uber-direct",   tags=["Uber Direct"])
 
-
-# Phase 1 & 2
-app.include_router(auth.router,          prefix="/auth",          tags=["Auth"])
-app.include_router(sellers.router,       prefix="/sellers",       tags=["Sellers"])
-app.include_router(products.router,      prefix="/products",      tags=["Products"])
-app.include_router(orders.router,        prefix="/orders",        tags=["Orders"])
-app.include_router(payments.router,      prefix="/payments",      tags=["Payments"])
-app.include_router(reviews.router,       prefix="/reviews",       tags=["Reviews"])
-app.include_router(admin.router,         prefix="/admin",         tags=["Admin"])
-app.include_router(wishlist.router,      prefix="/wishlist",      tags=["Wishlist"])
-app.include_router(discounts.router,     prefix="/discounts",     tags=["Discounts"])
-app.include_router(variants.router,      prefix="/variants",      tags=["Variants"])
-
-# Phase 3
-app.include_router(shipping.router,      prefix="/shipping",      tags=["Shipping"])
-app.include_router(messages.router,      prefix="/messages",      tags=["Messages"])
-app.include_router(subscriptions.router, prefix="/subscriptions", tags=["Subscriptions"])
-app.include_router(referrals.router,     prefix="/referrals",     tags=["Referrals"])
-app.include_router(ads.router,           prefix="/ads",           tags=["Ads"])
-app.include_router(push_notifications.router, prefix="/push",        tags=["Push"])
-app.include_router(uber_direct.router,    prefix="/uber-direct",   tags=["Uber Direct"])
-
+# ── Health ────────────────────────────────────────────────────
 @app.get("/", tags=["Health"])
 def root():
     return {"app": "Afrizone API", "version": "2.0.0", "status": "running", "docs": "/docs"}
