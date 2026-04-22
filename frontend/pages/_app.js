@@ -6,6 +6,9 @@ import { Toaster } from "react-hot-toast";
 import { authAPI, setAuthToken, loadStoredToken } from "../lib/api";
 import "../styles/globals.css";
 
+// ── Google Analytics ───────────────────────────────────────────
+const GA_ID = "G-2ESGNVEKP9";
+
 // ── Facebook Pixel ─────────────────────────────────────────────
 const FB_PIXEL_ID = process.env.NEXT_PUBLIC_FB_PIXEL_ID || "PLACEHOLDER";
 
@@ -67,14 +70,8 @@ function AuthProvider({ children }) {
       authAPI.me()
         .then((res) => setUser(res.data))
         .catch((err) => {
-          // ✅ FIX: On 401, we only clear the user object — NOT the stored token.
-          // The token stays in localStorage/cookie so the next visit can retry.
-          // Users are never auto-logged-out; only manual logout clears the token.
           if (err.response?.status === 401) {
             setUser(null);
-            // Do NOT call setAuthToken(null) or setToken(null) here.
-            // If the backend JWT expired, the user will be prompted to log in
-            // naturally when they try a protected action — not kicked out silently.
           }
         })
         .finally(() => setLoading(false));
@@ -89,7 +86,6 @@ function AuthProvider({ children }) {
     setUser(userData);
   };
 
-  // ✅ logout() is the ONLY place that wipes the token
   const logout = () => {
     setAuthToken(null);
     setToken(null);
@@ -213,13 +209,36 @@ export default function App({ Component, pageProps }) {
 
   useEffect(() => {
     saveUTM();
-    const handleRouteChange = () => fbq("track", "PageView");
+
+    // Track pageviews for Facebook Pixel + Google Analytics on route change
+    const handleRouteChange = (url) => {
+      fbq("track", "PageView");
+      // Send pageview to Google Analytics
+      if (typeof window !== "undefined" && window.gtag) {
+        window.gtag("config", GA_ID, { page_path: url });
+      }
+    };
     router.events.on("routeChangeComplete", handleRouteChange);
     return () => router.events.off("routeChangeComplete", handleRouteChange);
   }, [router.events]);
 
   return (
     <AuthProvider>
+      {/* ── Google Analytics ── */}
+      <Script
+        src={"https://www.googletagmanager.com/gtag/js?id=" + GA_ID}
+        strategy="afterInteractive"
+      />
+      <Script id="google-analytics" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', '${GA_ID}', { page_path: window.location.pathname });
+        `}
+      </Script>
+
+      {/* ── Facebook Pixel ── */}
       {FB_PIXEL_ID && FB_PIXEL_ID !== "PLACEHOLDER" && (
         <>
           <Script id="fb-pixel" strategy="afterInteractive">
@@ -238,11 +257,12 @@ export default function App({ Component, pageProps }) {
           </Script>
           <noscript>
             <img height="1" width="1" style={{ display: "none" }}
-              src={`https://www.facebook.com/tr?id=${FB_PIXEL_ID}&ev=PageView&noscript=1`}
+              src={"https://www.facebook.com/tr?id=" + FB_PIXEL_ID + "&ev=PageView&noscript=1"}
               alt="" />
           </noscript>
         </>
       )}
+
       <Component {...pageProps} />
       <PWAInstallBanner />
       <Toaster position="top-right" toastOptions={{ duration: 3000 }} />

@@ -2,14 +2,11 @@ const withPWA = require("next-pwa")({
   dest: "public",
   register: true,
   skipWaiting: true,
-  reloadOnOnline: false,         // ← was true: caused repeated HEAD checks on reconnect
+  reloadOnOnline: false,
   disable: process.env.NODE_ENV === "development",
-
-  // Stop Workbox from doing background HEAD checks on navigation routes
-  cacheOnFrontEndNav: false,     // ← prevents HEAD polls on every page visit
-
+  cacheOnFrontEndNav: false,
   runtimeCaching: [
-    // ── 1. Your own pages — NetworkFirst, short timeout, no HEAD polling ──
+    // ── 1. Your own pages — NetworkFirst, short timeout ──
     {
       urlPattern: /^https:\/\/afrizoneshop\.com\/.*$/i,
       handler: "NetworkFirst",
@@ -19,14 +16,21 @@ const withPWA = require("next-pwa")({
         expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
       },
     },
-
-    // ── 2. Backend API — NetworkOnly (never cache, never HEAD poll) ──
+    // ── 2. Backend API — NetworkOnly (never cache) ──
     {
       urlPattern: /^https:\/\/afrizone-loqr\.onrender\.com\/.*$/i,
       handler: "NetworkOnly",
     },
-
-    // ── 3. Cloudinary images — CacheFirst (unchanged) ──
+    // ── 3. Google Analytics — NetworkOnly (must always be fresh) ──
+    {
+      urlPattern: /^https:\/\/www\.googletagmanager\.com\/.*$/i,
+      handler: "NetworkOnly",
+    },
+    {
+      urlPattern: /^https:\/\/www\.google-analytics\.com\/.*$/i,
+      handler: "NetworkOnly",
+    },
+    // ── 4. Cloudinary images — CacheFirst ──
     {
       urlPattern: /^https:\/\/res\.cloudinary\.com\/.*$/i,
       handler: "CacheFirst",
@@ -35,8 +39,7 @@ const withPWA = require("next-pwa")({
         expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
       },
     },
-
-    // ── 4. Google Fonts — CacheFirst (unchanged) ──
+    // ── 5. Google Fonts — CacheFirst ──
     {
       urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*$/i,
       handler: "CacheFirst",
@@ -45,8 +48,7 @@ const withPWA = require("next-pwa")({
         expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
       },
     },
-
-    // ── 5. Stripe JS — NetworkOnly (must always be fresh for PCI compliance) ──
+    // ── 6. Stripe JS — NetworkOnly (PCI compliance) ──
     {
       urlPattern: /^https:\/\/js\.stripe\.com\/.*$/i,
       handler: "NetworkOnly",
