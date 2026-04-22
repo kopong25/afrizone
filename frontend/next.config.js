@@ -21,7 +21,7 @@ const withPWA = require("next-pwa")({
       urlPattern: /^https:\/\/afrizone-loqr\.onrender\.com\/.*$/i,
       handler: "NetworkOnly",
     },
-    // ── 3. Google Analytics — NetworkOnly (must always be fresh) ──
+    // ── 3. Google Analytics — NetworkOnly ──
     {
       urlPattern: /^https:\/\/www\.googletagmanager\.com\/.*$/i,
       handler: "NetworkOnly",
@@ -30,7 +30,12 @@ const withPWA = require("next-pwa")({
       urlPattern: /^https:\/\/www\.google-analytics\.com\/.*$/i,
       handler: "NetworkOnly",
     },
-    // ── 4. Cloudinary images — CacheFirst ──
+    // ── 4. Microsoft Clarity — NetworkOnly ──
+    {
+      urlPattern: /^https:\/\/www\.clarity\.ms\/.*$/i,
+      handler: "NetworkOnly",
+    },
+    // ── 5. Cloudinary images — CacheFirst ──
     {
       urlPattern: /^https:\/\/res\.cloudinary\.com\/.*$/i,
       handler: "CacheFirst",
@@ -39,7 +44,7 @@ const withPWA = require("next-pwa")({
         expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
       },
     },
-    // ── 5. Google Fonts — CacheFirst ──
+    // ── 6. Google Fonts — CacheFirst ──
     {
       urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*$/i,
       handler: "CacheFirst",
@@ -48,7 +53,7 @@ const withPWA = require("next-pwa")({
         expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
       },
     },
-    // ── 6. Stripe JS — NetworkOnly (PCI compliance) ──
+    // ── 7. Stripe JS — NetworkOnly (PCI compliance) ──
     {
       urlPattern: /^https:\/\/js\.stripe\.com\/.*$/i,
       handler: "NetworkOnly",
