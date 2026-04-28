@@ -131,15 +131,16 @@ def create_checkout(
         }
 
     kwargs = dict(
-        amount=amount_cents,
-        currency="usd",
-        metadata={
-            "order_id":  order.id,
-            "buyer_id":  current_user.id,
-            "store_id":  store.id,
-        },
-        automatic_payment_methods={"enabled": True},
-    )
+    amount=amount_cents,
+    currency="usd",
+    metadata={
+        "order_id":  order.id,
+        "buyer_id":  current_user.id,
+        "store_id":  store.id,
+    },
+    automatic_payment_methods={"enabled": True},
+    automatic_tax={"enabled": True},
+   )
 
     # Add shipping address if available
     if shipping_details:
