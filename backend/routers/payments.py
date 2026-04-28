@@ -117,9 +117,6 @@ def create_checkout(
           f"store={store.id} stripe_acct={store.stripe_account_id} "
           f"onboarded={store.stripe_onboarding_complete}")
 
-    # ── Build shipping address for Stripe Tax ──────────────────
-    # Stripe Tax needs the buyer's shipping address to calculate
-    # the correct sales tax rate for their state/city.
     shipping_details = None
     if order.shipping_address and order.shipping_state:
         shipping_details = {
@@ -133,18 +130,18 @@ def create_checkout(
             "name": order.shipping_name or "Customer",
         }
 
-   kwargs = dict(
-    amount=amount_cents,
-    currency="usd",
-    metadata={
-        "order_id":  order.id,
-        "buyer_id":  current_user.id,
-        "store_id":  store.id,
-    },
-    automatic_payment_methods={"enabled": True},
-)
+    kwargs = dict(
+        amount=amount_cents,
+        currency="usd",
+        metadata={
+            "order_id":  order.id,
+            "buyer_id":  current_user.id,
+            "store_id":  store.id,
+        },
+        automatic_payment_methods={"enabled": True},
+    )
 
-    # Add shipping address for tax calculation if available
+    # Add shipping address if available
     if shipping_details:
         kwargs["shipping"] = shipping_details
 
@@ -198,12 +195,6 @@ async def stripe_webhook(
                 order.status = models.OrderStatus.paid
                 order.stripe_charge_id = pi.get("latest_charge")
 
-                # Save tax amount if Stripe Tax collected any
-                tax_cents = 0
-                for charge_detail in pi.get("charges", {}).get("data", []):
-                    billing_details = charge_detail.get("billing_details", {})
-                    break
-                # Stripe Tax stores collected amount in payment_intent directly
                 try:
                     tax_cents = pi.get("amount_details", {}).get("tip", {}).get("amount", 0) or 0
                 except Exception:
