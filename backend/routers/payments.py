@@ -130,17 +130,28 @@ def create_checkout(
             "name": order.shipping_name or "Customer",
         }
 
+    # Manual tax calculation — 8.6% for Arizona, $0 everywhere else
+    AZ_TAX_RATE = 0.086
+    tax_amount = 0.0
+    if order.shipping_state and order.shipping_state.upper() in ["AZ", "ARIZONA"]:
+        tax_amount = round(order_total * AZ_TAX_RATE, 2)
+        print(f"[Checkout] AZ tax: ${tax_amount:.2f}")
+
+    taxed_total = order_total + tax_amount
+    amount_cents = int(taxed_total * 100)
+    platform_fee_cents = int(order_platform_fee * 100)
+
     kwargs = dict(
-    amount=amount_cents,
-    currency="usd",
-    metadata={
-        "order_id":  order.id,
-        "buyer_id":  current_user.id,
-        "store_id":  store.id,
-    },
-    automatic_payment_methods={"enabled": True},
-    automatic_tax={"enabled": True},
-   )
+        amount=amount_cents,
+        currency="usd",
+        metadata={
+            "order_id":  order.id,
+            "buyer_id":  current_user.id,
+            "store_id":  store.id,
+            "tax_amount": str(tax_amount),
+        },
+        automatic_payment_methods={"enabled": True},
+    )
 
     # Add shipping address if available
     if shipping_details:
