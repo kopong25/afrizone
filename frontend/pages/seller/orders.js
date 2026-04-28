@@ -45,7 +45,7 @@ export default function SellerOrders() {
   const [orders, setOrders] = useState([]);
   const [myStore, setMyStore] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState("paid");
   const [expanded, setExpanded] = useState(null);
   const [updating, setUpdating] = useState(null);
   const [trackingInputs, setTrackingInputs] = useState({});
@@ -265,7 +265,7 @@ export default function SellerOrders() {
         )}
 
         <div className="flex gap-2 mb-6 flex-wrap">
-          {["all", "pending", "paid", "processing", "shipped", "delivered", "cancelled"].map(s => (
+          {["all", "paid", "processing", "shipped", "delivered", "cancelled"].map(s => (
             <button key={s} onClick={() => setFilter(s)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all capitalize ${
                 filter === s ? "bg-green-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
