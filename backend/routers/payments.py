@@ -142,10 +142,10 @@ def create_checkout(
             "store_id":  store.id,
         },
         automatic_payment_methods={"enabled": True},
-        # ── Stripe Tax: automatically calculates sales tax ─────
-        # Only charged for Arizona buyers (our registered nexus state).
-        # Stripe will add the correct tax on top of the order total.
-        # Tax amount is visible to customer on the payment screen.
+        # ── Stripe Tax ─────────────────────────────────────────
+        # Automatically calculates & collects sales tax.
+        # Arizona buyers pay ~8-10% tax. Other states: $0.
+        automatic_tax={"enabled": True},
     )
 
     # Add shipping address for tax calculation if available
