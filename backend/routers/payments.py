@@ -132,6 +132,7 @@ def create_checkout(
 
     # Manual tax calculation — 8.6% for Arizona, $0 everywhere else
     AZ_TAX_RATE = 0.086
+    print(f"[Checkout] shipping_state='{order.shipping_state}' shipping_city='{order.shipping_city}'")
     tax_amount = 0.0
     if order.shipping_state and order.shipping_state.upper() in ["AZ", "ARIZONA"]:
         tax_amount = round(order_total * AZ_TAX_RATE, 2)
