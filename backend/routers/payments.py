@@ -86,7 +86,6 @@ def create_checkout(
             return {"client_secret": pi.client_secret, "payment_intent_id": pi.id}
         except Exception as e:
             print(f"[Checkout] Failed to retrieve existing PaymentIntent: {e}")
-            # Fall through to create a new one
 
     store = db.query(models.Store).filter(models.Store.id == order.store_id).first()
     if not store:
@@ -96,7 +95,6 @@ def create_checkout(
     order_total = order.total or 0
     order_platform_fee = order.platform_fee or 0
 
-    # Recalculate from subtotal + shipping if total is 0 or missing
     if order_total <= 0:
         subtotal = order.subtotal or sum(
             (i.unit_price or 0) * (i.quantity or 1) for i in (order.items or [])
@@ -108,7 +106,6 @@ def create_checkout(
     if order_total <= 0:
         raise HTTPException(status_code=400, detail="Order total is $0 — cannot process payment")
 
-    # Recalculate platform fee if missing
     if order_platform_fee <= 0:
         order_platform_fee = round(order_total * (PLATFORM_FEE_PERCENT / 100), 2)
         print(f"[Checkout] order.platform_fee was missing — recalculated: ${order_platform_fee:.2f}")
@@ -120,16 +117,40 @@ def create_checkout(
           f"store={store.id} stripe_acct={store.stripe_account_id} "
           f"onboarded={store.stripe_onboarding_complete}")
 
+    # ── Build shipping address for Stripe Tax ──────────────────
+    # Stripe Tax needs the buyer's shipping address to calculate
+    # the correct sales tax rate for their state/city.
+    shipping_details = None
+    if order.shipping_address and order.shipping_state:
+        shipping_details = {
+            "address": {
+                "line1":       order.shipping_address or "",
+                "city":        order.shipping_city    or "",
+                "state":       order.shipping_state   or "",
+                "postal_code": order.shipping_zip     or "",
+                "country":     "US",
+            },
+            "name": order.shipping_name or "Customer",
+        }
+
     kwargs = dict(
         amount=amount_cents,
         currency="usd",
         metadata={
-            "order_id": order.id,
-            "buyer_id": current_user.id,
-            "store_id": store.id,
+            "order_id":  order.id,
+            "buyer_id":  current_user.id,
+            "store_id":  store.id,
         },
         automatic_payment_methods={"enabled": True},
+        # ── Stripe Tax: automatically calculates sales tax ─────
+        # Only charged for Arizona buyers (our registered nexus state).
+        # Stripe will add the correct tax on top of the order total.
+        # Tax amount is visible to customer on the payment screen.
     )
+
+    # Add shipping address for tax calculation if available
+    if shipping_details:
+        kwargs["shipping"] = shipping_details
 
     # Use Connect transfer only if seller has completed Stripe onboarding
     if store.stripe_account_id and store.stripe_onboarding_complete:
@@ -150,7 +171,10 @@ def create_checkout(
     db.commit()
 
     print(f"[Checkout] PaymentIntent created: {payment_intent.id}")
-    return {"client_secret": payment_intent.client_secret, "payment_intent_id": payment_intent.id}
+    return {
+        "client_secret":      payment_intent.client_secret,
+        "payment_intent_id":  payment_intent.id,
+    }
 
 
 # ─── WEBHOOK ──────────────────────────────────────────────────
@@ -177,6 +201,21 @@ async def stripe_webhook(
             if order and order.status == models.OrderStatus.pending:
                 order.status = models.OrderStatus.paid
                 order.stripe_charge_id = pi.get("latest_charge")
+
+                # Save tax amount if Stripe Tax collected any
+                tax_cents = 0
+                for charge_detail in pi.get("charges", {}).get("data", []):
+                    billing_details = charge_detail.get("billing_details", {})
+                    break
+                # Stripe Tax stores collected amount in payment_intent directly
+                try:
+                    tax_cents = pi.get("amount_details", {}).get("tip", {}).get("amount", 0) or 0
+                except Exception:
+                    tax_cents = 0
+                if tax_cents:
+                    order.tax_amount = round(tax_cents / 100, 2)
+                    print(f"[Webhook] Tax collected: ${order.tax_amount:.2f} for order #{order.id}")
+
                 store = db.query(models.Store).filter(models.Store.id == order.store_id).first()
                 payout = models.Payout(
                     store_id=order.store_id, order_id=order.id,
