@@ -133,20 +133,16 @@ def create_checkout(
             "name": order.shipping_name or "Customer",
         }
 
-    kwargs = dict(
-        amount=amount_cents,
-        currency="usd",
-        metadata={
-            "order_id":  order.id,
-            "buyer_id":  current_user.id,
-            "store_id":  store.id,
-        },
-        automatic_payment_methods={"enabled": True},
-        # ── Stripe Tax ─────────────────────────────────────────
-        # Automatically calculates & collects sales tax.
-        # Arizona buyers pay ~8-10% tax. Other states: $0.
-        automatic_tax={"enabled": True},
-    )
+   kwargs = dict(
+    amount=amount_cents,
+    currency="usd",
+    metadata={
+        "order_id":  order.id,
+        "buyer_id":  current_user.id,
+        "store_id":  store.id,
+    },
+    automatic_payment_methods={"enabled": True},
+)
 
     # Add shipping address for tax calculation if available
     if shipping_details:
