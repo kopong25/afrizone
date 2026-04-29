@@ -152,7 +152,7 @@ class Store(Base):
 
     # Relationships
     owner = relationship("User", back_populates="store")
-    products = relationship("Product", back_populates="products")
+    products = relationship("Product", back_populates="store")
     orders = relationship("Order", back_populates="store")
     payouts = relationship("Payout", back_populates="store")
 
