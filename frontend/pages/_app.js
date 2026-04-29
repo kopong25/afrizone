@@ -35,7 +35,7 @@ export const getUTM = () => {
 export const saveUTM = () => {
   const utm = getUTM();
   if (utm.source && typeof window !== "undefined") {
-    sessionStorage.setItem("utm", JSON.stringify(utm));
+    try { sessionStorage.setItem("utm", JSON.stringify(utm)); } catch {}
   }
 };
 
@@ -44,6 +44,41 @@ export const getSavedUTM = () => {
     return JSON.parse(sessionStorage.getItem("utm") || "{}");
   } catch { return {}; }
 };
+
+// ── Cookie helpers (survives Edge Tracking Prevention) ─────────
+// These are the canonical read/write functions for the auth token.
+// localStorage and sessionStorage are used as secondary fallbacks only.
+
+const TOKEN_COOKIE = "afrizone_token";
+const TOKEN_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+
+function writeCookieToken(tok: string) {
+  try {
+    document.cookie = `${TOKEN_COOKIE}=${encodeURIComponent(tok)}; path=/; max-age=${TOKEN_MAX_AGE}; SameSite=Lax`;
+  } catch {}
+}
+
+function readCookieToken(): string | null {
+  try {
+    const m = document.cookie.match(/(?:^|;\s*)afrizone_token=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  } catch { return null; }
+}
+
+function clearCookieToken() {
+  try {
+    document.cookie = `${TOKEN_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+  } catch {}
+}
+
+// Reads token from cookie first, then falls back to lib/api's loadStoredToken
+// (which checks localStorage). This order is important — cookies survive
+// Edge's Tracking Prevention; localStorage does not when navigating cross-page.
+function resolveStoredToken(): string | null {
+  const cookieTok = readCookieToken();
+  if (cookieTok) return cookieTok;
+  try { return loadStoredToken(); } catch { return null; }
+}
 
 // ── Pages that skip the install wall ───────────────────────────
 const WALL_BYPASS_PAGES = [
@@ -66,15 +101,21 @@ function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = loadStoredToken();
+    // Prefer cookie token so Edge Tracking Prevention doesn't break auth
+    const stored = resolveStoredToken();
     if (stored) {
       setToken(stored);
       setAuthToken(stored);
+      // Also backfill the cookie in case it was only in localStorage
+      writeCookieToken(stored);
       authAPI.me()
         .then((res) => setUser(res.data))
         .catch((err) => {
           if (err.response?.status === 401) {
+            // Token is invalid/expired — clear everything
+            clearCookieToken();
             setUser(null);
+            setToken(null);
           }
         })
         .finally(() => setLoading(false));
@@ -83,16 +124,23 @@ function AuthProvider({ children }) {
     }
   }, []);
 
-  const login = (tok, userData) => {
+  const login = (tok: string, userData: any) => {
     setAuthToken(tok);
     setToken(tok);
     setUser(userData);
+    // Write to cookie — this is the primary storage, safe from Edge Tracking Prevention
+    writeCookieToken(tok);
+    // Also write to sessionStorage as secondary fallback
+    try { sessionStorage.setItem("az_tok", tok); } catch {}
   };
 
   const logout = () => {
     setAuthToken(null);
     setToken(null);
     setUser(null);
+    clearCookieToken();
+    try { sessionStorage.removeItem("az_tok"); } catch {}
+    try { localStorage.removeItem("afrizone_token"); } catch {}
     window.location.href = "/";
   };
 
