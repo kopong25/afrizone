@@ -358,11 +358,29 @@ export default function CartPage() {
           delivery_fee: shippingCost || 0,
           uber_quote_id: selectedDelivery?.quote_id || null,
         };
+
+        // ── FIX: await the POST and safely extract the order ID ──
         const r = await api.post("/orders/", orderPayload, { headers: authHeaders });
-        createdOrders.push(r.data);
+
+        // Defensively resolve ID across common response shapes:
+        // { id: 204 }  |  { order: { id: 204 } }  |  { order_id: 204 }
+        const orderId = r.data?.id ?? r.data?.order?.id ?? r.data?.order_id;
+
+        if (!orderId) {
+          console.error("[Order Error] Could not extract order ID from response:", r.data);
+          toast.error("Order was placed but we couldn't get the order ID. Check your orders.");
+          router.push("/orders");
+          setCheckingOut(false);
+          return;
+        }
+
+        createdOrders.push({ ...r.data, id: orderId });
       }
+
+      // Clear cart only after all orders are confirmed created
       try { await api.delete("/orders/cart/clear", { headers: authHeaders }); } catch {}
       setItems([]);
+
       if (createdOrders.length > 0) {
         router.push(`/checkout?order_id=${createdOrders[0].id}`);
       } else {
