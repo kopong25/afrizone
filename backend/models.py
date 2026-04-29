@@ -31,13 +31,17 @@ class SellerStatus(str, enum.Enum):
 
 
 class OrderStatus(str, enum.Enum):
-    pending = "pending"
-    paid = "paid"
-    processing = "processing"
-    shipped = "shipped"
-    delivered = "delivered"
-    cancelled = "cancelled"
-    refunded = "refunded"
+    # ── Pre-payment (invisible to seller) ────────────────────────────────
+    awaiting_payment = "awaiting_payment"   # ← ADDED: order created, Stripe not paid yet
+    payment_failed   = "payment_failed"     # ← ADDED: Stripe charge failed / intent expired
+    # ── Post-payment (seller-visible) ────────────────────────────────────
+    pending     = "pending"      # paid, awaiting seller action  ← was the default, now post-payment
+    paid        = "paid"         # legacy alias kept for compatibility
+    processing  = "processing"
+    shipped     = "shipped"
+    delivered   = "delivered"
+    cancelled   = "cancelled"
+    refunded    = "refunded"
 
 
 class PayoutStatus(str, enum.Enum):
@@ -148,7 +152,7 @@ class Store(Base):
 
     # Relationships
     owner = relationship("User", back_populates="store")
-    products = relationship("Product", back_populates="store")
+    products = relationship("Product", back_populates="products")
     orders = relationship("Order", back_populates="store")
     payouts = relationship("Payout", back_populates="store")
 
@@ -261,7 +265,9 @@ class Order(Base):
     currency = Column(String, default="USD")
 
     # Status
-    status = Column(Enum(OrderStatus, native_enum=False), default=OrderStatus.pending)
+    # Default is now awaiting_payment — order is NOT visible to seller until
+    # the Stripe webhook (payment_intent.succeeded) flips it to "pending".
+    status = Column(Enum(OrderStatus, native_enum=False), default=OrderStatus.awaiting_payment)
 
     # Shipping address
     shipping_name = Column(String, nullable=True)
@@ -284,13 +290,7 @@ class Order(Base):
     # Delivery
     delivery_method = Column(String, nullable=True)
     delivery_fee    = Column(Float,  nullable=True)
-
-    # ── FIX: store the Shippo rate object_id chosen at checkout ──────────
-    # This is the rate_id returned by /delivery/delivery-options.
-    # Passing it to Shippo when creating a label guarantees the label cost
-    # matches the quoted price exactly — no recalculation, no surprise charges.
     shippo_rate_id  = Column(String, nullable=True)
-    # ─────────────────────────────────────────────────────────────────────
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

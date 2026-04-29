@@ -76,14 +76,21 @@ def create_checkout(
     ).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if order.status not in [models.OrderStatus.pending, models.OrderStatus.paid]:
-        raise HTTPException(status_code=400, detail="Order already processed")
 
-    # Return existing payment intent if already created
+    # FIXED: only awaiting_payment orders should reach checkout.
+    # "pending" now means already paid — retrying payment on a paid order
+    # would double-charge the customer.
+    if order.status not in [models.OrderStatus.awaiting_payment]:
+        if order.status in [models.OrderStatus.pending, models.OrderStatus.paid]:
+            raise HTTPException(status_code=400, detail="This order has already been paid.")
+        raise HTTPException(status_code=400, detail=f"Order cannot be checked out (status: {order.status})")
+
+    # Return existing payment intent if already created (customer refreshed page etc.)
     if order.stripe_payment_intent_id:
         try:
             pi = stripe.PaymentIntent.retrieve(order.stripe_payment_intent_id)
-            return {"client_secret": pi.client_secret, "payment_intent_id": pi.id}
+            if pi.status not in ("canceled", "succeeded"):
+                return {"client_secret": pi.client_secret, "payment_intent_id": pi.id}
         except Exception as e:
             print(f"[Checkout] Failed to retrieve existing PaymentIntent: {e}")
 
@@ -109,9 +116,6 @@ def create_checkout(
     if order_platform_fee <= 0:
         order_platform_fee = round(order_total * (PLATFORM_FEE_PERCENT / 100), 2)
         print(f"[Checkout] order.platform_fee was missing — recalculated: ${order_platform_fee:.2f}")
-
-    amount_cents = int(order_total * 100)
-    platform_fee_cents = int(order_platform_fee * 100)
 
     print(f"[Checkout] order_id={order.id} total=${order_total:.2f} fee=${order_platform_fee:.2f} "
           f"store={store.id} stripe_acct={store.stripe_account_id} "
@@ -146,19 +150,17 @@ def create_checkout(
         amount=amount_cents,
         currency="usd",
         metadata={
-            "order_id":  order.id,
-            "buyer_id":  current_user.id,
-            "store_id":  store.id,
+            "order_id":   str(order.id),   # always pass as string for webhook safety
+            "buyer_id":   str(current_user.id),
+            "store_id":   str(store.id),
             "tax_amount": str(tax_amount),
         },
         automatic_payment_methods={"enabled": True},
     )
 
-    # Add shipping address if available
     if shipping_details:
         kwargs["shipping"] = shipping_details
 
-    # Use Connect transfer only if seller has completed Stripe onboarding
     if store.stripe_account_id and store.stripe_onboarding_complete:
         kwargs["application_fee_amount"] = platform_fee_cents
         kwargs["transfer_data"] = {"destination": store.stripe_account_id}
@@ -178,8 +180,8 @@ def create_checkout(
 
     print(f"[Checkout] PaymentIntent created: {payment_intent.id}")
     return {
-        "client_secret":      payment_intent.client_secret,
-        "payment_intent_id":  payment_intent.id,
+        "client_secret":     payment_intent.client_secret,
+        "payment_intent_id": payment_intent.id,
     }
 
 
@@ -200,12 +202,16 @@ async def stripe_webhook(
     try:
         etype = event["type"]
 
+        # ── Payment succeeded ─────────────────────────────────────────────
         if etype == "payment_intent.succeeded":
             pi = event["data"]["object"]
             order_id = int(pi["metadata"].get("order_id", 0))
             order = db.query(models.Order).filter(models.Order.id == order_id).first()
-            if order and order.status == models.OrderStatus.pending:
-                order.status = models.OrderStatus.paid
+
+            if order and order.status == models.OrderStatus.awaiting_payment:
+                # FIXED: gate is now awaiting_payment → pending (was pending → paid).
+                # "pending" is the new seller-visible paid state.
+                order.status = models.OrderStatus.pending
                 order.stripe_charge_id = pi.get("latest_charge")
 
                 try:
@@ -217,6 +223,8 @@ async def stripe_webhook(
                     print(f"[Webhook] Tax collected: ${order.tax_amount:.2f} for order #{order.id}")
 
                 store = db.query(models.Store).filter(models.Store.id == order.store_id).first()
+
+                # Create payout record only after confirmed payment
                 payout = models.Payout(
                     store_id=order.store_id, order_id=order.id,
                     amount=order.seller_amount, currency="USD",
@@ -224,9 +232,14 @@ async def stripe_webhook(
                 )
                 db.add(payout)
                 db.commit()
+
+                # Notify buyer + seller — both fire here, after payment confirmed
                 try:
                     from utils.email import send_order_confirmation, send_new_order_to_seller
-                    email_items = [{"name": i.product.name, "quantity": i.quantity, "price": i.unit_price} for i in order.items]
+                    email_items = [
+                        {"name": i.product.name, "quantity": i.quantity, "price": i.unit_price}
+                        for i in order.items
+                    ]
                     buyer = db.query(models.User).filter(models.User.id == order.buyer_id).first()
                     if buyer:
                         send_order_confirmation(
@@ -250,6 +263,7 @@ async def stripe_webhook(
                             seller_amount=order.seller_amount,
                             buyer_name=buyer.full_name if buyer else "Customer",
                         )
+                    # Push notification to seller
                     try:
                         from routers.push_notifications import send_push_to_user
                         if store and store.owner_id:
@@ -257,7 +271,7 @@ async def stripe_webhook(
                                 user_id=store.owner_id,
                                 title=f"🛒 New Order #{order.id}",
                                 body=f"{buyer.full_name if buyer else 'Customer'} ordered ${order.total:.2f} — tap to view",
-                                url=f"/seller/orders",
+                                url="/seller/orders",
                                 db=db
                             )
                     except Exception as pe:
@@ -265,14 +279,23 @@ async def stripe_webhook(
                 except Exception as e:
                     print(f"Email error: {e}")
 
+            elif order and order.status == models.OrderStatus.pending:
+                # payment_intent.succeeded fired twice (rare but possible) — ignore safely
+                print(f"[Webhook] payment_intent.succeeded for already-paid order #{order_id} — skipping")
+
+        # ── Payment failed ────────────────────────────────────────────────
         elif etype == "payment_intent.payment_failed":
             pi = event["data"]["object"]
             order_id = int(pi["metadata"].get("order_id", 0))
             order = db.query(models.Order).filter(models.Order.id == order_id).first()
-            if order:
-                order.status = models.OrderStatus.cancelled
+            if order and order.status == models.OrderStatus.awaiting_payment:
+                # FIXED: was setting to cancelled. Now uses payment_failed so the
+                # buyer can retry and the seller dashboard never surfaces this order.
+                order.status = models.OrderStatus.payment_failed
                 db.commit()
+                print(f"[Webhook] Payment failed for order #{order_id}")
 
+        # ── Stripe Connect account updated ────────────────────────────────
         elif etype == "account.updated":
             acct = event["data"]["object"]
             store = db.query(models.Store).filter(models.Store.stripe_account_id == acct["id"]).first()
@@ -280,6 +303,7 @@ async def stripe_webhook(
                 store.stripe_onboarding_complete = True
                 db.commit()
 
+        # ── Subscription lifecycle ────────────────────────────────────────
         elif etype in ["customer.subscription.updated", "customer.subscription.deleted"]:
             sub = event["data"]["object"]
             store_id = int(sub["metadata"].get("store_id", 0))
