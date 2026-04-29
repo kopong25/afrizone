@@ -13,7 +13,7 @@ function _write(token) {
     if (token) {
       const isProd = typeof window !== "undefined" && window.location.protocol === "https:";
       // ✅ FIX 1: Extended from 7 → 365 days so login persists for a full year
-      Cookies.set("afrizone_token", token, { expires: 365, sameSite: isProd ? "None" : "Lax", secure: isProd });
+      Cookies.set("afrizone_token", token, { expires: 365, sameSite: "Lax", secure: isProd });
     } else {
       Cookies.remove("afrizone_token");
     }
