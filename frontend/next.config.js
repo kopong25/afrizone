@@ -5,12 +5,16 @@ const withPWA = require("next-pwa")({
   reloadOnOnline: false,
   disable: process.env.NODE_ENV === "development",
   cacheOnFrontEndNav: false,
-  // ── FIX: exclude checkout from service worker caching entirely ──
   exclude: [
     /\/checkout/,
     /\/cart/,
   ],
   runtimeCaching: [
+    // ── 0. FIRST: exclude checkout and cart from SW entirely ──
+    {
+      urlPattern: /\/(checkout|cart)(\?.*)?$/i,
+      handler: "NetworkOnly",
+    },
     // ── 1. Your own pages — NetworkFirst, short timeout ──
     {
       urlPattern: /^https:\/\/afrizoneshop\.com\/.*$/i,
