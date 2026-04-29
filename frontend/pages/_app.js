@@ -46,19 +46,16 @@ export const getSavedUTM = () => {
 };
 
 // ── Cookie helpers (survives Edge Tracking Prevention) ─────────
-// These are the canonical read/write functions for the auth token.
-// localStorage and sessionStorage are used as secondary fallbacks only.
-
 const TOKEN_COOKIE = "afrizone_token";
 const TOKEN_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
-function writeCookieToken(tok: string) {
+function writeCookieToken(tok) {
   try {
     document.cookie = `${TOKEN_COOKIE}=${encodeURIComponent(tok)}; path=/; max-age=${TOKEN_MAX_AGE}; SameSite=Lax`;
   } catch {}
 }
 
-function readCookieToken(): string | null {
+function readCookieToken() {
   try {
     const m = document.cookie.match(/(?:^|;\s*)afrizone_token=([^;]+)/);
     return m ? decodeURIComponent(m[1]) : null;
@@ -71,10 +68,8 @@ function clearCookieToken() {
   } catch {}
 }
 
-// Reads token from cookie first, then falls back to lib/api's loadStoredToken
-// (which checks localStorage). This order is important — cookies survive
-// Edge's Tracking Prevention; localStorage does not when navigating cross-page.
-function resolveStoredToken(): string | null {
+// Cookie first, then localStorage fallback
+function resolveStoredToken() {
   const cookieTok = readCookieToken();
   if (cookieTok) return cookieTok;
   try { return loadStoredToken(); } catch { return null; }
@@ -101,18 +96,16 @@ function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Prefer cookie token so Edge Tracking Prevention doesn't break auth
     const stored = resolveStoredToken();
     if (stored) {
       setToken(stored);
       setAuthToken(stored);
-      // Also backfill the cookie in case it was only in localStorage
+      // Backfill cookie in case token was only in localStorage
       writeCookieToken(stored);
       authAPI.me()
         .then((res) => setUser(res.data))
         .catch((err) => {
           if (err.response?.status === 401) {
-            // Token is invalid/expired — clear everything
             clearCookieToken();
             setUser(null);
             setToken(null);
@@ -124,14 +117,12 @@ function AuthProvider({ children }) {
     }
   }, []);
 
-  const login = (tok: string, userData: any) => {
+  const login = (tok, userData) => {
     setAuthToken(tok);
     setToken(tok);
     setUser(userData);
-    // Write to cookie — this is the primary storage, safe from Edge Tracking Prevention
-    writeCookieToken(tok);
-    // Also write to sessionStorage as secondary fallback
-    try { sessionStorage.setItem("az_tok", tok); } catch {}
+    writeCookieToken(tok); // primary — Edge-safe
+    try { sessionStorage.setItem("az_tok", tok); } catch {} // secondary fallback
   };
 
   const logout = () => {
