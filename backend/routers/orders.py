@@ -488,11 +488,16 @@ def get_order(
             raise HTTPException(status_code=404, detail="Order not found")
 
     if not (is_buyer or is_seller or is_admin):
-        print(f"[get_order] ACCESS DENIED — buyer_id={order.buyer_id} user_id={current_user.id} is_seller={is_seller}")
         raise HTTPException(status_code=403, detail="Access denied")
 
-    return order
+    try:
+        schemas.OrderOut.model_validate(order)
+        print(f"[get_order] Serialization OK")
+    except Exception as e:
+        print(f"[get_order] SERIALIZATION ERROR: {e}")
+        raise HTTPException(status_code=500, detail=f"Serialization failed: {str(e)}")
 
+    return order
 
 @router.put("/{order_id}/status", response_model=schemas.OrderOut)
 def update_order_status(
