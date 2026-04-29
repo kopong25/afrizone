@@ -466,21 +466,31 @@ def get_order(
     db:           Session     = Depends(get_db),
     current_user: models.User = Depends(auth_utils.get_current_user),
 ):
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    order = db.query(models.Order).options(
+        joinedload(models.Order.items)
+            .joinedload(models.OrderItem.product)
+            .joinedload(models.Product.store),
+        joinedload(models.Order.store),
+    ).filter(models.Order.id == order_id).first()
+
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    print(f"[get_order] order.buyer_id={order.buyer_id} current_user.id={current_user.id}")
+
     is_buyer  = order.buyer_id == current_user.id
     store     = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     is_seller = store and order.store_id == store.id
-    is_admin  = current_user.role == models.UserRole.admin
+    is_admin  = getattr(current_user, "role", None) == models.UserRole.admin
 
-    # Sellers can only access orders that have been paid
     if is_seller and not is_admin:
         if order.status not in SELLER_VISIBLE_STATUSES:
-            raise HTTPException(status_code=404, detail="Order not found")  # ← don't reveal existence
+            raise HTTPException(status_code=404, detail="Order not found")
 
     if not (is_buyer or is_seller or is_admin):
+        print(f"[get_order] ACCESS DENIED — buyer_id={order.buyer_id} user_id={current_user.id} is_seller={is_seller}")
         raise HTTPException(status_code=403, detail="Access denied")
+
     return order
 
 
