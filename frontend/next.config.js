@@ -5,6 +5,11 @@ const withPWA = require("next-pwa")({
   reloadOnOnline: false,
   disable: process.env.NODE_ENV === "development",
   cacheOnFrontEndNav: false,
+  // ── FIX: exclude checkout from service worker caching entirely ──
+  exclude: [
+    /\/checkout/,
+    /\/cart/,
+  ],
   runtimeCaching: [
     // ── 1. Your own pages — NetworkFirst, short timeout ──
     {
@@ -16,12 +21,17 @@ const withPWA = require("next-pwa")({
         expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
       },
     },
-    // ── 2. Backend API — NetworkOnly (never cache) ──
+    // ── 2. Backend API (new domain) — NetworkOnly (never cache) ──
+    {
+      urlPattern: /^https:\/\/api\.afrizoneshop\.com\/.*$/i,
+      handler: "NetworkOnly",
+    },
+    // ── 3. Backend API (old domain fallback) — NetworkOnly ──
     {
       urlPattern: /^https:\/\/afrizone-loqr\.onrender\.com\/.*$/i,
       handler: "NetworkOnly",
     },
-    // ── 3. Google Analytics — NetworkOnly ──
+    // ── 4. Google Analytics — NetworkOnly ──
     {
       urlPattern: /^https:\/\/www\.googletagmanager\.com\/.*$/i,
       handler: "NetworkOnly",
@@ -30,12 +40,12 @@ const withPWA = require("next-pwa")({
       urlPattern: /^https:\/\/www\.google-analytics\.com\/.*$/i,
       handler: "NetworkOnly",
     },
-    // ── 4. Microsoft Clarity — NetworkOnly ──
+    // ── 5. Microsoft Clarity — NetworkOnly ──
     {
       urlPattern: /^https:\/\/www\.clarity\.ms\/.*$/i,
       handler: "NetworkOnly",
     },
-    // ── 5. Cloudinary images — CacheFirst ──
+    // ── 6. Cloudinary images — CacheFirst ──
     {
       urlPattern: /^https:\/\/res\.cloudinary\.com\/.*$/i,
       handler: "CacheFirst",
@@ -44,7 +54,7 @@ const withPWA = require("next-pwa")({
         expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
       },
     },
-    // ── 6. Google Fonts — CacheFirst ──
+    // ── 7. Google Fonts — CacheFirst ──
     {
       urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*$/i,
       handler: "CacheFirst",
@@ -53,7 +63,7 @@ const withPWA = require("next-pwa")({
         expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
       },
     },
-    // ── 7. Stripe JS — NetworkOnly (PCI compliance) ──
+    // ── 8. Stripe JS — NetworkOnly (PCI compliance) ──
     {
       urlPattern: /^https:\/\/js\.stripe\.com\/.*$/i,
       handler: "NetworkOnly",
