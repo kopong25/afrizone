@@ -240,7 +240,7 @@ class ProductListOut(BaseModel):
     stock: int
     is_featured: bool
     tags: List[str] = []
-    store_id: int
+    store_id: Optional[int] = None
     store: Optional[StoreMinimal] = None
     created_at: datetime
 
@@ -305,23 +305,25 @@ class OrderItemOut(BaseModel):
 
 class OrderOut(BaseModel):
     id: int
-    subtotal: float
-    shipping_cost: float
-    platform_fee: float
-    seller_amount: float
-    total: float
-    currency: str
+    subtotal: float = 0.0
+    shipping_cost: float = 0.0
+    platform_fee: float = 0.0
+    seller_amount: float = 0.0
+    total: float = 0.0
+    currency: str = "USD"
     status: OrderStatus
-    shipping_name: Optional[str]
-    shipping_address: Optional[str]
-    shipping_city: Optional[str]
-    shipping_country: Optional[str]
-    tracking_number: Optional[str]
-    tracking_url: Optional[str]
-    stripe_payment_intent_id: Optional[str]
+    shipping_name: Optional[str] = None
+    shipping_address: Optional[str] = None
+    shipping_city: Optional[str] = None
+    shipping_state: Optional[str] = None
+    shipping_zip: Optional[str] = None
+    shipping_country: Optional[str] = None
+    tracking_number: Optional[str] = None
+    tracking_url: Optional[str] = None
+    stripe_payment_intent_id: Optional[str] = None
     delivery_method: Optional[str] = None
     delivery_fee: Optional[float] = None
-    items: List[OrderItemOut]
+    items: List[OrderItemOut] = []
     store: Optional[StoreOut] = None
     created_at: datetime
 
