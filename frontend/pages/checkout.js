@@ -6,14 +6,14 @@ import Footer from "../components/layout/Footer";
 import { useAuth } from "./_app";
 import api from "../lib/api";
 import toast from "react-hot-toast";
-import { FiLock, FiArrowLeft, FiCheck } from "react-icons/fi";
+import { FiLock, FiArrowLeft } from "react-icons/fi";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "");
 
 // ─── Inner Payment Form ───────────────────────────────────────
-function PaymentForm({ orderId, total, onSuccess }) {
+function PaymentForm({ orderId, total }) {
   const stripe = useStripe();
   const elements = useElements();
   const [paying, setPaying] = useState(false);
@@ -39,7 +39,6 @@ function PaymentForm({ orderId, total, onSuccess }) {
       setError(confirmError.message);
       setPaying(false);
     }
-    // On success Stripe redirects to return_url
   };
 
   return (
@@ -62,30 +61,49 @@ function PaymentForm({ orderId, total, onSuccess }) {
 export default function CheckoutPage() {
   const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
-  const { order_id } = router.query;
+
+  // ── FIX: also read `tok` from URL — passed by cart.js to bypass Edge storage blocking ──
+  const { order_id, tok: urlToken } = router.query;
 
   const [order, setOrder] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ── FIX: delay 100ms so token is available after redirect from cart ──
   useEffect(() => {
     if (authLoading) return;
-    if (!user) { router.push("/login?redirect=/checkout?order_id=" + order_id); return; }
     if (!order_id) return;
-    setTimeout(() => initPayment(token), 100);
-  }, [user, order_id, authLoading]);
+    // Allow urlToken to bypass auth check — it proves identity on its own
+    if (!user && !urlToken) {
+      router.push("/login?redirect=/checkout?order_id=" + order_id);
+      return;
+    }
+    setTimeout(() => initPayment(), 100);
+  }, [user, order_id, authLoading, urlToken]);
 
-  const initPayment = async (authToken) => {
-    // ── FIX: resolve token from all sources — mirrors cart.js fallback chain ──
-    let resolvedToken = authToken;
+  const initPayment = async () => {
+    // ── Resolve token: URL first (Edge-safe), then all storage fallbacks ──
+    let resolvedToken = null;
+
+    // 1. URL token — always works, not blocked by Edge
+    if (urlToken) {
+      try { resolvedToken = decodeURIComponent(urlToken); } catch { resolvedToken = urlToken; }
+    }
+
+    // 2. Auth context token
+    if (!resolvedToken) resolvedToken = token || null;
+
+    // 3. sessionStorage
     if (!resolvedToken) {
       try { resolvedToken = sessionStorage.getItem("az_tok"); } catch {}
     }
+
+    // 4. localStorage
     if (!resolvedToken) {
       try { resolvedToken = localStorage.getItem("afrizone_token"); } catch {}
     }
+
+    // 5. Cookie
     if (!resolvedToken) {
       try {
         const m = document.cookie.match(/(?:^|;\s*)afrizone_token=([^;]+)/);

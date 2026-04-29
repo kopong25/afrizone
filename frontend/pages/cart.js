@@ -76,7 +76,6 @@ export default function CartPage() {
   const [loadingDelivery, setLoadingDelivery] = useState(false);
   const [distanceInfo, setDistanceInfo] = useState(null);
 
-  // ── Real Shippo rate state ─────────────────────────────────
   const [uspsRate, setUspsRate] = useState(null);
   const [cachedShippingKey, setCachedShippingKey] = useState(null);
   const [fetchingUspsRate, setFetchingUspsRate] = useState(false);
@@ -106,7 +105,6 @@ export default function CartPage() {
     } catch { toast.error("Failed to remove item"); }
   };
 
-  // ── Fetch real Shippo rate estimate (cached) ───────────────
   const fetchUspsEstimate = async (shippingAddress, storeId) => {
     const cacheKey = `${storeId}-${shippingAddress.zip}-${shippingAddress.state}`;
     if (cachedShippingKey === cacheKey && uspsRate !== null) {
@@ -136,9 +134,7 @@ export default function CartPage() {
     }
   };
 
-  // ── Delivery routing ───────────────────────────────────────
   const fetchDeliveryOptions = async () => {
-    // Don't re-fetch if we already have options and a cached rate
     if (deliveryOptions.length > 0 && uspsRate !== null) {
       return true;
     }
@@ -148,7 +144,6 @@ export default function CartPage() {
     setSelectedDelivery(null);
 
     try {
-      // ── 1. Resolve store metadata ────────────────────────
       const currentByStore = items.reduce((acc, item) => {
         const sid = item.product.store?.id || item.product.store_id || "unknown";
         if (!acc[sid]) acc[sid] = { store: item.product.store || { id: sid }, items: [] };
@@ -177,7 +172,6 @@ export default function CartPage() {
       const isRestaurant = storeVendorType === "restaurant";
       const offersPickup = !storeDeliveryType || ["pickup", "both", "local_delivery"].includes(storeDeliveryType);
 
-      // ── 2. Geocode customer address ──────────────────────
       let customerLat = null, customerLng = null;
       try {
         const geo = await fetch(
@@ -194,7 +188,6 @@ export default function CartPage() {
         console.warn("[Delivery] Geocode failed:", e?.message);
       }
 
-      // ── 3. Fetch delivery options from backend ───────────
       let apiOptions = [];
       try {
         const res = await api.post("/uber-direct/delivery-options", {
@@ -217,7 +210,6 @@ export default function CartPage() {
         }];
       }
 
-      // ── 4. Hydrate USPS options with live Shippo rate ────
       const hydratedOptions = await Promise.all(
         apiOptions.map(async (opt) => {
           if (opt.provider === "usps" && !isRestaurant) {
@@ -228,7 +220,6 @@ export default function CartPage() {
         })
       );
 
-      // ── 5. Add pickup if missing ─────────────────────────
       const hasPickup = hydratedOptions.some(o => o.provider === "pickup");
       if (!hasPickup && offersPickup) {
         hydratedOptions.push({
@@ -305,6 +296,7 @@ export default function CartPage() {
       } catch {}
     }
 
+    // ── Resolve token from all sources ──────────────────────────────────
     let authToken = token;
     if (!authToken) { try { authToken = sessionStorage.getItem("az_tok"); } catch {} }
     if (!authToken) { try { authToken = localStorage.getItem("afrizone_token"); } catch {} }
@@ -320,6 +312,7 @@ export default function CartPage() {
       router.push("/login?redirect=/cart");
       return;
     }
+
     if (typeof window !== "undefined") {
       try { window._azMemToken = authToken; } catch {}
     }
@@ -359,11 +352,7 @@ export default function CartPage() {
           uber_quote_id: selectedDelivery?.quote_id || null,
         };
 
-        // ── FIX: await the POST and safely extract the order ID ──
         const r = await api.post("/orders/", orderPayload, { headers: authHeaders });
-
-        // Defensively resolve ID across common response shapes:
-        // { id: 204 }  |  { order: { id: 204 } }  |  { order_id: 204 }
         const orderId = r.data?.id ?? r.data?.order?.id ?? r.data?.order_id;
 
         if (!orderId) {
@@ -377,12 +366,12 @@ export default function CartPage() {
         createdOrders.push({ ...r.data, id: orderId });
       }
 
-      // Clear cart only after all orders are confirmed created
       try { await api.delete("/orders/cart/clear", { headers: authHeaders }); } catch {}
       setItems([]);
 
       if (createdOrders.length > 0) {
-        router.push(`/checkout?order_id=${createdOrders[0].id}`);
+        // ── FIX: pass token in URL so checkout page bypasses Edge storage blocking ──
+        router.push(`/checkout?order_id=${createdOrders[0].id}&tok=${encodeURIComponent(authToken)}`);
       } else {
         router.push("/orders");
       }
