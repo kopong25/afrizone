@@ -69,17 +69,39 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // ── FIX: delay 100ms so token is available after redirect from cart ──
   useEffect(() => {
-    if (authLoading) return; // Wait for auth to load
+    if (authLoading) return;
     if (!user) { router.push("/login?redirect=/checkout?order_id=" + order_id); return; }
     if (!order_id) return;
-    initPayment(token);
+    setTimeout(() => initPayment(token), 100);
   }, [user, order_id, authLoading]);
 
   const initPayment = async (authToken) => {
+    // ── FIX: resolve token from all sources — mirrors cart.js fallback chain ──
+    let resolvedToken = authToken;
+    if (!resolvedToken) {
+      try { resolvedToken = sessionStorage.getItem("az_tok"); } catch {}
+    }
+    if (!resolvedToken) {
+      try { resolvedToken = localStorage.getItem("afrizone_token"); } catch {}
+    }
+    if (!resolvedToken) {
+      try {
+        const m = document.cookie.match(/(?:^|;\s*)afrizone_token=([^;]+)/);
+        resolvedToken = m ? decodeURIComponent(m[1]) : null;
+      } catch {}
+    }
+
+    if (!resolvedToken) {
+      setError("Session expired. Please sign in again.");
+      setLoading(false);
+      router.push("/login?redirect=/checkout?order_id=" + order_id);
+      return;
+    }
+
     try {
-      // Use explicit auth header — bypasses interceptor for iOS Safari reliability
-      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+      const headers = { Authorization: `Bearer ${resolvedToken}` };
       const orderRes = await api.get(`/orders/${order_id}`, { headers });
       setOrder(orderRes.data);
       const payRes = await api.post("/payments/checkout", { order_id: parseInt(order_id) }, { headers });
