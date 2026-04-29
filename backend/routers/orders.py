@@ -10,6 +10,23 @@ Key changes vs previous version:
     for server-side verification before the order is committed.
   • Pickup is always free; USPS always re-verified via Shippo; Uber re-verified
     via quote lookup (surge / expiry protection).
+
+CRITICAL BUG FIX — 4 leak points patched:
+  LEAK 1: create_order() now sets status="awaiting_payment" (was "pending").
+           "pending" is now the PAID state, not the created state.
+  LEAK 2: send-confirmation endpoint no longer emails the seller.
+           Seller email fires only from the Stripe webhook after payment.
+  LEAK 3: get_seller_orders() now filters out non-paid statuses.
+  LEAK 4: get_store_orders() now filters out non-paid statuses.
+
+Add this to models.py OrderStatus enum:
+    awaiting_payment = "awaiting_payment"
+    payment_failed   = "payment_failed"
+
+Add to your Stripe webhook (routers/payments.py or similar):
+    on checkout.session.completed → set status="pending", fire seller email
+    on checkout.session.expired   → set status="payment_failed"
+    on payment_intent.failed      → set status="payment_failed"
 """
 
 from __future__ import annotations
@@ -25,6 +42,18 @@ import json
 from datetime import datetime, timezone as dt_timezone
 
 PLATFORM_FEE_PERCENT = float(os.getenv("PLATFORM_FEE_PERCENT", "8"))
+
+# Statuses that mean payment has been confirmed.
+# "awaiting_payment" and "payment_failed" are intentionally excluded —
+# orders in those states are never shown to sellers.
+SELLER_VISIBLE_STATUSES = [
+    "pending",        # paid, awaiting seller action
+    "processing",
+    "shipped",
+    "delivered",
+    "cancelled",
+    "refunded",
+]
 
 router = APIRouter()
 
@@ -195,6 +224,10 @@ def create_order(
     """
     Create a new order. All items must belong to the same store.
     Shipping cost is always re-verified server-side — client values are ignored.
+
+    The order is created with status="awaiting_payment".
+    It becomes visible to the seller only after the Stripe webhook
+    confirms payment (checkout.session.completed → status="pending").
     """
     from sqlalchemy import text
 
@@ -283,14 +316,18 @@ def create_order(
     platform_fee, seller_amount, total = calculate_order_amounts(subtotal, shipping_cost)
 
     # ── Persist order ─────────────────────────────────────────────────────
+    # CRITICAL: status starts as "awaiting_payment", NOT "pending".
+    # The Stripe webhook flips it to "pending" (seller-visible) only on
+    # checkout.session.completed. Never change this default.
     order = models.Order(
-        buyer_id        = current_user.id,
-        store_id        = store.id,
-        subtotal        = subtotal,
-        shipping_cost   = shipping_cost,
-        platform_fee    = platform_fee,
-        seller_amount   = seller_amount,
-        total           = total,
+        buyer_id         = current_user.id,
+        store_id         = store.id,
+        status           = models.OrderStatus.awaiting_payment,  # ← FIXED (was "pending")
+        subtotal         = subtotal,
+        shipping_cost    = shipping_cost,
+        platform_fee     = platform_fee,
+        seller_amount    = seller_amount,
+        total            = total,
         shipping_name    = order_in.shipping.name,
         shipping_address = order_in.shipping.address,
         shipping_city    = order_in.shipping.city,
@@ -300,7 +337,7 @@ def create_order(
     )
     try:
         order.delivery_method = order_in.delivery_method
-        order.delivery_fee    = shipping_cost          # always the verified rate
+        order.delivery_fee    = shipping_cost
     except Exception:
         pass
 
@@ -345,6 +382,8 @@ def get_my_orders(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.get_current_user),
 ):
+    # Buyers see all their own orders including awaiting_payment — they need
+    # to know their order exists while completing payment.
     query = db.query(models.Order).filter(models.Order.buyer_id == current_user.id)
     total  = query.count()
     orders = query.order_by(models.Order.created_at.desc()).offset((page - 1) * size).limit(size).all()
@@ -362,9 +401,22 @@ def get_seller_orders(
     store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
+
     query = db.query(models.Order).filter(models.Order.store_id == store.id)
+
     if status:
+        # Even if the caller explicitly requests "awaiting_payment",
+        # block it — sellers must never see unpaid orders.
+        if status not in SELLER_VISIBLE_STATUSES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status filter '{status}'. Must be one of: {', '.join(SELLER_VISIBLE_STATUSES)}"
+            )
         query = query.filter(models.Order.status == status)
+    else:
+        # Default: show only paid/processed statuses — never awaiting_payment.
+        query = query.filter(models.Order.status.in_(SELLER_VISIBLE_STATUSES))  # ← FIXED
+
     total  = query.count()
     orders = query.order_by(models.Order.created_at.desc()).offset((page - 1) * size).limit(size).all()
     return {"items": orders, "total": total, "page": page, "pages": math.ceil(total / size), "size": size}
@@ -381,6 +433,7 @@ def get_store_orders(
     store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
+
     query = (
         db.query(models.Order)
         .options(
@@ -389,8 +442,18 @@ def get_store_orders(
         )
         .filter(models.Order.store_id == store.id)
     )
+
     if status:
+        if status not in SELLER_VISIBLE_STATUSES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status filter '{status}'. Must be one of: {', '.join(SELLER_VISIBLE_STATUSES)}"
+            )
         query = query.filter(models.Order.status == status)
+    else:
+        # Default: exclude unpaid orders — sellers never see awaiting_payment.
+        query = query.filter(models.Order.status.in_(SELLER_VISIBLE_STATUSES))  # ← FIXED
+
     query = query.order_by(models.Order.created_at.desc())
     total  = query.count()
     orders = query.offset((page - 1) * size).limit(size).all()
@@ -410,6 +473,12 @@ def get_order(
     store     = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     is_seller = store and order.store_id == store.id
     is_admin  = current_user.role == models.UserRole.admin
+
+    # Sellers can only access orders that have been paid
+    if is_seller and not is_admin:
+        if order.status not in SELLER_VISIBLE_STATUSES:
+            raise HTTPException(status_code=404, detail="Order not found")  # ← don't reveal existence
+
     if not (is_buyer or is_seller or is_admin):
         raise HTTPException(status_code=403, detail="Access denied")
     return order
@@ -428,6 +497,14 @@ def update_order_status(
     store = db.query(models.Store).filter(models.Store.owner_id == current_user.id).first()
     if not store or order.store_id != store.id:
         raise HTTPException(status_code=403, detail="Access denied")
+
+    # Sellers cannot manually move orders out of awaiting_payment —
+    # only the Stripe webhook does that.
+    if order.status not in SELLER_VISIBLE_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot update order status — payment has not been confirmed."
+        )
 
     order.status = update.status
     if update.tracking_number:
@@ -554,6 +631,12 @@ def send_order_confirmation_email(
     db:           Session     = Depends(get_db),
     current_user: models.User = Depends(auth_utils.get_current_user),
 ):
+    """
+    Send a confirmation email to the buyer.
+    The seller email is intentionally NOT sent here — it fires from the
+    Stripe webhook (checkout.session.completed) once payment is confirmed.
+    Calling this endpoint before payment is complete must never notify the seller.
+    """
     order = db.query(models.Order).options(
         joinedload(models.Order.items).joinedload(models.OrderItem.product),
         joinedload(models.Order.store).joinedload(models.Store.owner),
@@ -563,25 +646,88 @@ def send_order_confirmation_email(
     ).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+
     try:
-        from utils.email import send_order_confirmation, send_new_order_to_seller
+        from utils.email import send_order_confirmation
         email_items = [
             {"name": oi.product.name, "quantity": oi.quantity, "price": oi.unit_price}
             for oi in order.items
         ]
+        # ── Buyer confirmation only ────────────────────────────────────────
         send_order_confirmation(
             buyer_email=current_user.email, buyer_name=current_user.full_name,
             order_id=order.id, items=email_items, subtotal=order.subtotal,
             shipping=order.shipping_cost, total=order.total,
             store_name=order.store.name if order.store else "Afrizone",
         )
-        seller_email = order.store.owner.email if order.store and order.store.owner else None
-        if seller_email:
-            send_new_order_to_seller(
-                seller_email=seller_email, store_name=order.store.name,
-                order_id=order.id, items=email_items, total=order.total,
-                seller_amount=order.seller_amount, buyer_name=current_user.full_name,
-            )
+        # ── Seller email REMOVED from here — see Stripe webhook ───────────
+        # Previously: send_new_order_to_seller(...) was called here,
+        # which fired before payment was confirmed. That was LEAK 2.
+        # The seller email now lives in routers/payments.py (Stripe webhook)
+        # inside the checkout.session.completed handler.
     except Exception as e:
         print(f"Email error: {e}")
     return {"sent": True}
+
+
+# ─────────────────────────── Stripe webhook stub ────────────────────────────
+# Add this to your existing routers/payments.py (or wherever you handle Stripe).
+# Shown here as a reference — do NOT register this router twice.
+
+STRIPE_WEBHOOK_REFERENCE = """
+# Add to routers/payments.py
+
+@router.post("/webhook/stripe")
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+    payload    = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, os.getenv("STRIPE_WEBHOOK_SECRET")
+        )
+    except stripe.error.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="Invalid Stripe signature")
+
+    # ── Payment confirmed ─────────────────────────────────────────────────
+    if event["type"] == "checkout.session.completed":
+        session  = event["data"]["object"]
+        order_id = session["metadata"].get("order_id")
+        order    = db.query(models.Order).filter(models.Order.id == int(order_id)).first()
+
+        if order and order.status == "awaiting_payment":
+            order.status         = "pending"   # now visible to seller
+            order.payment_intent = session.get("payment_intent")
+            order.paid_at        = datetime.now(timezone.utc)
+            db.commit()
+
+            # Seller email fires HERE — after payment is confirmed
+            try:
+                from utils.email import send_new_order_to_seller
+                store = db.query(models.Store).filter(models.Store.id == order.store_id).first()
+                buyer = db.query(models.User).filter(models.User.id == order.buyer_id).first()
+                if store and store.owner and buyer:
+                    email_items = [
+                        {"name": oi.product.name, "quantity": oi.quantity, "price": oi.unit_price}
+                        for oi in order.items
+                    ]
+                    send_new_order_to_seller(
+                        seller_email=store.owner.email, store_name=store.name,
+                        order_id=order.id, items=email_items, total=order.total,
+                        seller_amount=order.seller_amount, buyer_name=buyer.full_name,
+                    )
+            except Exception as e:
+                print(f"Seller email error: {e}")
+
+    # ── Payment failed or expired ─────────────────────────────────────────
+    elif event["type"] in ("checkout.session.expired", "payment_intent.payment_failed"):
+        session  = event["data"]["object"]
+        order_id = (session.get("metadata") or {}).get("order_id")
+        if order_id:
+            order = db.query(models.Order).filter(models.Order.id == int(order_id)).first()
+            if order and order.status == "awaiting_payment":
+                order.status = "payment_failed"
+                db.commit()
+
+    return {"received": True}
+"""
