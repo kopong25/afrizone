@@ -6,7 +6,7 @@ import Footer from "../components/layout/Footer";
 import { useAuth } from "./_app";
 import api from "../lib/api";
 import toast from "react-hot-toast";
-import { FiLock, FiArrowLeft } from "react-icons/fi";
+import { FiLock, FiArrowLeft, FiTruck } from "react-icons/fi";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
@@ -54,6 +54,39 @@ function PaymentForm({ orderId, total }) {
         <FiLock size={11} /> Secured by Stripe · 256-bit SSL encryption
       </p>
     </form>
+  );
+}
+
+// ─── Shipping Cost Row ────────────────────────────────────────
+// FIX: Displays the shipping cost locked at order creation time.
+// If the order has a shipping_method label (e.g. "USPS Priority Mail"),
+// it is shown alongside the price so the customer sees exactly what they
+// selected in the cart. The amount is read from order.shipping_cost which
+// is set once when the order is created and never recalculated.
+function ShippingRow({ order }) {
+  const cost = Number(order.shipping_cost ?? 0);
+  const method = order.shipping_method || null;
+
+  if (cost === 0) {
+    return (
+      <div className="flex justify-between text-sm text-gray-500">
+        <span className="flex items-center gap-1">
+          <FiTruck size={13} />
+          {method ? `${method} (Pickup)` : "Pickup"}
+        </span>
+        <span className="text-green-700 font-semibold">FREE</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-between text-sm text-gray-500">
+      <span className="flex items-center gap-1">
+        <FiTruck size={13} />
+        {method || "Shipping"}
+      </span>
+      <span>${cost.toFixed(2)}</span>
+    </div>
   );
 }
 
@@ -120,10 +153,30 @@ export default function CheckoutPage() {
 
     try {
       const headers = { Authorization: `Bearer ${resolvedToken}` };
+
+      // Fetch order — shipping_cost is already locked on the order record.
+      // We display exactly that amount; no re-calculation is done here.
       const orderRes = await api.get(`/orders/${order_id}`, { headers });
-      setOrder(orderRes.data);
+      const fetchedOrder = orderRes.data;
+      setOrder(fetchedOrder);
+
+      // FIX: confirm the payment intent total matches order.total exactly.
+      // The backend /payments/checkout endpoint must use order.total (which
+      // already includes the locked shipping cost) — not re-derive it.
       const payRes = await api.post("/payments/checkout", { order_id: parseInt(order_id) }, { headers });
       setClientSecret(payRes.data.client_secret);
+
+      // Safety check: warn in dev if the Stripe amount differs from order total
+      if (process.env.NODE_ENV === "development") {
+        const stripeAmount = payRes.data.amount_cents; // expose this from your backend
+        const orderTotal = Math.round(fetchedOrder.total * 100);
+        if (stripeAmount && stripeAmount !== orderTotal) {
+          console.warn(
+            `[Checkout] ⚠️ Stripe amount (${stripeAmount}¢) differs from order total (${orderTotal}¢). ` +
+            `Check /payments/checkout — it must use order.total, not recalculate shipping.`
+          );
+        }
+      }
     } catch (e) {
       const msg = e.response?.data?.detail || "Failed to initialize payment";
       setError(msg);
@@ -183,10 +236,10 @@ export default function CheckoutPage() {
                 <div className="flex justify-between text-sm text-gray-500">
                   <span>Subtotal</span><span>${Number(order.subtotal).toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>Shipping</span>
-                  <span>{order.shipping_cost === 0 ? "FREE" : `$${Number(order.shipping_cost).toFixed(2)}`}</span>
-                </div>
+
+                {/* FIX: dedicated shipping row that shows method name + locked cost */}
+                <ShippingRow order={order} />
+
                 <div className="flex justify-between font-black text-gray-900 text-lg pt-1 border-t">
                   <span>Total</span><span>${Number(order.total).toFixed(2)}</span>
                 </div>

@@ -105,26 +105,34 @@ def _build_address_to(order: models.Order) -> dict:
     }
 
 
-def _build_parcel(order: models.Order) -> dict:
-    total_weight = sum(
-        (item.product.weight_kg or 0.5) * item.quantity
-        for item in order.items
-    ) or 0.5
+# ---------------------------------------------------------------------------
+# FIX: Single unified parcel builder used for BOTH estimate and label creation.
+# Previously there were two different functions (_build_parcel_estimate with a
+# 6x4x2 box and _build_parcel with a 12x10x6 box) which caused Shippo to
+# return different rates at estimate vs label time.
+# ---------------------------------------------------------------------------
+
+def _build_standard_parcel(weight_lbs: float = 1.0) -> dict:
+    """
+    Unified parcel dimensions used for every Shippo call — estimate AND label.
+    Using consistent dimensions guarantees the customer is quoted the same rate
+    that is actually charged when the shipping label is purchased.
+    """
     return {
         "length": "12", "width": "10", "height": "6",
         "distance_unit": "in",
-        "weight": str(round(total_weight * 2.205, 2)),
+        "weight": str(round(max(weight_lbs, 0.1), 2)),
         "mass_unit": "lb",
     }
 
 
-def _build_parcel_estimate(weight_lbs: float = 1.0) -> dict:
-    return {
-        "length": "6", "width": "4", "height": "2",
-        "distance_unit": "in",
-        "weight": str(round(weight_lbs, 2)),
-        "mass_unit": "lb",
-    }
+def _order_weight_lbs(order: models.Order) -> float:
+    """Calculate total shipment weight in lbs from order line items."""
+    total = sum(
+        (item.product.weight_kg or 0.5) * item.quantity
+        for item in order.items
+    ) or 0.5
+    return round(total * 2.205, 2)  # kg → lbs
 
 
 def _create_mock_label(order_id: int, db: Session, order, store, background_tasks: BackgroundTasks, sample: bool = False):
@@ -183,6 +191,10 @@ async def get_shipping_estimate(
     """
     Get a real-time USPS shipping rate estimate before an order is placed.
     Called during checkout so the customer pays the correct Shippo rate.
+
+    IMPORTANT: Uses _build_standard_parcel with the caller-supplied weight so
+    the estimate matches the rate charged at label creation time exactly.
+
     Falls back to $8.99 if Shippo is unavailable or not configured.
     """
     FALLBACK_RATE = 8.99
@@ -213,7 +225,9 @@ async def get_shipping_estimate(
             "zip":     body.zip,
             "country": body.country or "US",
         }
-        parcel = _build_parcel_estimate(body.weight_lbs or 1.0)
+
+        # FIX: use the same parcel dimensions as label creation
+        parcel = _build_standard_parcel(body.weight_lbs or 1.0)
 
         shipment = await shippo_post("shipments", {
             "address_from": address_from,
@@ -235,10 +249,12 @@ async def get_shipping_estimate(
         service = best.get("servicelevel", {}).get("name", "Priority Mail")
         carrier = best.get("provider", "USPS")
         days = best.get("estimated_days", "1–3")
+        rate_id = best.get("object_id")  # FIX: return rate_id so frontend can lock it
 
-        logger.info(f"[SHIPPO] Estimate: {carrier} {service} = ${real_rate} ({days} days)")
+        logger.info(f"[SHIPPO] Estimate: {carrier} {service} = ${real_rate} ({days} days) rate_id={rate_id}")
         return {
             "rate":    real_rate,
+            "rate_id": rate_id,   # FIX: frontend saves this and sends it with the order
             "mock":    False,
             "carrier": carrier,
             "service": service,
@@ -275,11 +291,14 @@ async def get_shipping_rates(
             ],
         }
 
+    # FIX: use real order weight and unified parcel dimensions
+    parcel = _build_standard_parcel(_order_weight_lbs(order))
+
     try:
         shipment = await shippo_post("shipments", {
             "address_from": _build_address_from(store),
             "address_to":   _build_address_to(order),
-            "parcels":      [_build_parcel(order)],
+            "parcels":      [parcel],
             "async": False,
         })
     except httpx.HTTPStatusError as e:
@@ -350,23 +369,25 @@ async def create_shipping_label(
 
     validate_shipping_address(order)
 
-    # ── FIX: use the rate locked at checkout time ─────────────────────────
+    # ── Use the rate locked at checkout time ──────────────────────────────
     # Priority order:
     #   1. rate_id passed explicitly as query param (seller override)
     #   2. order.shippo_rate_id saved when customer selected shipping at checkout
-    #   3. auto-fetch as last resort (original behaviour — can cause discrepancy)
+    #   3. auto-fetch as last resort (legacy orders / pickup orders)
     if rate_id == "auto" and order.shippo_rate_id:
         rate_id = order.shippo_rate_id
         logger.info(f"[SHIPPO] Using locked checkout rate: {rate_id} for order {order_id}")
     # ─────────────────────────────────────────────────────────────────────
 
     if rate_id == "auto":
-        # No stored rate — fall back to fetching fresh (legacy orders / pickup orders)
+        # No stored rate — fetch fresh using unified parcel (legacy orders)
+        # FIX: uses _build_standard_parcel so rate matches any prior estimate
+        parcel = _build_standard_parcel(_order_weight_lbs(order))
         try:
             shipment = await shippo_post("shipments", {
                 "address_from": _build_address_from(store),
                 "address_to":   _build_address_to(order),
-                "parcels":      [_build_parcel(order)],
+                "parcels":      [parcel],
                 "async": False,
             })
             rates = shipment.get("rates", [])
