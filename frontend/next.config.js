@@ -5,6 +5,7 @@ const withPWA = require("next-pwa")({
   reloadOnOnline: false,
   disable: process.env.NODE_ENV === "development",
   cacheOnFrontEndNav: false,
+  buildExcludes: [/middleware-manifest\.json$/],
   exclude: [
     /\/checkout/,
     /\/cart/,
@@ -20,7 +21,7 @@ const withPWA = require("next-pwa")({
       urlPattern: /^https:\/\/afrizoneshop\.com\/.*$/i,
       handler: "NetworkFirst",
       options: {
-        cacheName: "page-cache",
+        cacheName: "page-cache-v2",
         networkTimeoutSeconds: 5,
         expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
       },
@@ -54,7 +55,7 @@ const withPWA = require("next-pwa")({
       urlPattern: /^https:\/\/res\.cloudinary\.com\/.*$/i,
       handler: "CacheFirst",
       options: {
-        cacheName: "image-cache",
+        cacheName: "image-cache-v2",
         expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
       },
     },
@@ -63,7 +64,7 @@ const withPWA = require("next-pwa")({
       urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*$/i,
       handler: "CacheFirst",
       options: {
-        cacheName: "font-cache",
+        cacheName: "font-cache-v2",
         expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
       },
     },
