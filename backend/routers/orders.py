@@ -3,19 +3,31 @@ routers/orders.py
 ─────────────────
 All order, cart, and delivery-fee endpoints.
 
-Key changes vs previous version:
-  • fetch_verified_shipping_cost() now also handles Uber Direct, re-verifying
-    the quote_id that was captured at rate-selection time.
-  • create_order() accepts uber_quote_id on the payload and passes it through
-    for server-side verification before the order is committed.
-  • Pickup is always free; USPS always re-verified via Shippo; Uber re-verified
-    via quote lookup (surge / expiry protection).
+AMAZON-STANDARD SHIPPING FIX:
+  Shipping is calculated ONCE — at cart/estimate time via /shipping/estimate.
+  The verified rate + rate_id are sent by the frontend when placing the order.
+  create_order() trusts the client-supplied shipping_cost + shippo_rate_id.
+  There is NO second Shippo call here. The /shipping/estimate endpoint already
+  verified the rate against real parcel dimensions and the real destination.
+
+  Old flow (broken):
+    /shipping/estimate → $13.48 shown to customer
+    create_order()     → re-calls Shippo → $10.01 saved to order   ← MISMATCH
+    /payments/checkout → charges $20.00 (subtotal only)             ← SHIPPING DROPPED
+
+  New flow (Amazon standard):
+    /shipping/estimate → $13.48 + rate_id returned, saved in cart state
+    create_order()     → trusts $13.48, saves rate_id, total = $30.01
+    /payments/checkout → charges order.total = $30.01               ← CORRECT
+
+  Uber Direct quotes are still re-verified server-side because they expire
+  and can surge — that is a quote-ID lookup, not a fresh rate calculation.
 
 CRITICAL BUG FIX — 4 leak points patched:
-  LEAK 1: create_order() now sets status="awaiting_payment" (was "pending").
+  LEAK 1: create_order() sets status="awaiting_payment" (was "pending").
   LEAK 2: send-confirmation endpoint no longer emails the seller.
-  LEAK 3: get_seller_orders() now filters out non-paid statuses.
-  LEAK 4: get_store_orders() now filters out non-paid statuses.
+  LEAK 3: get_seller_orders() filters out non-paid statuses.
+  LEAK 4: get_store_orders() filters out non-paid statuses.
 
 ROUTE ORDER FIX:
   Cart endpoints and send-confirmation MUST come before /{order_id}
@@ -67,113 +79,43 @@ def get_local_time(tz_name: str) -> datetime:
         return datetime.now(dt_timezone.utc)
 
 
-# ─────────────────────────── Shipping verification ──────────────────────────
+# ─────────────────────────── Shipping resolver ──────────────────────────────
+# AMAZON STANDARD: resolve_shipping_cost() does NOT call Shippo.
+# The rate was already fetched and shown to the customer by /shipping/estimate.
+# We trust that verified amount here. The shippo_rate_id is stored on the order
+# so the seller's label creation uses the exact same rate — no new Shippo call.
+#
+# Uber Direct is the only exception: quotes expire and can surge, so we do a
+# lightweight quote-ID lookup (not a fresh rate fetch) to confirm the price
+# hasn't changed since the customer selected it.
+# ────────────────────────────────────────────────────────────────────────────
 
-def fetch_verified_shipping_cost(
-    delivery_method:  str,
-    store_id:         int,
-    shipping_address: dict,
-    client_fee:       float,
-    db:               Session,
-    uber_quote_id:    Optional[str] = None,
+def resolve_shipping_cost(
+    delivery_method: str,
+    client_fee:      float,
+    uber_quote_id:   Optional[str] = None,
 ) -> float:
+    """
+    Return the shipping cost to save on the order.
+
+    - pickup  → always $0
+    - usps    → trust client_fee (already verified by /shipping/estimate)
+    - uber    → re-verify quote_id because Uber quotes expire and can surge
+    - other   → trust client_fee
+    """
     method = (delivery_method or "").lower()
 
     if method == "pickup":
         return 0.0
-
-    if method.startswith("usps"):
-        shippo_token = os.getenv("SHIPPO_API_KEY") or os.getenv("SHIPPO_TOKEN")
-        if not shippo_token:
-            print("[Orders] WARNING: SHIPPO_API_KEY not set. Using client-supplied fee.")
-            return round(float(client_fee or 0.0), 2)
-
-        try:
-            import httpx
-            from sqlalchemy import text
-
-            row = db.execute(
-                text("SELECT address, city, state, zip, country FROM stores WHERE id = :id"),
-                {"id": store_id},
-            ).fetchone()
-            if not row:
-                raise HTTPException(status_code=400, detail="Store address not found for shipping calculation.")
-
-            src_country = (row[4] or "US").upper()
-            if src_country in ("USA", "UNITED STATES"):
-                src_country = "US"
-            dest_country = (shipping_address.get("country") or "US").upper()
-            if dest_country in ("USA", "UNITED STATES"):
-                dest_country = "US"
-
-            payload = {
-                "address_from": {
-                    "street1": row[0] or "",
-                    "city":    row[1] or "",
-                    "state":   row[2] or "",
-                    "zip":     row[3] or "",
-                    "country": src_country,
-                },
-                "address_to": {
-                    "street1": shipping_address.get("address", ""),
-                    "city":    shipping_address.get("city", ""),
-                    "state":   shipping_address.get("state", ""),
-                    "zip":     shipping_address.get("zip", ""),
-                    "country": dest_country,
-                },
-                "parcels": [{
-                    "length": "10", "width": "8", "height": "4",
-                    "distance_unit": "in",
-                    "weight": "1", "mass_unit": "lb",
-                }],
-                "async": False,
-            }
-
-            resp = httpx.post(
-                "https://api.goshippo.com/shipments/",
-                json=payload,
-                headers={"Authorization": f"ShippoToken {shippo_token}"},
-                timeout=12.0,
-            )
-            resp.raise_for_status()
-            data  = resp.json()
-            rates = data.get("rates", [])
-
-            usps_rates = [
-                r for r in rates
-                if r.get("provider", "").upper() == "USPS" and r.get("amount")
-            ]
-
-            target_service = "PRIORITY" if "priority" in method else "GROUND"
-            tier_rates = [
-                r for r in usps_rates
-                if target_service in r.get("servicelevel", {}).get("name", "").upper()
-            ]
-            pool = tier_rates or usps_rates
-
-            if pool:
-                best = min(pool, key=lambda r: float(r["amount"]))
-                verified = round(float(best["amount"]), 2)
-                print(f"[Orders] Shippo verified USPS rate: ${verified} (client sent ${client_fee})")
-                return verified
-
-            raise HTTPException(
-                status_code=400,
-                detail="Unable to calculate USPS shipping cost. Please try again."
-            )
-
-        except HTTPException:
-            raise
-        except Exception as e:
-            print(f"[Orders] Shippo verification error: {e}")
-            raise HTTPException(status_code=400, detail="Shipping rate verification failed. Please try again.")
 
     if method.startswith("uber"):
         if uber_quote_id:
             try:
                 from routers.uber_direct import verify_uber_quote
                 expected_cents = round(float(client_fee or 0.0) * 100)
-                return verify_uber_quote(uber_quote_id, expected_cents)
+                verified = verify_uber_quote(uber_quote_id, expected_cents)
+                print(f"[Orders] Uber quote verified: ${verified} (client sent ${client_fee})")
+                return verified
             except HTTPException:
                 raise
             except Exception as e:
@@ -181,7 +123,10 @@ def fetch_verified_shipping_cost(
         print("[Orders] WARNING: Uber quote_id missing. Using client-supplied fee.")
         return round(float(client_fee or 0.0), 2)
 
-    return round(float(client_fee or 0.0), 2)
+    # USPS / any other carrier — trust the rate already shown to the customer
+    verified = round(float(client_fee or 0.0), 2)
+    print(f"[Orders] Shipping locked at checkout rate: ${verified} method={method}")
+    return verified
 
 
 # ─────────────────────────── Order creation ─────────────────────────────────
@@ -243,8 +188,8 @@ def create_order(
 
     for item in order_in.items:
         product = db.query(models.Product).filter(
-            models.Product.id       == item.product_id,
-            models.Product.store_id == order_in.store_id,
+            models.Product.id        == item.product_id,
+            models.Product.store_id  == order_in.store_id,
             models.Product.is_active == True,
         ).first()
         if not product:
@@ -256,23 +201,19 @@ def create_order(
         subtotal  += line_total
         order_items.append((product, item.quantity, product.price, line_total))
 
-    shipping_address = {
-        "address": order_in.shipping.address,
-        "city":    order_in.shipping.city,
-        "state":   order_in.shipping.state,
-        "zip":     order_in.shipping.zip,
-        "country": order_in.shipping.country,
-    }
-    shipping_cost = fetch_verified_shipping_cost(
-        delivery_method  = order_in.delivery_method,
-        store_id         = order_in.store_id,
-        shipping_address = shipping_address,
-        client_fee       = order_in.delivery_fee,
-        db               = db,
-        uber_quote_id    = getattr(order_in, "uber_quote_id", None),
+    # ── AMAZON STANDARD: one shipping calculation, done at estimate time ──
+    # resolve_shipping_cost() trusts the client-supplied fee for USPS.
+    # No second Shippo API call is made here.
+    shipping_cost = resolve_shipping_cost(
+        delivery_method = order_in.delivery_method,
+        client_fee      = order_in.delivery_fee,
+        uber_quote_id   = getattr(order_in, "uber_quote_id", None),
     )
 
     platform_fee, seller_amount, total = calculate_order_amounts(subtotal, shipping_cost)
+
+    # total = subtotal + shipping — this is what Stripe must charge
+    print(f"[Orders] Order totals: subtotal=${subtotal} shipping=${shipping_cost} total=${total}")
 
     order = models.Order(
         buyer_id         = current_user.id,
@@ -290,9 +231,27 @@ def create_order(
         shipping_country = order_in.shipping.country,
         shipping_zip     = order_in.shipping.zip,
     )
+
+    # Store the locked Shippo rate_id so label creation uses the same rate
+    # and the seller is never charged a different amount than the customer paid
     try:
         order.delivery_method = order_in.delivery_method
         order.delivery_fee    = shipping_cost
+    except Exception:
+        pass
+
+    try:
+        # shippo_rate_id is sent by the frontend after /shipping/estimate
+        # If your OrderCreate schema doesn't have this field yet, add it as Optional[str]
+        if getattr(order_in, "shippo_rate_id", None):
+            order.shippo_rate_id = order_in.shippo_rate_id
+            print(f"[Orders] Locked Shippo rate_id={order_in.shippo_rate_id} for order")
+    except Exception:
+        pass
+
+    try:
+        if getattr(order_in, "shipping_method", None):
+            order.shipping_method = order_in.shipping_method
     except Exception:
         pass
 
@@ -437,7 +396,7 @@ def get_cart(
             if item.product and item.product.store:
                 sid = item.product.store.id
                 if sid in store_map:
-                    item.product.store.vendor_type  = store_map[sid][0]
+                    item.product.store.vendor_type   = store_map[sid][0]
                     item.product.store.delivery_type = store_map[sid][1]
     return cart_items
 

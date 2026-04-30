@@ -77,9 +77,6 @@ def create_checkout(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    # FIXED: only awaiting_payment orders should reach checkout.
-    # "pending" now means already paid — retrying payment on a paid order
-    # would double-charge the customer.
     if order.status not in [models.OrderStatus.awaiting_payment]:
         if order.status in [models.OrderStatus.pending, models.OrderStatus.paid]:
             raise HTTPException(status_code=400, detail="This order has already been paid.")
@@ -90,7 +87,12 @@ def create_checkout(
         try:
             pi = stripe.PaymentIntent.retrieve(order.stripe_payment_intent_id)
             if pi.status not in ("canceled", "succeeded"):
-                return {"client_secret": pi.client_secret, "payment_intent_id": pi.id}
+                return {
+                    "client_secret":     pi.client_secret,
+                    "payment_intent_id": pi.id,
+                    # FIX 1: always return amount_cents so checkout.js dev warning works
+                    "amount_cents":      pi.amount,
+                }
         except Exception as e:
             print(f"[Checkout] Failed to retrieve existing PaymentIntent: {e}")
 
@@ -98,17 +100,23 @@ def create_checkout(
     if not store:
         raise HTTPException(status_code=404, detail="Store not found for this order")
 
-    # ── Null-safe amount calculation ───────────────────────────
-    order_total = order.total or 0
+    # ── AMAZON STANDARD: order.total is the single source of truth ────────
+    # order.total = subtotal + shipping_cost, set once in orders.py at order
+    # creation time using the rate the customer was shown in the cart.
+    # We never recalculate shipping here. We charge exactly what was quoted.
+    # ──────────────────────────────────────────────────────────────────────
+    order_total        = order.total or 0
     order_platform_fee = order.platform_fee or 0
 
+    # FIX 2: if order.total is somehow 0 or None, fall back to subtotal + shipping_cost
+    # (both are locked on the order row — no new Shippo call is made)
     if order_total <= 0:
-        subtotal = order.subtotal or sum(
+        subtotal      = order.subtotal or sum(
             (i.unit_price or 0) * (i.quantity or 1) for i in (order.items or [])
         )
-        shipping = order.shipping_cost or 0
-        order_total = subtotal + shipping
-        print(f"[Checkout] order.total was missing — recalculated: ${order_total:.2f}")
+        shipping      = order.shipping_cost or 0
+        order_total   = round(subtotal + shipping, 2)
+        print(f"[Checkout] order.total was 0 — rebuilt from locked fields: subtotal=${subtotal} + shipping=${shipping} = ${order_total}")
 
     if order_total <= 0:
         raise HTTPException(status_code=400, detail="Order total is $0 — cannot process payment")
@@ -117,9 +125,15 @@ def create_checkout(
         order_platform_fee = round(order_total * (PLATFORM_FEE_PERCENT / 100), 2)
         print(f"[Checkout] order.platform_fee was missing — recalculated: ${order_platform_fee:.2f}")
 
-    print(f"[Checkout] order_id={order.id} total=${order_total:.2f} fee=${order_platform_fee:.2f} "
-          f"store={store.id} stripe_acct={store.stripe_account_id} "
-          f"onboarded={store.stripe_onboarding_complete}")
+    print(
+        f"[Checkout] order_id={order.id} "
+        f"subtotal=${order.subtotal:.2f} "
+        f"shipping=${order.shipping_cost:.2f} "
+        f"total=${order_total:.2f} "          # should equal subtotal + shipping
+        f"fee=${order_platform_fee:.2f} "
+        f"store={store.id} stripe_acct={store.stripe_account_id} "
+        f"onboarded={store.stripe_onboarding_complete}"
+    )
 
     shipping_details = None
     if order.shipping_address and order.shipping_state:
@@ -134,26 +148,32 @@ def create_checkout(
             "name": order.shipping_name or "Customer",
         }
 
-    # Manual tax calculation — 8.6% for Arizona, $0 everywhere else
+    # FIX 3: tax applies to subtotal only, not shipping cost.
+    # Charging tax on shipping is incorrect — shipping is not taxable in most US states.
     AZ_TAX_RATE = 0.086
     print(f"[Checkout] shipping_state='{order.shipping_state}' shipping_city='{order.shipping_city}'")
     tax_amount = 0.0
     if order.shipping_state and order.shipping_state.upper() in ["AZ", "ARIZONA"]:
-        tax_amount = round(order_total * AZ_TAX_RATE, 2)
-        print(f"[Checkout] AZ tax: ${tax_amount:.2f}")
+        taxable_amount = order.subtotal or 0          # tax on product price only
+        tax_amount     = round(taxable_amount * AZ_TAX_RATE, 2)
+        print(f"[Checkout] AZ tax: ${tax_amount:.2f} (on subtotal ${taxable_amount:.2f}, not on shipping)")
 
-    taxed_total = order_total + tax_amount
-    amount_cents = int(taxed_total * 100)
+    taxed_total        = round(order_total + tax_amount, 2)
+    amount_cents       = int(taxed_total * 100)
     platform_fee_cents = int(order_platform_fee * 100)
+
+    print(f"[Checkout] Charging Stripe: ${taxed_total:.2f} ({amount_cents} cents)")
 
     kwargs = dict(
         amount=amount_cents,
         currency="usd",
         metadata={
-            "order_id":   str(order.id),   # always pass as string for webhook safety
-            "buyer_id":   str(current_user.id),
-            "store_id":   str(store.id),
-            "tax_amount": str(tax_amount),
+            "order_id":        str(order.id),
+            "buyer_id":        str(current_user.id),
+            "store_id":        str(store.id),
+            "subtotal":        str(order.subtotal or 0),
+            "shipping_cost":   str(order.shipping_cost or 0),
+            "tax_amount":      str(tax_amount),
         },
         automatic_payment_methods={"enabled": True},
     )
@@ -163,7 +183,7 @@ def create_checkout(
 
     if store.stripe_account_id and store.stripe_onboarding_complete:
         kwargs["application_fee_amount"] = platform_fee_cents
-        kwargs["transfer_data"] = {"destination": store.stripe_account_id}
+        kwargs["transfer_data"]          = {"destination": store.stripe_account_id}
         print(f"[Checkout] Using Connect transfer → {store.stripe_account_id}")
     else:
         kwargs["metadata"]["payout_status"] = "held_pending_seller_connect"
@@ -178,10 +198,12 @@ def create_checkout(
     order.stripe_payment_intent_id = payment_intent.id
     db.commit()
 
-    print(f"[Checkout] PaymentIntent created: {payment_intent.id}")
+    print(f"[Checkout] PaymentIntent created: {payment_intent.id} amount={amount_cents}¢")
     return {
         "client_secret":     payment_intent.client_secret,
         "payment_intent_id": payment_intent.id,
+        # FIX 1: returned so checkout.js dev warning can verify amount matches order.total
+        "amount_cents":      amount_cents,
     }
 
 
@@ -202,16 +224,13 @@ async def stripe_webhook(
     try:
         etype = event["type"]
 
-        # ── Payment succeeded ─────────────────────────────────────────────
         if etype == "payment_intent.succeeded":
             pi = event["data"]["object"]
             order_id = int(pi["metadata"].get("order_id", 0))
             order = db.query(models.Order).filter(models.Order.id == order_id).first()
 
             if order and order.status == models.OrderStatus.awaiting_payment:
-                # FIXED: gate is now awaiting_payment → pending (was pending → paid).
-                # "pending" is the new seller-visible paid state.
-                order.status = models.OrderStatus.pending
+                order.status           = models.OrderStatus.pending
                 order.stripe_charge_id = pi.get("latest_charge")
 
                 try:
@@ -224,7 +243,6 @@ async def stripe_webhook(
 
                 store = db.query(models.Store).filter(models.Store.id == order.store_id).first()
 
-                # Create payout record only after confirmed payment
                 payout = models.Payout(
                     store_id=order.store_id, order_id=order.id,
                     amount=order.seller_amount, currency="USD",
@@ -233,7 +251,6 @@ async def stripe_webhook(
                 db.add(payout)
                 db.commit()
 
-                # Notify buyer + seller — both fire here, after payment confirmed
                 try:
                     from utils.email import send_order_confirmation, send_new_order_to_seller
                     email_items = [
@@ -263,7 +280,6 @@ async def stripe_webhook(
                             seller_amount=order.seller_amount,
                             buyer_name=buyer.full_name if buyer else "Customer",
                         )
-                    # Push notification to seller
                     try:
                         from routers.push_notifications import send_push_to_user
                         if store and store.owner_id:
@@ -280,22 +296,17 @@ async def stripe_webhook(
                     print(f"Email error: {e}")
 
             elif order and order.status == models.OrderStatus.pending:
-                # payment_intent.succeeded fired twice (rare but possible) — ignore safely
                 print(f"[Webhook] payment_intent.succeeded for already-paid order #{order_id} — skipping")
 
-        # ── Payment failed ────────────────────────────────────────────────
         elif etype == "payment_intent.payment_failed":
             pi = event["data"]["object"]
             order_id = int(pi["metadata"].get("order_id", 0))
             order = db.query(models.Order).filter(models.Order.id == order_id).first()
             if order and order.status == models.OrderStatus.awaiting_payment:
-                # FIXED: was setting to cancelled. Now uses payment_failed so the
-                # buyer can retry and the seller dashboard never surfaces this order.
                 order.status = models.OrderStatus.payment_failed
                 db.commit()
                 print(f"[Webhook] Payment failed for order #{order_id}")
 
-        # ── Stripe Connect account updated ────────────────────────────────
         elif etype == "account.updated":
             acct = event["data"]["object"]
             store = db.query(models.Store).filter(models.Store.stripe_account_id == acct["id"]).first()
@@ -303,7 +314,6 @@ async def stripe_webhook(
                 store.stripe_onboarding_complete = True
                 db.commit()
 
-        # ── Subscription lifecycle ────────────────────────────────────────
         elif etype in ["customer.subscription.updated", "customer.subscription.deleted"]:
             sub = event["data"]["object"]
             store_id = int(sub["metadata"].get("store_id", 0))
