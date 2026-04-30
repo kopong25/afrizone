@@ -369,11 +369,10 @@ export default function CartPage() {
       try { await api.delete("/orders/cart/clear", { headers: authHeaders }); } catch {}
       setItems([]);
 
-      if (createdOrders.length > 0) {
-        // ── FIX: pass token in URL so checkout page bypasses Edge storage blocking ──
-        router.push(`/checkout?order_id=${createdOrders[0].id}&tok=${encodeURIComponent(authToken)}`);
-      } else {
-        router.push("/orders");
+     if (createdOrders.length > 0) {
+    router.push(`/checkout?order_id=${createdOrders[0].id}`);
+  } else {
+    router.push("/orders");
       }
     } catch (err) {
       const errMsg = apiErr(err, err.message || "Checkout failed. Please try again.");
