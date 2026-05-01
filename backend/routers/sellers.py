@@ -9,6 +9,7 @@ from slugify import slugify
 router = APIRouter()
 
 
+@router.get("", response_model=List[schemas.StoreOut])
 @router.get("/", response_model=List[schemas.StoreOut])
 def list_stores(
     country: Optional[str] = None,
@@ -142,28 +143,6 @@ async def upload_store_banner(
     db.commit()
     return {"banner_url": url}
 
-
-@router.get("/{slug}", response_model=schemas.StoreOut)
-def get_store(slug: str, db: Session = Depends(get_db)):
-    """Get a single store by slug (public)."""
-    store = db.query(models.Store).filter(
-        models.Store.slug == slug,
-        models.Store.status == models.SellerStatus.approved
-    ).first()
-    if not store:
-        raise HTTPException(status_code=404, detail="Store not found")
-    return store
-
-
-@router.get("/{store_id}/products", response_model=List[schemas.ProductListOut])
-def get_store_products(store_id: int, db: Session = Depends(get_db)):
-    """Get all active products for a store (public)."""
-    return db.query(models.Product).filter(
-        models.Product.store_id == store_id,
-        models.Product.is_active == True
-    ).all()
-
-
 @router.get("/my-store/analytics")
 def get_store_analytics(
     days: int = 30,
@@ -272,6 +251,27 @@ def get_store_analytics(
         "top_products": top_products,
         "status_breakdown": status_counts,
     }
+
+
+@router.get("/{slug}", response_model=schemas.StoreOut)
+def get_store(slug: str, db: Session = Depends(get_db)):
+    """Get a single store by slug (public)."""
+    store = db.query(models.Store).filter(
+        models.Store.slug == slug,
+        models.Store.status == models.SellerStatus.approved
+    ).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="Store not found")
+    return store
+
+
+@router.get("/{store_id}/products", response_model=List[schemas.ProductListOut])
+def get_store_products(store_id: int, db: Session = Depends(get_db)):
+    """Get all active products for a store (public)."""
+    return db.query(models.Product).filter(
+        models.Product.store_id == store_id,
+        models.Product.is_active == True
+    ).all()
 
 
 @router.get("/{store_id}/public", response_model=schemas.StoreOut)
