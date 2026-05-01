@@ -11,7 +11,7 @@ import math
 router = APIRouter()
 
 
-@router.get("/", response_model=schemas.PaginatedProducts)
+@router.get("", response_model=schemas.PaginatedProducts)
 def list_products(
     q: Optional[str] = Query(None, description="Search query"),
     category: Optional[str] = None,
@@ -20,7 +20,7 @@ def list_products(
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     featured: Optional[bool] = None,
-    sort: str = "created_at",   # created_at | price_asc | price_desc | rating | popular
+    sort: str = "created_at",
     page: int = 1,
     size: int = 24,
     db: Session = Depends(get_db)
@@ -31,11 +31,9 @@ def list_products(
     ).filter(
         models.Product.is_active == True,
         models.Product.stock > 0,
-        # ── Hide products from suspended stores ──
         models.Store.status != models.SellerStatus.suspended,
     )
 
-    # Full-text search
     if q:
         search = f"%{q}%"
         query = query.filter(
@@ -45,7 +43,6 @@ def list_products(
             )
         )
 
-    # Filters
     if category:
         cat = db.query(models.Category).filter(models.Category.slug == category).first()
         if cat:
@@ -61,7 +58,6 @@ def list_products(
     if featured is not None:
         query = query.filter(models.Product.is_featured == featured)
 
-    # Sorting
     sort_map = {
         "created_at": models.Product.created_at.desc(),
         "price_asc": models.Product.price.asc(),
@@ -97,21 +93,17 @@ def get_product(slug: str, db: Session = Depends(get_db)):
     ).filter(
         models.Product.slug == slug,
         models.Product.is_active == True,
-        # ── Block direct access to products from suspended stores ──
         models.Store.status != models.SellerStatus.suspended,
     ).first()
 
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    # Increment view count
     product.view_count += 1
     db.commit()
     db.refresh(product)
     return product
 
-
-# ──── SELLER: Manage their own products ────
 
 @router.get("/seller/mine", response_model=List[schemas.ProductOut])
 def get_my_products(
@@ -138,14 +130,12 @@ def create_product(
     if store.status != models.SellerStatus.approved:
         raise HTTPException(status_code=403, detail="Store must be approved before listing products")
 
-    # Check listing limits per tier
     product_count = db.query(models.Product).filter(models.Product.store_id == store.id).count()
     limits = {models.SellerTier.basic: 50, models.SellerTier.standard: 200, models.SellerTier.premium: 99999}
     if product_count >= limits.get(store.tier, 50):
         raise HTTPException(status_code=403, detail=f"Product limit reached for your {store.tier} plan. Please upgrade.")
 
     slug = slugify(product_in.name)
-    # Ensure unique slug
     existing = db.query(models.Product).filter(models.Product.slug == slug).first()
     if existing:
         slug = f"{slug}-{store.id}"
