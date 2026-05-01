@@ -9,7 +9,7 @@ from slugify import slugify
 router = APIRouter()
 
 
-@router.get("", response_model=List[schemas.StoreOut])
+@router.get("/", response_model=List[schemas.StoreOut])
 def list_stores(
     country: Optional[str] = None,
     business_type: Optional[str] = None,
