@@ -3,10 +3,10 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
-import { ordersAPI } from "../lib/api";
+import { ordersAPI, reviewsAPI } from "../lib/api";
 import { useAuth } from "./_app";
 import toast from "react-hot-toast";
-import { FiPackage, FiTruck, FiCheck, FiClock, FiX, FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { FiPackage, FiTruck, FiCheck, FiClock, FiX, FiChevronDown, FiChevronUp, FiStar } from "react-icons/fi";
 
 const STATUS_STEPS = ["pending", "paid", "processing", "shipped", "delivered"];
 
@@ -19,6 +19,108 @@ const STATUS_CONFIG = {
   cancelled:  { label: "Cancelled",  color: "bg-red-100 text-red-800",      icon: FiX },
   refunded:   { label: "Refunded",   color: "bg-gray-100 text-gray-600",    icon: FiX },
 };
+
+function StarPicker({ value, onChange }) {
+  const [hovered, setHovered] = useState(0);
+  return (
+    <div className="flex gap-1">
+      {[1,2,3,4,5].map(s => (
+        <button key={s}
+          onMouseEnter={() => setHovered(s)}
+          onMouseLeave={() => setHovered(0)}
+          onClick={() => onChange(s)}
+          className="text-2xl transition-transform hover:scale-110">
+          <span className={(hovered || value) >= s ? "text-yellow-400" : "text-gray-300"}>★</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ReviewModal({ item, orderId, onClose, onSubmitted }) {
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    if (!rating) { toast.error("Please select a rating"); return; }
+    setSubmitting(true);
+    try {
+      await reviewsAPI.create({
+        product_id: item.product?.id,
+        rating,
+        comment,
+      });
+      toast.success("Review submitted! Thank you 🌍");
+      onSubmitted(item.product?.id);
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to submit review");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.6)"}}>
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="bg-green-900 p-5 text-white">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs text-green-300 uppercase tracking-wider mb-1">Leave a Review</p>
+              <h3 className="font-black text-lg leading-tight">{item.product?.name}</h3>
+            </div>
+            <button onClick={onClose} className="text-white/60 hover:text-white text-xl ml-4">✕</button>
+          </div>
+        </div>
+        <div className="p-5">
+          <div className="flex items-center gap-4 mb-5 pb-4 border-b">
+            <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+              {item.product?.images?.[0]
+                ? <img src={item.product.images[0]} className="w-full h-full object-cover" />
+                : <div className="w-full h-full flex items-center justify-center text-2xl">🛒</div>
+              }
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">{item.product?.name}</p>
+              <p className="text-xs text-gray-400">Order #{orderId}</p>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <p className="text-sm font-bold text-gray-700 mb-2">Your Rating</p>
+            <StarPicker value={rating} onChange={setRating} />
+            <p className="text-xs text-gray-400 mt-1">
+              {rating === 5 ? "Excellent!" : rating === 4 ? "Good" : rating === 3 ? "Average" : rating === 2 ? "Poor" : rating === 1 ? "Terrible" : ""}
+            </p>
+          </div>
+
+          <div className="mb-5">
+            <p className="text-sm font-bold text-gray-700 mb-2">Your Review <span className="font-normal text-gray-400">(optional)</span></p>
+            <textarea
+              value={comment}
+              onChange={e => setComment(e.target.value)}
+              placeholder="Share your experience with this product..."
+              rows={3}
+              className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 resize-none"
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <button onClick={onClose}
+              className="flex-1 border border-gray-200 text-gray-600 font-bold py-3 rounded-xl hover:bg-gray-50 text-sm">
+              Cancel
+            </button>
+            <button onClick={submit} disabled={submitting || !rating}
+              className="flex-1 bg-green-900 hover:bg-green-800 text-white font-black py-3 rounded-xl text-sm disabled:opacity-50">
+              {submitting ? "Submitting..." : "Submit Review ★"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function OrderTracker({ status }) {
   const currentStep = STATUS_STEPS.indexOf(status);
@@ -56,11 +158,27 @@ function OrderTracker({ status }) {
 
 function OrderCard({ order }) {
   const [expanded, setExpanded] = useState(false);
+  const [reviewModal, setReviewModal] = useState(null); // item to review
+  const [reviewedIds, setReviewedIds] = useState(new Set());
   const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
   const Icon = config.icon;
+  const isDelivered = order.status === "delivered";
+
+  const handleReviewed = (productId) => {
+    setReviewedIds(prev => new Set([...prev, productId]));
+  };
 
   return (
     <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+      {reviewModal && (
+        <ReviewModal
+          item={reviewModal}
+          orderId={order.id}
+          onClose={() => setReviewModal(null)}
+          onSubmitted={handleReviewed}
+        />
+      )}
+
       <div className="p-4 flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
@@ -87,6 +205,21 @@ function OrderCard({ order }) {
         <OrderTracker status={order.status} />
       </div>
 
+      {/* Review prompt banner for delivered orders */}
+      {isDelivered && (order.items || []).some(i => !reviewedIds.has(i.product?.id)) && (
+        <div className="mx-4 mb-4 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-yellow-500 text-lg">⭐</span>
+            <p className="text-sm font-semibold text-yellow-800">How was your order?</p>
+          </div>
+          <button
+            onClick={() => { setExpanded(true); }}
+            className="text-xs bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-black px-3 py-1.5 rounded-lg transition-colors">
+            Leave a Review
+          </button>
+        </div>
+      )}
+
       {order.tracking_number && (
         <div className="px-4 pb-3">
           <div className="bg-blue-50 rounded-lg p-3 flex items-center justify-between">
@@ -109,7 +242,7 @@ function OrderCard({ order }) {
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <p className="text-xs font-bold text-gray-500 uppercase mb-2">Items</p>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {(order.items || []).map((item) => (
                   <div key={item.id} className="flex gap-3">
                     <div className="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
@@ -118,9 +251,21 @@ function OrderCard({ order }) {
                         : <div className="w-full h-full flex items-center justify-center text-xl">🛒</div>
                       }
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{item.product?.name || "Product"}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{item.product?.name || "Product"}</p>
                       <p className="text-xs text-gray-500">Qty: {item.quantity} · ${Number(item.unit_price || 0).toFixed(2)} each</p>
+                      {/* Review button per item */}
+                      {isDelivered && item.product?.id && (
+                        reviewedIds.has(item.product.id) ? (
+                          <p className="text-xs text-green-600 font-semibold mt-1">✓ Review submitted</p>
+                        ) : (
+                          <button
+                            onClick={() => setReviewModal(item)}
+                            className="mt-1 text-xs flex items-center gap-1 text-yellow-600 hover:text-yellow-700 font-semibold">
+                            <FiStar size={11} /> Write a review
+                          </button>
+                        )
+                      )}
                     </div>
                   </div>
                 ))}
