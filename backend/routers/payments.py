@@ -230,7 +230,7 @@ async def stripe_webhook(
             order = db.query(models.Order).filter(models.Order.id == order_id).first()
 
             if order and order.status == models.OrderStatus.awaiting_payment:
-                order.status           = models.OrderStatus.pending
+                order.status           = models.OrderStatus.paid
                 order.stripe_charge_id = pi.get("latest_charge")
 
                 try:
