@@ -49,6 +49,7 @@ from datetime import datetime, timezone as dt_timezone
 PLATFORM_FEE_PERCENT = float(os.getenv("PLATFORM_FEE_PERCENT", "8"))
 
 SELLER_VISIBLE_STATUSES = [
+    "paid",
     "pending",
     "processing",
     "shipped",
