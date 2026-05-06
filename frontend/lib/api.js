@@ -174,7 +174,7 @@ export const paymentsAPI = {
 // ── Reviews ──
 export const reviewsAPI = {
   getForProduct: (id) => api.get(`/reviews/product/${id}`),
-  create: (data) => api.post("/reviews", data),
+  create: (data) => api.post("/reviews/", data),
   delete: (id) => api.delete(`/reviews/${id}`),
 };
 
