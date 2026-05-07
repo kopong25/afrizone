@@ -40,10 +40,12 @@ def create_review(
         models.Order.status == models.OrderStatus.delivered
     ).first()
 
+    data = {k: v for k, v in review_in.model_dump().items() if k != "photos"}
     review = models.Review(
         user_id=current_user.id,
         is_verified_purchase=bool(purchased),
-        **review_in.model_dump()
+        photos=[],
+        **data
     )
     db.add(review)
     db.flush()
