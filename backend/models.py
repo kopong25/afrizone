@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Text,
-    ForeignKey, Enum, JSON, BigInteger
+    ForeignKey, Enum, JSON, BigInteger, ARRAY
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -330,7 +330,7 @@ class Review(Base):
     title = Column(String, nullable=True)
     body = Column(Text, nullable=True)
     is_verified_purchase = Column(Boolean, default=False)
-    photos = Column(JSON, default=list)
+    photos = Column(ARRAY(String), default=list)
     helpful_count = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
